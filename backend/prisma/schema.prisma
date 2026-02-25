@@ -1,0 +1,184 @@
+// Prisma schema for UniStay Boarding Discovery Platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+
+// Enum definitions
+enum UserRole {
+  STUDENT
+  OWNER
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum BoardingType {
+  SINGLE
+  DOUBLE
+  TRIPLE
+  QUAD
+  STUDIO
+  APARTMENT
+  DORMITORY
+  OTHER
+}
+
+enum ReactionType {
+  LIKE
+  DISLIKE
+}
+
+// User model - base for both students and owners
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  firstName String
+  lastName  String
+  phone     String?
+  nicNumber String?  @unique
+  gender    Gender?
+  dateOfBirth DateTime?
+  role      UserRole @default(STUDENT)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Student-specific fields
+  university String?
+  studyYear  Int?
+  degree     String?
+
+  // Relations
+  ownedBoardings Boarding[]
+  reviews        Review[]
+  reviewComments ReviewComment[]
+  reviewReactions ReviewReaction[]
+  reviewCommentReactions ReviewCommentReaction[]
+
+  @@index([email])
+  @@index([role])
+}
+
+// Boarding property model
+model Boarding {
+  id          String       @id @default(cuid())
+  propertyName String
+  type        BoardingType
+  address     String
+  city        String?
+  state       String?
+  zipCode     String?
+  description String?
+  amenities   String[]
+  price       Float?
+  available   Boolean      @default(true)
+  ownerId     String
+  owner       User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  // Relations
+  reviews Review[]
+
+  @@index([ownerId])
+  @@index([type])
+  @@index([available])
+}
+
+// Review model - students rate boardings after their stay
+model Review {
+  id            String    @id @default(cuid())
+  boardingId    String
+  boarding      Boarding  @relation(fields: [boardingId], references: [id], onDelete: Cascade)
+  studentId     String
+  student       User      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  rating        Int       // 1-5 stars
+  comment       String?
+  commentedAt   DateTime  @default(now())
+  editedAt      DateTime? // Null = can edit, Not null = already edited (one-time edit)
+  likeCount     Int       @default(0)
+  dislikeCount  Int       @default(0)
+  images        String[]  @default([]) // Array of image paths (max 5)
+  video         String?   // Single video path (optional)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  comments ReviewComment[]
+  reactions ReviewReaction[]
+
+  @@index([boardingId])
+  @@index([studentId])
+  @@index([rating])
+
+  // Constraints
+  @@map("reviews")
+}
+
+// ReviewComment model - owners/others can reply to reviews
+model ReviewComment {
+  id            String    @id @default(cuid())
+  reviewId      String
+  review        Review    @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  commentorId   String
+  commentor     User      @relation(fields: [commentorId], references: [id], onDelete: Cascade)
+  comment       String
+  commentedAt   DateTime  @default(now())
+  editedAt      DateTime? // Null = can edit, Not null = already edited (one-time edit)
+  likeCount     Int       @default(0)
+  dislikeCount  Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  reactions ReviewCommentReaction[]
+
+  @@index([reviewId])
+  @@index([commentorId])
+
+  // Constraints
+  @@map("review_comments")
+}
+
+// ReviewReaction model - track likes/dislikes on reviews
+model ReviewReaction {
+  id        String       @id @default(cuid())
+  reviewId  String
+  review    Review       @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      ReactionType
+  createdAt DateTime     @default(now())
+
+  @@unique([reviewId, userId]) // One reaction per user per review
+  @@index([reviewId])
+  @@index([userId])
+
+  @@map("review_reactions")
+}
+
+// ReviewCommentReaction model - track likes/dislikes on review comments
+model ReviewCommentReaction {
+  id              String          @id @default(cuid())
+  reviewCommentId String
+  reviewComment   ReviewComment   @relation(fields: [reviewCommentId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type            ReactionType
+  createdAt       DateTime        @default(now())
+
+  @@unique([reviewCommentId, userId]) // One reaction per user per comment
+  @@index([reviewCommentId])
+  @@index([userId])
+
+  @@map("review_comment_reactions")
+}

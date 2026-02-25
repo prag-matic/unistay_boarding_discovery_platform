@@ -30,10 +30,6 @@ export const config = {
     refreshExpiry: optional("JWT_REFRESH_EXPIRY", "30d"),
   },
 
-  bcrypt: {
-    saltRounds: parseInt(optional("BCRYPT_SALT_ROUNDS", "12"), 10),
-  },
-
   appUrl: optional("APP_URL", "http://localhost:3000"),
 
   smtp: {
@@ -55,5 +51,6 @@ export const config = {
 
   openinary: {
     baseUrl: optional("OPENINARY_URL", "http://localhost:3001"),
+    apiKey: optional("OPENINARY_API_KEY", ""),
   },
 };
