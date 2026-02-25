@@ -11,11 +11,15 @@ COPY package*.json ./
 # Install dependencies
 RUN npm install
 
-# Copy source code
-COPY . ./
+# Copy Prisma schema
+COPY prisma ./prisma/
 
-# Generate Prisma client (if schema exists)
-RUN [ -f prisma/schema.prisma ] && npm run prisma:generate || true
+# Generate Prisma client
+RUN npm run prisma:generate
+
+# Copy source code (excluding seed.ts from production build)
+COPY tsconfig.json ./
+COPY src ./src
 
 # Build the application
 RUN npm run build
