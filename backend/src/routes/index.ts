@@ -1,4 +1,5 @@
-import { Router } from 'express';
+import { Router } from "express";
+import reviewRoutes from "./review.routes.js";
 
 const router = Router();
 
@@ -9,23 +10,17 @@ const router = Router();
  *
  * Structure:
  * - index.ts (main router - this file)
- * - user.routes.ts
- * - auth.routes.ts
- * - boarding.routes.ts
  * - review.routes.ts
+ * - user.routes.ts (future)
+ * - auth.routes.ts (future)
+ * - boarding.routes.ts (future)
  * - chat.routes.ts (future)
- *
- * Example:
- * ```typescript
- * import userRoutes from './user.routes';
- * router.use('/users', userRoutes);
- * ```
  */
 
-// Import and register routes here as they are created
-// router.use('/auth', authRoutes);
-// router.use('/users', userRoutes);
-// router.use('/boardings', boardingRoutes);
-// router.use('/reviews', reviewRoutes);
+// Review routes
+router.use("/reviews", reviewRoutes);
+
+// Boarding routes (review access via boarding)
+router.use("/boardings", reviewRoutes);
 
 export default router;

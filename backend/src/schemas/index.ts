@@ -104,11 +104,15 @@ export const reviewCommentSchema = z.object({
   comment: z.string().min(1, "Comment is required").max(500),
 });
 
-// Review comment creation schema
-export const createReviewCommentSchema = reviewCommentSchema;
+// Review comment creation schema (only comment field, reviewId passed separately)
+export const createReviewCommentSchema = z.object({
+  comment: z.string().min(1, "Comment is required").max(500),
+});
 
-// Review comment update schema (one-time edit)
-export const updateReviewCommentSchema = reviewCommentSchema.partial();
+// Review comment update schema (one-time edit) - only comment field needed
+export const updateReviewCommentSchema = z.object({
+  comment: z.string().min(1, "Comment is required").max(500),
+});
 
 // Reaction schema
 export const reactionTypeSchema = z.enum(["LIKE", "DISLIKE"]);
