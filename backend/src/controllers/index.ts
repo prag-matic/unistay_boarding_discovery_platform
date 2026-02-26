@@ -5,11 +5,12 @@
  * They should be thin and delegate business logic to services.
  *
  * Structure:
- * - user.controller.ts
- * - auth.controller.ts
- * - boarding.controller.ts
+ * - index.ts (exports all controllers)
  * - review.controller.ts
+ * - user.controller.ts (future)
+ * - auth.controller.ts (future)
+ * - boarding.controller.ts (future)
  * - chat.controller.ts (future)
  */
 
-// Export controllers here as they are created
+export { ReviewController, reviewController } from "./review.controller.js";

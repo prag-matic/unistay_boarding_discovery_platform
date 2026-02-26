@@ -39,9 +39,6 @@ class OpeninaryClient {
 
   /**
    * Upload a file to Openinary storage
-   * @param file - The file to upload (Buffer or ReadStream)
-   * @param options - Upload options including folder and transformations
-   * @returns Upload response with URL and path
    */
   async upload(
     file: Buffer | NodeJS.ReadableStream,
@@ -49,28 +46,18 @@ class OpeninaryClient {
   ): Promise<UploadResponse> {
     const formData = new FormData();
 
-    // Handle file based on type
     if (file instanceof Buffer) {
       const uint8Array = new Uint8Array(file);
       formData.append("file", new Blob([uint8Array]));
     } else {
-      // For streams, we'll need to convert to Blob
-      // This is a simplified version - in production, handle streams properly
       formData.append("file", new Blob([]));
     }
 
-    if (options?.folder) {
-      formData.append("folder", options.folder);
-    }
-
-    if (options?.publicId) {
-      formData.append("public_id", options.publicId);
-    }
+    if (options?.folder) formData.append("folder", options.folder);
+    if (options?.publicId) formData.append("public_id", options.publicId);
 
     const headers: Record<string, string> = {};
-    if (this.apiKey) {
-      headers["Authorization"] = `Bearer ${this.apiKey}`;
-    }
+    if (this.apiKey) headers["Authorization"] = `Bearer ${this.apiKey}`;
 
     const response = await fetch(`${this.baseUrl}/upload`, {
       method: "POST",
@@ -83,58 +70,72 @@ class OpeninaryClient {
       throw new Error(`Openinary upload failed: ${error}`);
     }
 
-    const result = (await response.json()) as UploadResponse;
-    return result;
+    return (await response.json()) as UploadResponse;
   }
 
   /**
-   * Upload a file from a URL
-   * @param url - The URL to upload from
-   * @param options - Upload options
-   * @returns Upload response
+   * Upload and convert image to WebP format
    */
-  async uploadFromUrl(
-    url: string,
-    options?: UploadOptions,
+  async uploadImageWebp(
+    file: Buffer,
+    folder: string = "reviews/images",
   ): Promise<UploadResponse> {
-    const body: Record<string, string> = { file_url: url };
+    const formData = new FormData();
+    const uint8Array = new Uint8Array(file);
+    formData.append("file", new Blob([uint8Array]));
+    formData.append("folder", folder);
+    formData.append("format", "webp");
+    formData.append("quality", "80");
 
-    if (options?.folder) {
-      body.folder = options.folder;
-    }
-
-    if (options?.publicId) {
-      body.public_id = options.publicId;
-    }
-
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-
-    if (this.apiKey) {
-      headers["Authorization"] = `Bearer ${this.apiKey}`;
-    }
+    const headers: Record<string, string> = {};
+    if (this.apiKey) headers["Authorization"] = `Bearer ${this.apiKey}`;
 
     const response = await fetch(`${this.baseUrl}/upload`, {
       method: "POST",
       headers,
-      body: JSON.stringify(body),
+      body: formData,
     });
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`Openinary upload from URL failed: ${error}`);
+      throw new Error(`Openinary image upload failed: ${error}`);
     }
 
-    const result = (await response.json()) as UploadResponse;
-    return result;
+    return (await response.json()) as UploadResponse;
+  }
+
+  /**
+   * Upload and convert video to WebM format
+   */
+  async uploadVideoWebm(
+    file: Buffer,
+    folder: string = "reviews/videos",
+  ): Promise<UploadResponse> {
+    const formData = new FormData();
+    const uint8Array = new Uint8Array(file);
+    formData.append("file", new Blob([uint8Array]));
+    formData.append("folder", folder);
+    formData.append("format", "webm");
+
+    const headers: Record<string, string> = {};
+    if (this.apiKey) headers["Authorization"] = `Bearer ${this.apiKey}`;
+
+    const response = await fetch(`${this.baseUrl}/upload`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Openinary video upload failed: ${error}`);
+    }
+
+    return (await response.json()) as UploadResponse;
   }
 
   /**
    * Get the URL for a stored asset
-   * @param publicId - The public ID of the asset
-   * @param transformations - Optional transformations
-   * @returns The transformed URL
    */
   getUrl(
     publicId: string,
@@ -150,7 +151,6 @@ class OpeninaryClient {
         params.append("h", transformations.height.toString());
       if (transformations.quality) params.append("q", transformations.quality);
       if (transformations.format) params.append("f", transformations.format);
-
       url += `?${params.toString()}`;
     }
 
@@ -159,16 +159,13 @@ class OpeninaryClient {
 
   /**
    * Delete an asset from Openinary
-   * @param publicId - The public ID of the asset to delete
    */
   async delete(publicId: string): Promise<void> {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
 
-    if (this.apiKey) {
-      headers["Authorization"] = `Bearer ${this.apiKey}`;
-    }
+    if (this.apiKey) headers["Authorization"] = `Bearer ${this.apiKey}`;
 
     const response = await fetch(`${this.baseUrl}/assets/${publicId}`, {
       method: "DELETE",
@@ -182,7 +179,6 @@ class OpeninaryClient {
   }
 }
 
-// Export singleton instance
 export const openinary = new OpeninaryClient({
   baseUrl: config.openinary.baseUrl,
   apiKey: config.openinary.apiKey,
