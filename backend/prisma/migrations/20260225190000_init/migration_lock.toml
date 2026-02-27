@@ -1,0 +1,4 @@
+# Prisma Migrate migration lockfile
+# See: https://pris.ly/d/migrate-lock
+
+version = "5.22.0"
