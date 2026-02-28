@@ -11,6 +11,12 @@ export class AppError extends Error {
     }
 }
 
+export class UserNotFoundError extends AppError {
+    constructor(message = 'User Not Found') {
+        super(message, 404);
+    }
+}
+
 export class UserAlreadyExistsError extends AppError {
     constructor(message = 'A user with this email already Exists') {
         super(message, 409);
