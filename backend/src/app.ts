@@ -24,20 +24,12 @@ const limiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
 app.use("/api", limiter);
 
 // Body parsing
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Health check endpoint
-app.get("/health", (_req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "Server is healthy",
-    timestamp: new Date().toISOString(),
-  });
-});
 
 // API routes
 app.use("/api", router);
@@ -52,7 +44,7 @@ app.use((_req: Request, res: Response) => {
   });
 });
 
-// Global error handler (must be last)
+// Global error handler
 app.use(errorHandler);
 
 export default app;
