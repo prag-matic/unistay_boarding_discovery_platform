@@ -3,18 +3,28 @@ import { prisma } from '@/lib/prisma.js';
 import bcrypt  from 'bcryptjs'
 import { config } from '@/config/env.js';
 import { Role } from '@prisma/client';
-import { generateSecureToken } from '@/lib/hash.js';
+import { generateSecureToken, sha256 } from '@/lib/hash.js';
 import { sendVerificationEmail } from '@/lib/email.js';
 import { sendSuccess } from '@/lib/response.js'
 import { sanitizeUser } from '@/utils/index.js';
-import { type RegisterInput, type LoginInput } from '@/schemas/auth.validators.js';
+import { signAccessToken, parseDurationMs } from '@/lib/jwt.js';
+
+// zod validator types
+import {
+    type RegisterInput, 
+    type LoginInput, 
+    type RefreshTokenInput 
+} from '@/schemas/auth.validators.js';
 
 // Error Imports
 import { 
     UserAlreadyExistsError,
     InvalidCredentialError,
     AccountDeactivatedError,
+    UnauthorizedError,
+    UserNotFoundError,
 } from '@/errors/AppError.js';
+import { access } from 'fs';
 
 // POST /api/auth/register
 export async function register(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -97,9 +107,88 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
         const payload = { userId: loginUser.id, role: loginUser.role, email: loginUser.email };
         const accessToken = signAccessToken(payload);
 
-    } catch (error) {
+        // Generate Refresh Token
+        const rawRefreshToken = generateSecureToken(48);
+        const refreshTokenHash = sha256(rawRefreshToken);
+        const expiresAt = new Date(Date.now() + parseDurationMs(config.jwt.refreshExpiry));
 
+        await prisma.refreshToken.create({
+            data: {
+                tokenHash: refreshTokenHash,
+                userId: loginUser.id,
+                expiresAt
+            }
+        });
+        
+        sendSuccess(res, {
+            accessToken,
+            refreshToken: rawRefreshToken,
+            user: {
+                id: loginUser.id,
+                email: loginUser.email,
+                firstName: loginUser.firstName,
+                lastName: loginUser.lastName,
+                role: loginUser.role,
+                isVerified: loginUser.isVerified,
+            },
+        });
+
+        } catch (error) {
+            next();
     }
-    
+}
+
+// POST /api/auth/refresh
+export async function refreshToken(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+        const {refreshToken} = req.body as RefreshTokenInput;
+
+        //hashing the refresh token
+        const tokenHash = sha256(refreshToken);
+        const stored = await prisma.refreshToken.findUnique({
+            where: { tokenHash }
+        });
+
+        if (!stored || stored.revokedAt !== null) {
+            throw new UnauthorizedError('Refresh Token is Invalid or Revoked');
+        }
+
+        // revoked old token and issue new one
+        const user = await prisma.user.findUnique({
+            where: { id: stored.userId }
+        });
+
+        if (!user) throw new UserNotFoundError();
+        if (!user.isActive) throw new AccountDeactivatedError();
+
+        const rawRefreshToken = generateSecureToken(48);
+        const newTokenHash = sha256(rawRefreshToken);
+        const newExpiresAt = new Date(Date.now() + parseDurationMs(config.jwt.refreshExpiry));
+
+        await prisma.$transaction(async (tx) => {
+
+            // store new refresh token in the DB
+            const newRt = await tx.refreshToken.create({
+                data: {tokenHash: newTokenHash, userId: user.id, expiresAt: newExpiresAt}
+            });
+
+            //revoke the Old refresh Token
+            await tx.refreshToken.update({
+                where: { id: stored.id },
+                data: { revokedAt: new Date(), replacedByTokenId: newRt.id }
+            });
+
+        });
+
+        const newAccessToken = signAccessToken({ userId: user.id, role: user.role, email: user.email });
+
+        sendSuccess(res, {
+            accessToken: newAccessToken,
+            refreshToken: rawRefreshToken,
+        });
+
+    } catch (Error) {
+        next(Error);
+    }
 }
 
