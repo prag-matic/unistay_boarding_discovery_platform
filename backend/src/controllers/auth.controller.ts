@@ -4,7 +4,7 @@ import bcrypt  from 'bcryptjs'
 import { config } from '@/config/env.js';
 import { Role } from '@prisma/client';
 import { generateSecureToken, sha256 } from '@/lib/hash.js';
-import { sendVerificationEmail } from '@/lib/email.js';
+import { sendVerificationEmail, sendPasswordResetEmail } from '@/lib/email.js';
 import { sendSuccess } from '@/lib/response.js'
 import { sanitizeUser } from '@/utils/index.js';
 import { signAccessToken, parseDurationMs } from '@/lib/jwt.js';
@@ -15,7 +15,9 @@ import {
     type LoginInput, 
     type RefreshTokenInput, 
     type LogoutInput,
-    type ResendVerificationInput
+    type ResendVerificationInput,
+    type ForgotPasswordInput,
+    type ResetPasswordInput
 } from '@/schemas/auth.validators.js';
 
 // Error Imports
@@ -27,8 +29,6 @@ import {
     UserNotFoundError,
     TokenExpiredError,
 } from '@/errors/AppError.js';
-import { access } from 'fs';
-import { error } from 'console';
 
 // POST /api/auth/register
 export async function register(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -299,3 +299,92 @@ export async function resendVerification(req: Request, res: Response, next: Next
     }
 }
 
+// POST /api/auth/forgot-password
+export async function forgotPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+
+        const { email } = req.body as ForgotPasswordInput;
+
+        const user = await prisma.user.findUnique({
+            where: { email }
+        });
+
+        // Always return success to prevent user enumeration
+        if (!user) {
+            sendSuccess(res, null, 'If that email is registered, a password reset link has been sent.');
+            return;
+        }
+
+        // Invalidate existing reset tokens
+        await prisma.passwordResetToken.deleteMany({
+            where: { userId: user.id }
+        });
+
+        const rawToken = generateSecureToken();
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+        await prisma.passwordResetToken.create({
+            data: { 
+                token: rawToken,
+                userId: user.id, 
+                expiresAt 
+            },
+        });
+
+        try {
+            await sendPasswordResetEmail(user.email, user.firstName, rawToken);
+        } catch (emailErr) {
+            console.error('[Email] Failed to send password reset email:', emailErr);
+        }
+
+        sendSuccess(res, null, 'If that email is registered, a password reset link has been sent.');
+
+    } catch (err) {
+        next(err);
+    }
+
+}
+
+// POST /api/auth/reset-password
+export async function resetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try{
+        const { token, password } = req.body as ResetPasswordInput;
+
+        const record = await prisma.passwordResetToken.findUnique({
+            where: { token }
+        });
+
+        if (!record || record.used) throw new TokenExpiredError('Invalid or expired reset token');
+
+        if (record.expiresAt < new Date()) {
+            await prisma.passwordResetToken.delete({ where: { id: record.id } });
+            throw new TokenExpiredError('Reset token has expired');
+        }
+
+        const passwordHash = await bcrypt.hash(password, config.saltRounds);
+
+        await prisma.$transaction([
+
+            prisma.user.update({
+                where: { id: record.userId },
+                data: { passwordHash }
+            }),
+
+            prisma.passwordResetToken.update({
+                where: { id: record.id },
+                data: { used: true }
+            }),
+
+            prisma.refreshToken.updateMany({
+                where: { userId: record.userId, revokedAt: null },
+                data: { revokedAt: new Date() },  
+            }),
+
+        ]);
+
+        sendSuccess(res, null, 'Password Reset Successfully');
+
+    } catch (error) {
+        next(error);
+    }
+}
