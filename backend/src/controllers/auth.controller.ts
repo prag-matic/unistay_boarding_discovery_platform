@@ -13,7 +13,9 @@ import { signAccessToken, parseDurationMs } from '@/lib/jwt.js';
 import {
     type RegisterInput, 
     type LoginInput, 
-    type RefreshTokenInput 
+    type RefreshTokenInput, 
+    type LogoutInput,
+    type ResendVerificationInput
 } from '@/schemas/auth.validators.js';
 
 // Error Imports
@@ -23,8 +25,10 @@ import {
     AccountDeactivatedError,
     UnauthorizedError,
     UserNotFoundError,
+    TokenExpiredError,
 } from '@/errors/AppError.js';
 import { access } from 'fs';
+import { error } from 'console';
 
 // POST /api/auth/register
 export async function register(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -189,6 +193,109 @@ export async function refreshToken(req: Request, res: Response, next: NextFuncti
 
     } catch (Error) {
         next(Error);
+    }
+}
+
+// POST /api/auth/logout
+export async function logout(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+        const { refreshToken } = req.body as LogoutInput;
+        const tokenHash = sha256(refreshToken);
+
+        await prisma.refreshToken.updateMany({
+            where: { tokenHash, revokedAt: null},
+            data: { revokedAt: new Date() },
+        });
+
+        sendSuccess(res, null, 'Logged Out Successfully')
+
+    } catch (error) {
+        next(error);
+    }
+}
+
+// GET /api/auth/verify-email?token=...
+export async function verifyEmail(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+        const { token } = req.query as { token: string };
+        if (!token) throw new TokenExpiredError('Verification Token is Missing');
+
+        const record = await prisma.emailVerificationToken.findUnique({
+            where: { token }
+        });
+
+        if (!record) throw new TokenExpiredError('Invalid or Expired Verification Token');
+
+        if (record.expiresAt < new Date()) {
+
+            await prisma.emailVerificationToken.delete({
+                where: { id: record.id }
+            });
+
+            throw new TokenExpiredError('Verification token has expired');
+        }
+
+        await prisma.$transaction([
+
+            prisma.user.update({
+                where: { id: record.userId },
+                data: { isVerified: true }
+            }),
+
+            prisma.emailVerificationToken.delete({
+                where: { id: record.id }
+            })
+
+        ]);
+
+        sendSuccess(res, null, 'Email Verified Sucessfully');
+
+    } catch (error) {
+        next(error);
+    }
+}
+
+// GET /api/auth/resend-verification
+export async function resendVerification(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+        const { email } = req.body as ResendVerificationInput;
+
+        const user = await prisma.user.findUnique({
+            where: { email }
+        });
+
+        if (!user || user.isVerified) {
+            sendSuccess(res, null, 'If that email exists and is unverified, a new link has been sent.');
+            return;
+        }
+
+        // revoke exisiting tokens
+        await prisma.emailVerificationToken.deleteMany({
+            where: { userId: user.id }
+        });
+
+        const rawToken = generateSecureToken();
+        const expiresAt = new Date(Date.now() + config.emailVerficationTokenExpiry);
+
+        // create the email verification token for the user in DB
+        await prisma.emailVerificationToken.create({
+            data: {
+                token: rawToken,
+                userId: user.id,
+                expiresAt
+            }
+        });
+
+        try {
+            await sendVerificationEmail(user.email, user.firstName, rawToken);
+        } catch (emailErr) {
+            console.error('[Email] Failed to send verification email:', emailErr);
+        }
+
+        sendSuccess(res, null, 'If that email exists and is unverified, a new link has been sent.');
+
+    } catch (error) {
+        next(error);
     }
 }
 
