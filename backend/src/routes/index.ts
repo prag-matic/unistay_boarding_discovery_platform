@@ -1,4 +1,5 @@
 import { Router } from "express";
+import authRoutes from "@/routes/auth.routes.js"
 import reviewRoutes from "./review.routes.js";
 
 const router = Router();
@@ -16,6 +17,18 @@ const router = Router();
  * - boarding.routes.ts (future)
  * - chat.routes.ts (future)
  */
+
+
+router.get("/health", (_req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Server is healthy",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Authentication Routes
+router.use("/auth", authRoutes);
 
 // Review routes
 router.use("/reviews", reviewRoutes);
