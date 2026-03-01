@@ -59,12 +59,6 @@ export class ForbiddenError extends AppError {
   }
 }
 
-export class NoImageProvidedError extends AppError {
-  constructor(message = 'No image file provided') {
-    super(message, 400);
-  }
-}
-
 export class ValidationError extends AppError {
   public readonly details: unknown;
   constructor(message = 'Validation failed', details?: unknown) {
