@@ -1,60 +1,78 @@
-import type { Request, Response, NextFunction } from "express";
-import type { ZodSchema } from "zod";
-import { ZodError } from "zod";
+import type { Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
+import { sendError } from '@/lib/response.js';
 
-/**
- * Validation middleware factory
- * @param schema - Zod schema to validate against
- * @param source - Where to get the data from ('body', 'params', 'query')
- */
-export const validate = (
-  schema: ZodSchema,
-  source: "body" | "params" | "query" = "body",
-) => {
-  return (req: Request, res: Response, next: NextFunction): void => {
-    
-    try {
+type ValidationTarget = 'body' | 'query' | 'params';
 
-      // Parse and validate the data
-      schema.parse(req[source]);
-      next();
+export function validate(schema: z.ZodType, target: ValidationTarget = 'body') {
 
-    } catch (error) {
+  	return (req: Request, res: Response, next: NextFunction): void => {
+    	const input = req[target];
+    	const result = schema.safeParse(input);
 
-      if (error instanceof ZodError) {
-        const errors = error.issues.map((err) => ({
-          field: String(err.path.join(".")),
-          message: err.message,
-        }));
+    	if (!result.success) {
+      		const details = result.error.issues.map((e) => ({
+        			field: e.path.join('.'),
+        			message: e.message,
+      			})
+			);
 
-        res.status(400).json({
-          success: false,
-          error: "ValidationError",
-          message: "Validation failed",
-          errors,
-        });
+      		sendError(res, 'ValidationError', 'Validation failed', 422, details);
+      		return;
+    	}
 
-        return;
+    	if (target === 'body') {
+    		req.body = result.data;
+      		next();
+      		return;
+    	}
 
-      }
+    	if (target === 'query') {
+      		Object.defineProperty(req, 'query', {
+        		value: result.data,
+        		writable: true,
+        		configurable: true,
+        		enumerable: true,
+      		});
 
-      next(error);
+      		next();
+      		return;
+    	}
 
-    }
+    	if (target === 'params') {
+      		Object.defineProperty(req, 'params', {
+        		value: result.data,
+        		writable: true,
+        		configurable: true,
+        		enumerable: true,
+      		});
+
+      		next();
+     		return;
+    	}
+
+    	const current = req[target] as Record<string, unknown>;
+    	const parsed = result.data as Record<string, unknown>;
+
+    	for (const key of Object.keys(current)) {
+    		delete current[key];
+    	}
+
+    	Object.assign(current, parsed);
+
+    next();
+	
   };
-};
+}
 
-/**
- * Validate request body
- */
-export const validateBody = (schema: ZodSchema) => validate(schema, "body");
+export function validateBody(schema: z.ZodType) {
+  	return validate(schema, 'body');
+}
 
-/**
- * Validate request params
- */
-export const validateParams = (schema: ZodSchema) => validate(schema, "params");
+export function validateQuery(schema: z.ZodType) {
+  	return validate(schema, 'query');
+}
 
-/**
- * Validate request query
- */
-export const validateQuery = (schema: ZodSchema) => validate(schema, "query");
+export function validateParams(schema: z.ZodType) {
+  	return validate(schema, 'params');
+}
