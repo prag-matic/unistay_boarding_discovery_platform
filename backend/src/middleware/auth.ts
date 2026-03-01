@@ -1,6 +1,6 @@
 import { signAccessToken, verifyAccessToken, type JwtPayload } from '@/lib/jwt.js'
 import type { Request, Response, NextFunction } from 'express'
-import { ForbiddenError, UnauthorizedError } from './errorHandler.js';
+import { ForbiddenError, UnauthorizedError } from '@/errors/AppError.js';
 
 declare global {
     namespace Express {
