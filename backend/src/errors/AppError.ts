@@ -23,7 +23,7 @@ export class UserAlreadyExistsError extends AppError {
     }
 }
 
-export class InvalidCredentialError extends AppError {
+export class InvalidCredentialsError extends AppError {
     constructor(message = 'Invalid email or password') {
         super(message, 404);
     }
@@ -59,6 +59,12 @@ export class ForbiddenError extends AppError {
   }
 }
 
+export class NoImageProvidedError extends AppError {
+  constructor(message = 'No image file provided') {
+    super(message, 400);
+  }
+}
+
 export class ValidationError extends AppError {
   public readonly details: unknown;
   constructor(message = 'Validation failed', details?: unknown) {
@@ -85,17 +91,6 @@ export class SlugConflictError extends AppError {
   }
 }
 
-export class ConflictError extends AppError {
-  constructor(message = 'Conflict') {
-    super(message, 409);
-  }
-}
-
-export class NotFoundError extends AppError {
-  constructor(message = 'Not found') {
-    super(message, 404);
-  }
-}
 
 export class GoneError extends AppError {
   constructor(message = 'Resource is gone') {
@@ -103,8 +98,29 @@ export class GoneError extends AppError {
   }
 }
 
+/**
+ * Not found error
+ */
+export class NotFoundError extends AppError {
+  constructor(resource: string = "Resource") {
+    super(`${resource} not found`, 404);
+  }
+}
+
+/**
+ * Bad request error
+ */
 export class BadRequestError extends AppError {
-  constructor(message = 'Bad request') {
+  constructor(message: string = "Bad request") {
     super(message, 400);
+  }
+}
+
+/**
+ * Conflict error
+ */
+export class ConflictError extends AppError {
+  constructor(message: string = "Resource already exists") {
+    super(message, 409);
   }
 }
