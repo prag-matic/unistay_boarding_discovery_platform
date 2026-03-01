@@ -18,6 +18,7 @@ export function authenticate(req: Request, res: Response, next: NextFunction): v
         return next(new UnauthorizedError('No Token Provided'));
     }
 
+    // get token from the header value
     const token = authHeader.slice(7);
 
     // verify Token
