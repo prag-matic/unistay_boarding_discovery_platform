@@ -23,7 +23,7 @@ import {
 // Error Imports
 import { 
     UserAlreadyExistsError,
-    InvalidCredentialError,
+    InvalidCredentialsError,
     AccountDeactivatedError,
     UnauthorizedError,
     UserNotFoundError,
@@ -100,10 +100,10 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
             where: { email }
         });
 
-        if (!loginUser) throw new InvalidCredentialError();
+        if (!loginUser) throw new InvalidCredentialsError();
 
         const passwordMatch = await bcrypt.compare(password, loginUser.passwordHash);
-        if (!passwordMatch) throw new InvalidCredentialError();
+        if (!passwordMatch) throw new InvalidCredentialsError();
 
         if (!loginUser.isActive) throw new AccountDeactivatedError();
 
