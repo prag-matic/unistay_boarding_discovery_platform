@@ -42,7 +42,6 @@ export const errorHandler = (
     handlePrismaError(err, res);
     return;
   }
-
   // Our custom AppErrors
   if (err instanceof AppError) {
     const details = err instanceof ValidationError ? err.details : undefined;
