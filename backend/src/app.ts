@@ -5,6 +5,7 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import router from "./routes/index.js";
 import { errorHandler } from "./middleware/errorHandler.js";
+import { apiLimiter } from "./middleware/rateLimit.js";
 
 const app = express();
 
@@ -13,19 +14,7 @@ app.use(helmet());
 app.use(cors());
 
 // Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: {
-    success: false,
-    error: "TooManyRequests",
-    message: "Too many requests from this IP, please try again later",
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-app.use("/api", limiter);
+app.use("/api", apiLimiter);
 
 // Body parsing
 app.use(express.json());
