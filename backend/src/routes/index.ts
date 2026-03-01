@@ -13,11 +13,10 @@ const router = Router();
  * - index.ts (main router - this file)
  * - review.routes.ts
  * - user.routes.ts (future)
- * - auth.routes.ts (future)
+ * - auth.routes.ts
  * - boarding.routes.ts (future)
  * - chat.routes.ts (future)
  */
-
 
 router.get("/health", (_req, res) => {
   res.status(200).json({
