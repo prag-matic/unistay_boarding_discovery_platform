@@ -16,7 +16,7 @@ import {
     resetPassword
 } from "@/controllers/auth.controller.js";
 
-import { validate } from "@/middleware/validate.js";
+import { validateBody } from "@/middleware/validate.js";
 
 import { 
     loginSchema, 
@@ -30,13 +30,13 @@ import {
 
 const router = Router();
 
-router.post('/register', validate(registerSchema), register);
-router.post('/login', loginLimiter, validate(loginSchema), login);
-router.post('/refresh', refreshLimiter, validate(refreshTokenSchema), refreshToken);
-router.post('/logout', validate(logoutSchema), logout);
+router.post('/register', validateBody(registerSchema), register);
+router.post('/login', loginLimiter, validateBody(loginSchema), login);
+router.post('/refresh', refreshLimiter, validateBody(refreshTokenSchema), refreshToken);
+router.post('/logout', validateBody(logoutSchema), logout);
 router.get('/verify-email', verifyEmail);
-router.post('/resend-verification', emailLimiter, validate(resendVerificationSchema), resendVerification);
-router.post('/forgot-password', emailLimiter, validate(forgotPasswordSchema), forgotPassword);
-router.post('/reset-password', validate(resetPasswordSchema), resetPassword);
+router.post('/resend-verification', emailLimiter, validateBody(resendVerificationSchema), resendVerification);
+router.post('/forgot-password', emailLimiter, validateBody(forgotPasswordSchema), forgotPassword);
+router.post('/reset-password', validateBody(resetPasswordSchema), resetPassword);
 
 export default router;
