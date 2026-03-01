@@ -1,14 +1,13 @@
-import jwt, { type JwtPayload } from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 import { config } from '@/config/env.js';
-import type { JWTPayload } from '@/types/index.js';
 
-export interface jwtPayload {
+export interface JwtPayload {
     userId: string;
     role: string;
     email: string;
 }
 
-export function signAccessToken(payload: jwtPayload): string {
+export function signAccessToken(payload: JwtPayload): string {
     return jwt.sign(
         payload,
         config.jwt.accessSecret,
@@ -16,7 +15,7 @@ export function signAccessToken(payload: jwtPayload): string {
     );
 }
 
-export function signRefreshToken(payload: jwtPayload): string {
+export function signRefreshToken(payload: JwtPayload): string {
     return jwt.sign(
         payload,
         config.jwt.refreshSecret,
@@ -25,11 +24,11 @@ export function signRefreshToken(payload: jwtPayload): string {
 }
 
 export function verifyAccessToken(token: string): JwtPayload {
-    return jwt.verify(token, config.jwt.accessSecret) as JWTPayload;
+    return jwt.verify(token, config.jwt.accessSecret) as JwtPayload;
 } 
 
 export function verifyRefreshToken(token: string): JwtPayload {
-    return jwt.verify(token, config.jwt.refreshSecret) as JWTPayload;
+    return jwt.verify(token, config.jwt.refreshSecret) as JwtPayload;
 }
 
 export function decodeToken(token: string): JwtPayload | null {
