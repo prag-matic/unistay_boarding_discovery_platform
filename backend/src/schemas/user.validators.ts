@@ -21,7 +21,7 @@ export const adminListUsersQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   size: z.coerce.number().int().positive().max(100).default(20),
   role: z.enum(['STUDENT', 'OWNER', 'ADMIN']).optional(),
-  active: z.coerce.boolean().optional(),
+  active: z.stringbool().optional(),
 });
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
