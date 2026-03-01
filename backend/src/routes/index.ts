@@ -1,5 +1,7 @@
 import { Router } from "express";
-import authRoutes from "@/routes/auth.routes.js"
+import authRoutes from "@/routes/auth.routes.js";
+import userRoutes from "@/routes/user.routes.js";
+import adminRoutes from "@/routes/admin.routes.js";
 import reviewRoutes from "./review.routes.js";
 
 const router = Router();
@@ -28,6 +30,12 @@ router.get("/health", (_req, res) => {
 
 // Authentication Routes
 router.use("/auth", authRoutes);
+
+// User Routes
+router.use("/users", userRoutes);
+
+// Admin Routes
+router.use("/admin", adminRoutes);
 
 // Review routes
 router.use("/reviews", reviewRoutes);
