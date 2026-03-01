@@ -12,11 +12,15 @@ export const validate = (
   source: "body" | "params" | "query" = "body",
 ) => {
   return (req: Request, res: Response, next: NextFunction): void => {
+    
     try {
+
       // Parse and validate the data
       schema.parse(req[source]);
       next();
+
     } catch (error) {
+
       if (error instanceof ZodError) {
         const errors = error.issues.map((err) => ({
           field: String(err.path.join(".")),
@@ -29,10 +33,13 @@ export const validate = (
           message: "Validation failed",
           errors,
         });
+
         return;
+
       }
 
       next(error);
+
     }
   };
 };
