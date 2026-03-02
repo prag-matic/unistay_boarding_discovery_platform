@@ -10,6 +10,8 @@ import {
     BadRequestError, 
     BoardingNotFoundError,
     ConflictError,
+    NotFoundError,
+    ForbiddenError,
 } from "@/errors/AppError.js";
 
 import { Prisma, BoardingStatus, ReservationStatus } from '@prisma/client'; 
@@ -210,7 +212,123 @@ export async function getMyRequests(req: Request, res: Response, next: NextFunct
 
         sendSuccess(res, { reservations });
 
-  } catch (err) {
-    next(err);
-  }
+    } catch (err) {
+        next(err);
+    }
 }
+
+// GET /api/reservations/my-boardings  (owner)
+export async function getMyBoardingRequests(req: Request, res: Response, next: NextFunction): Promise<void> {
+
+    try {
+        const ownerId = req.user!.userId;
+
+        const reservations = await prisma.reservation.findMany({
+            where: { boarding: { ownerId } },
+            orderBy: { createdAt: 'desc' },
+            select: reservationSelect(),
+        });
+
+        sendSuccess(res, { reservations });
+
+    } catch (err) {
+        next(err);
+    }
+}
+
+// GET /api/reservations/:id
+export async function getReservationById(req: Request, res: Response, next: NextFunction): Promise<void> {
+    
+    try {
+        const { id } = req.params as { id: string };
+        const userId = req.user!.userId;
+        const role = req.user!.role;
+
+        const reservation = await prisma.reservation.findUnique({
+            where: { id },
+            select: reservationSelect(),
+        });
+
+        if (!reservation) throw new NotFoundError('Reservation not found');
+
+        // Only participant (student or owner) can access
+        if (role !== 'ADMIN') {
+            const isStudent = reservation.studentId === userId;
+            
+            if (!isStudent) {
+                const boarding = await prisma.boarding.findUnique({ where: { id: reservation.boardingId } });
+                
+                if (!boarding || boarding.ownerId !== userId) {
+                        throw new ForbiddenError('Access denied');
+                }
+            }
+        }
+
+        sendSuccess(res, { reservation });
+
+    } catch (err) {
+        next(err);
+    }
+}
+
+// PATCH /api/reservations/:id/approve  (owner)
+export async function approveReservation(req: Request, res: Response, next: NextFunction): Promise<void> {
+
+    try {
+
+        const { id } = req.params as { id: string };
+        const ownerId = req.user!.userId;
+
+        const reservation = await prisma.$transaction(async (tx) => {
+        
+            const res = await tx.reservation.findUnique({
+                where: { id },
+                include: { boarding: true },
+            });
+
+            if (!res) throw new NotFoundError('Reservation not found');
+            
+            if (res.boarding.ownerId !== ownerId) {
+                throw new ForbiddenError('You do not own this boarding');
+            }
+        
+            if (res.status !== ReservationStatus.PENDING) {
+                throw new BadRequestError('Only PENDING reservations can be approved');
+            }
+
+            // Check if expired
+            if (new Date() > res.expiresAt) {
+                await tx.reservation.update({ where: { id }, data: { status: ReservationStatus.EXPIRED } });
+                throw new BadRequestError('Reservation has expired');
+            }
+
+            // Re-check occupancy
+            if (res.boarding.currentOccupants >= res.boarding.maxOccupants) {
+                throw new ConflictError('Boarding is full');
+            }
+
+            // Increment occupants
+            await tx.boarding.update({
+                where: { id: res.boardingId },
+                data: { currentOccupants: { increment: 1 } },
+            });
+
+            const updated = await tx.reservation.update({
+                where: { id },
+                data: { status: ReservationStatus.ACTIVE },
+                select: reservationSelect(),
+            });
+
+            // Generate rental periods
+            await generateRentalPeriods(tx, id, res.moveInDate, res.rentSnapshot);
+
+            return updated;
+        });
+
+        sendSuccess(res, { reservation }, 'Reservation approved');
+
+    } catch (err) {
+        next(err);
+    }
+}
+
