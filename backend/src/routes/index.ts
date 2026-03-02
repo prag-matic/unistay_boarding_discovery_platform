@@ -4,6 +4,7 @@ import userRoutes from "@/routes/user.routes.js";
 import adminRoutes from "@/routes/admin.routes.js";
 import reviewRoutes from "@/routes/review.routes.js";
 import boardingRoutes from "@/routes/boarding.routes.js";
+import reservationRouter from "@/routes/reservation.routes.js";
 
 const router = Router();
 
@@ -17,7 +18,7 @@ const router = Router();
  * - review.routes.ts
  * - user.routes.ts (future)
  * - auth.routes.ts
- * - boarding.routes.ts (future)
+ * - boarding.routes.ts
  * - chat.routes.ts (future)
  */
 
@@ -40,6 +41,9 @@ router.use("/admin", adminRoutes);
 
 // Boarding Routes
 router.use("/boardings", boardingRoutes);
+
+// Reservation Routes
+router.use("/reservation", reservationRouter);
 
 // Review routes
 router.use("/reviews", reviewRoutes);
