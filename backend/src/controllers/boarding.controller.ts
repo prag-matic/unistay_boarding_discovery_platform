@@ -35,8 +35,6 @@ export function boardingSelect() {
         monthlyRent: true,
         boardingType: true,
         genderPref: true,
-        isFurnished: true,
-        hasWifi: true,
         nearUniversity: true,
         latitude: true,
         longitude: true,
@@ -50,6 +48,10 @@ export function boardingSelect() {
 
         images: {
             select: { id: true, url: true, publicId: true, createdAt: true },
+        },
+
+        amenities: {
+            select: { id: true, name: true, createdAt: true },
         },
 
         rules: {
@@ -75,8 +77,7 @@ export async function searchBoardings(req: Request, res: Response, next: NextFun
             maxRent,
             boardingType,
             genderPref,
-            isFurnished,
-            hasWifi,
+            amenities,
             nearUniversity,
             search,
             sortBy,
@@ -98,8 +99,15 @@ export async function searchBoardings(req: Request, res: Response, next: NextFun
 
             ...(boardingType && { boardingType }),
             ...(genderPref && { genderPref }),
-            ...(isFurnished !== undefined && { isFurnished }),
-            ...(hasWifi !== undefined && { hasWifi }),
+
+            ...(amenities && amenities.length > 0 && {
+                amenities: {
+                    some: {
+                        name: { in: amenities },
+                    },
+                },
+            }),
+            
             ...(nearUniversity && { nearUniversity: { contains: nearUniversity, mode: 'insensitive' } }),
 
             ...(search && {
@@ -191,7 +199,7 @@ export async function createBoarding(req: Request, res: Response, next: NextFunc
 
         const slug = await generateUniqueSlug(body.title);
 
-        const { rules, ...boardingData } = body;
+        const { rules, amenities, ...boardingData } = body;
 
         const boarding = await prisma.boarding.create({
 
@@ -199,6 +207,9 @@ export async function createBoarding(req: Request, res: Response, next: NextFunc
                 ...boardingData,
                 ownerId,
                 slug,
+                amenities: amenities && amenities.length > 0
+                    ? { create: amenities.map((name) => ({ name })) }
+                    : undefined,
                 rules: rules && rules.length > 0
                     ? { create: rules.map((rule) => ({ rule }))}
                     : undefined,
@@ -247,7 +258,7 @@ export async function updateBoarding(req: Request, res: Response, next: NextFunc
             throw new ValidationError('currentOccupants cannot exceed maxOccupants');
         }
 
-        const { rules, title, ...rest } = body;
+    const { rules, title, amenities, ...rest } = body;
 
         let slug = existing.slug;
 
@@ -263,12 +274,21 @@ export async function updateBoarding(req: Request, res: Response, next: NextFunc
                 });
             }
 
+            if (amenities !== undefined) {
+                await tx.boardingAmenity.deleteMany({
+                    where: { boardingId: id },
+                });
+            }
+
             return tx.boarding.update({
                 where: { id },
                 data: {
                     ...rest,
                     ...(title && { title }),
                     slug,
+                    ...(amenities !== undefined && {
+                        amenities: { create: amenities.map((name) => ({ name })) },
+                    }),
                     ...(rules !== undefined && {
                         rules: { create: rules.map((rule) => ({ rule })) },
                     }),
