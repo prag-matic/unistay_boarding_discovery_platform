@@ -35,6 +35,23 @@ enum BoardingStatus {
   INACTIVE
 }
 
+enum BoardingAmenityType {
+  WIFI
+  AIR_CONDITIONING
+  HOT_WATER
+  LAUNDRY
+  PARKING
+  SECURITY
+  KITCHEN
+  GYM
+  SWIMMING_POOL
+  STUDY_ROOM
+  COMMON_AREA
+  BALCONY
+  GENERATOR
+  WATER_TANK
+}
+
 enum ReservationStatus {
   PENDING
   ACTIVE
@@ -160,8 +177,6 @@ model Boarding {
   monthlyRent      Int
   boardingType     BoardingType
   genderPref       GenderPref
-  isFurnished      Boolean        @default(false)
-  hasWifi          Boolean        @default(false)
   nearUniversity   String?
   latitude         Float
   longitude        Float
@@ -175,6 +190,7 @@ model Boarding {
 
   owner   User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   images  BoardingImage[]
+  amenities BoardingAmenity[]
   rules   BoardingRule[]
   savedBy SavedBoarding[]
   reservations  Reservation[]
@@ -182,6 +198,19 @@ model Boarding {
   visitRequests VisitRequest[]
 
   @@map("boardings")
+}
+
+model BoardingAmenity {
+  id         String   @id @default(cuid())
+  boardingId String
+  name       BoardingAmenityType
+  createdAt  DateTime @default(now())
+
+  boarding Boarding @relation(fields: [boardingId], references: [id], onDelete: Cascade)
+
+  @@unique([boardingId, name])
+  @@index([boardingId])
+  @@map("boarding_amenities")
 }
 
 model BoardingImage {
