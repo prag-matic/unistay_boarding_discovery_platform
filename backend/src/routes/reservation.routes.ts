@@ -9,8 +9,10 @@ import {
     getMyBoardingRequests,
     getReservationById,
     approveReservation,
+    rejectReservation,
+    cancelReservation,
+    completeReservation,
 } from '@/controllers/reservation.controller.js';
-
 
 import {
     createReservationSchema,
@@ -26,6 +28,8 @@ router.get('/my-requests', authenticate, requireRole('STUDENT'), getMyRequests);
 router.get('/my-boardings', authenticate, requireRole('OWNER'), getMyBoardingRequests);
 router.get('/:id', authenticate, getReservationById);
 router.patch('/:id/approve', authenticate, requireRole('OWNER'), approveReservation);
-
+router.patch('/:id/reject', authenticate, requireRole('OWNER'), validateBody(rejectReservationSchema), rejectReservation);
+router.patch('/:id/cancel', authenticate, requireRole('STUDENT'), cancelReservation);
+router.patch('/:id/complete', authenticate, requireRole('OWNER'), completeReservation);
 
 export default router;

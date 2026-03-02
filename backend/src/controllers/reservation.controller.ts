@@ -3,7 +3,8 @@ import prisma from '@/lib/prisma.js';
 import { sendSuccess } from '@/lib/response.js';
 
 import type { 
-    CreateReservationInput, 
+    CreateReservationInput,
+    RejectReservationInput,
 } from "@/schemas/reservation.validators.js"
 
 import { 
@@ -332,3 +333,132 @@ export async function approveReservation(req: Request, res: Response, next: Next
     }
 }
 
+// PATCH /api/reservations/:id/reject  (owner)
+export async function rejectReservation(req: Request, res: Response, next: NextFunction): Promise<void> {
+    
+    try {
+        
+        const { id } = req.params as { id: string };
+        const ownerId = req.user!.userId;
+        const { reason } = req.body as RejectReservationInput;
+
+        const existing = await prisma.reservation.findUnique({
+            where: { id },
+            include: { boarding: true },
+        });
+
+        if (!existing) throw new NotFoundError('Reservation not found');
+    
+        if (existing.boarding.ownerId !== ownerId) throw new ForbiddenError('You do not own this boarding');
+    
+        if (existing.status !== ReservationStatus.PENDING) {
+            throw new BadRequestError('Only PENDING reservations can be rejected');
+        }
+
+        const reservation = await prisma.reservation.update({
+            where: { id },
+            data: { 
+                status: ReservationStatus.REJECTED, 
+                rejectionReason: reason },
+            select: reservationSelect(),
+        });
+
+        sendSuccess(res, { reservation }, 'Reservation rejected');
+
+    } catch (err) {
+        next(err);
+    }
+}
+
+// PATCH /api/v1/reservations/:id/cancel  (student)
+export async function cancelReservation(req: Request, res: Response, next: NextFunction): Promise<void> {
+    
+    try {
+        
+        const { id } = req.params as { id: string };
+        const studentId = req.user!.userId;
+
+        const existing = await prisma.reservation.findUnique({ where: { id } });
+        
+        if (!existing) throw new NotFoundError('Reservation not found');
+        
+        if (existing.studentId !== studentId) throw new ForbiddenError('This is not your reservation');
+        
+        if (
+            existing.status !== ReservationStatus.PENDING &&
+            existing.status !== ReservationStatus.ACTIVE
+        ) {
+            throw new BadRequestError('Only PENDING or ACTIVE reservations can be cancelled');
+        }
+
+        const reservation = await prisma.$transaction(async (tx) => {
+
+            const updated = await tx.reservation.update({
+                where: { id },
+                data: { status: ReservationStatus.CANCELLED },
+                select: reservationSelect(),
+            });
+
+            // Decrement occupants if was ACTIVE
+            if (existing.status === ReservationStatus.ACTIVE) {
+                await tx.boarding.update({
+                    where: { id: existing.boardingId },
+                    data: { currentOccupants: { decrement: 1 } },
+                });
+            }
+
+            return updated;
+
+        });
+
+        sendSuccess(res, { reservation }, 'Reservation cancelled');
+    
+    } catch (err) {
+        next(err);
+    }
+}
+
+// PATCH /api/reservations/:id/complete  (owner)
+export async function completeReservation(req: Request, res: Response, next: NextFunction): Promise<void> {
+    
+    try {
+
+        const { id } = req.params as { id: string };
+        const ownerId = req.user!.userId;
+
+        const existing = await prisma.reservation.findUnique({
+            where: { id },
+            include: { boarding: true },
+        });
+    
+        if (!existing) throw new NotFoundError('Reservation not found');
+    
+        if (existing.boarding.ownerId !== ownerId) throw new ForbiddenError('You do not own this boarding');
+    
+        if (existing.status !== ReservationStatus.ACTIVE) {
+            throw new BadRequestError('Only ACTIVE reservations can be completed');
+        }
+
+        const reservation = await prisma.$transaction(async (tx) => {
+            const updated = await tx.reservation.update({
+                where: { id },
+                data: { status: ReservationStatus.COMPLETED },
+                select: reservationSelect(),
+            });
+
+            await tx.boarding.update({
+                where: { id: existing.boardingId },
+                data: { 
+                    currentOccupants: { decrement: 1 } },
+            });
+
+        return updated;
+
+    });
+
+    sendSuccess(res, { reservation }, 'Reservation completed');
+
+    } catch (err) {
+        next(err);
+    }
+}
