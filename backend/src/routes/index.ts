@@ -5,6 +5,7 @@ import adminRoutes from "@/routes/admin.routes.js";
 import reviewRoutes from "@/routes/review.routes.js";
 import boardingRoutes from "@/routes/boarding.routes.js";
 import reservationRouter from "@/routes/reservation.routes.js";
+import savedBoardingRoutes from "@/routes/savedBoarding.routes.js";
 
 const router = Router();
 
@@ -23,11 +24,11 @@ const router = Router();
  */
 
 router.get("/health", (_req, res) => {
-    res.status(200).json({
-    	success: true,
-    	message: "Server is healthy",
-    	timestamp: new Date().toISOString(),
-  	});
+  	res.status(200).json({
+    success: true,
+    message: "Server is healthy",
+    timestamp: new Date().toISOString(),
+  });
 });
 
 // Authentication Routes
@@ -44,6 +45,9 @@ router.use("/boardings", boardingRoutes);
 
 // Reservation Routes
 router.use("/reservation", reservationRouter);
+
+// saved-boarding Routes
+router.use('/saved-boardings', savedBoardingRoutes);
 
 // Review routes
 router.use("/reviews", reviewRoutes);
