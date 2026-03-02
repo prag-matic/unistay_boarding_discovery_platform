@@ -14,6 +14,8 @@ import {
     completeReservation,
 } from '@/controllers/reservation.controller.js';
 
+import { getRentalPeriods } from '@/controllers/rentalPeriod.controller.js';
+
 import {
     createReservationSchema,
     rejectReservationSchema,
@@ -31,5 +33,6 @@ router.patch('/:id/approve', authenticate, requireRole('OWNER'), approveReservat
 router.patch('/:id/reject', authenticate, requireRole('OWNER'), validateBody(rejectReservationSchema), rejectReservation);
 router.patch('/:id/cancel', authenticate, requireRole('STUDENT'), cancelReservation);
 router.patch('/:id/complete', authenticate, requireRole('OWNER'), completeReservation);
+router.get('/:resId/rental-periods', authenticate, getRentalPeriods);
 
 export default router;
