@@ -21,7 +21,7 @@ import {
 import { boardingTypeSchema } from "@/schemas/index.js";
 
 // Helpers
-function boardingSelect() {
+export function boardingSelect() {
 
     return {
         id: true,
