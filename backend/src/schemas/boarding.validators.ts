@@ -1,9 +1,36 @@
 import { z } from 'zod';
+import { BoardingAmenityType } from '@prisma/client';
 
 const SRI_LANKA_LAT_MIN = 5.9;
 const SRI_LANKA_LAT_MAX = 9.9;
 const SRI_LANKA_LNG_MIN = 79.5;
 const SRI_LANKA_LNG_MAX = 81.9;
+
+const amenityEnumSchema = z.enum(BoardingAmenityType);
+
+const normalizeAmenity = (value: unknown) =>
+  String(value)
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, '_');
+
+const amenitiesBodySchema = z.preprocess((value) => {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) return value;
+  return [...new Set(value.map(normalizeAmenity).filter(Boolean))];
+}, z.array(amenityEnumSchema));
+
+const amenitiesQuerySchema = z.preprocess((value) => {
+  if (value === undefined) return undefined;
+
+  const rawValues = Array.isArray(value)
+    ? value.flatMap((item) => String(item).split(','))
+    : String(value).split(',');
+
+  const normalized = [...new Set(rawValues.map(normalizeAmenity).filter(Boolean))];
+
+  return normalized;
+}, z.array(amenityEnumSchema).optional());
 
 export const createBoardingSchema = z.object({
   title: z.string().min(10, 'Title must be at least 10 characters').max(200, 'Title must be at most 200 characters'),
@@ -14,8 +41,7 @@ export const createBoardingSchema = z.object({
   monthlyRent: z.number().int().min(1000, 'Monthly rent must be at least 1000').max(500000, 'Monthly rent must be at most 500000'),
   boardingType: z.enum(['SINGLE_ROOM', 'SHARED_ROOM', 'ANNEX', 'HOUSE']),
   genderPref: z.enum(['MALE', 'FEMALE', 'ANY']),
-  isFurnished: z.boolean().default(false),
-  hasWifi: z.boolean().default(false),
+  amenities: amenitiesBodySchema.default([]),
   nearUniversity: z.string().optional(),
   latitude: z.number().min(SRI_LANKA_LAT_MIN, `Latitude must be within Sri Lanka bounds (${SRI_LANKA_LAT_MIN}-${SRI_LANKA_LAT_MAX})`).max(SRI_LANKA_LAT_MAX, `Latitude must be within Sri Lanka bounds (${SRI_LANKA_LAT_MIN}-${SRI_LANKA_LAT_MAX})`),
   longitude: z.number().min(SRI_LANKA_LNG_MIN, `Longitude must be within Sri Lanka bounds (${SRI_LANKA_LNG_MIN}-${SRI_LANKA_LNG_MAX})`).max(SRI_LANKA_LNG_MAX, `Longitude must be within Sri Lanka bounds (${SRI_LANKA_LNG_MIN}-${SRI_LANKA_LNG_MAX})`),
@@ -33,8 +59,7 @@ export const updateBoardingSchema = z.object({
   monthlyRent: z.number().int().min(1000).max(500000).optional(),
   boardingType: z.enum(['SINGLE_ROOM', 'SHARED_ROOM', 'ANNEX', 'HOUSE']).optional(),
   genderPref: z.enum(['MALE', 'FEMALE', 'ANY']).optional(),
-  isFurnished: z.boolean().optional(),
-  hasWifi: z.boolean().optional(),
+  amenities: amenitiesBodySchema.optional(),
   nearUniversity: z.string().optional(),
   latitude: z.number().min(5.9).max(9.9).optional(),
   longitude: z.number().min(79.5).max(81.9).optional(),
@@ -56,8 +81,7 @@ export const searchBoardingsQuerySchema = z.object({
   maxRent: z.coerce.number().int().positive().optional(),
   boardingType: z.enum(['SINGLE_ROOM', 'SHARED_ROOM', 'ANNEX', 'HOUSE']).optional(),
   genderPref: z.enum(['MALE', 'FEMALE', 'ANY']).optional(),
-  isFurnished: z.coerce.boolean().optional(),
-  hasWifi: z.coerce.boolean().optional(),
+  amenities: amenitiesQuerySchema,
   nearUniversity: z.string().optional(),
   search: z.string().optional(),
   sortBy: z.enum(['monthlyRent', 'createdAt']).default('createdAt'),
