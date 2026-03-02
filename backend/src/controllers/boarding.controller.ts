@@ -2,6 +2,8 @@ import type { Request, Response, NextFunction } from "express";
 import { Prisma, BoardingStatus } from "@prisma/client";
 import prisma from "@/lib/prisma.js";
 import { generateUniqueSlug } from "@/utils/slug.js"
+import { MAX_BOARDING_IMAGES } from "@/middleware/upload.js"
+import { uploadBoardingImage, deleteBoardingImage } from '@/lib/cloudinary.js';
 import { sendSuccess } from "@/lib/response.js";
 
 import type { 
@@ -354,7 +356,7 @@ export async function deactivateBoarding(req: Request, res: Response, next: Next
     }
 }
 
-// PATCH /api/v1/boardings/:id/activate  (owner)
+// PATCH /api/boardings/:id/activate  (owner)
 export async function activateBoarding(req: Request, res: Response, next: NextFunction): Promise<void> {
     
     try {
@@ -385,3 +387,100 @@ export async function activateBoarding(req: Request, res: Response, next: NextFu
     }
 }
 
+// POST /api/boardings/:id/images  (owner)
+export async function uploadImages(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+
+        const { id } = req.params as { id: string };
+        const ownerId = req.user!.userId;
+
+        const existing = await prisma.boarding.findUnique({
+            where: { id },
+            include: { images: true } 
+        });
+
+        if (!existing || existing.isDeleted) throw new BoardingNotFoundError();
+
+        if (existing.ownerId !== ownerId) throw new ForbiddenError('You do not own this listing');
+
+        const files = req.files as Express.Multer.File[] | undefined;
+
+        if (!files || files.length === 0) {
+            throw new ValidationError('No images provided');
+        }
+
+        const currentCount = existing.images.length;
+        
+        if (currentCount + files.length > MAX_BOARDING_IMAGES) {
+                throw new ValidationError(
+                    `Cannot exceed ${MAX_BOARDING_IMAGES} images. Currently have ${currentCount}, trying to add ${files.length}.`
+                );
+        }
+
+        const uploadedImages = await Promise.all(
+            files.map((file) => uploadBoardingImage(file.buffer, file.mimetype)),
+        );
+
+        const images = await prisma.$transaction(
+            uploadedImages.map((img) => 
+                prisma.boardingImage.create ({
+                    data: {
+                        boardingId: id,
+                        url: img.url,
+                        publicId: img.publicId ,
+                    },
+
+                    select: { 
+                        id: true, 
+                        url: true, 
+                        publicId: 
+                        true, 
+                        createdAt: true 
+                    }
+
+                }),
+            ),
+        );
+
+        sendSuccess(res, { images }, "Images Uploaded Sucessfully", 201);
+
+    } catch(error) {
+        next(error);
+    }
+}
+
+// DELETE /api/boardings/:id/images/:imageId  (owner)
+export async function deleteImage(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+
+        const { id, imageId } = req.params as { id: string; imageId: string };
+        const ownerId = req.user!.userId;
+
+        const existing = await prisma.boarding.findUnique({ 
+            where: { id } 
+        });
+        
+        if (!existing || existing.isDeleted) throw new BoardingNotFoundError();
+        
+        if (existing.ownerId !== ownerId) throw new ForbiddenError('You do not own this listing');
+
+        const image = await prisma.boardingImage.findUnique({ 
+            where: { id: imageId } 
+        });
+    
+        if (!image || image.boardingId !== id) {
+            throw new BoardingNotFoundError('Image not found');
+        }
+
+        await deleteBoardingImage(image.publicId);
+        
+        await prisma.boardingImage.delete({ 
+            where: { id: imageId } 
+        });
+
+        sendSuccess(res, null, 'Image deleted successfully');
+    
+    } catch (err) {
+        next(err);
+    }
+}
