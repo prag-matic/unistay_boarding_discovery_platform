@@ -1,10 +1,21 @@
 import type { Request, Response, NextFunction } from "express";
 import { Prisma, BoardingStatus } from "@prisma/client";
 import prisma from "@/lib/prisma.js";
+import { generateUniqueSlug } from "@/utils/slug.js"
 import { sendSuccess } from "@/lib/response.js";
 
-import type { SearchBoardingsQuery } from "@/schemas/boarding.validators.js"
-import { BoardingNotFoundError } from "@/errors/AppError.js";
+import type { 
+    SearchBoardingsQuery, 
+    CreateBoardingInput, 
+    UpdateBoardingInput,
+} from "@/schemas/boarding.validators.js"
+
+import { 
+    BoardingNotFoundError, 
+    ValidationError, 
+    ForbiddenError,
+    InvalidStateTransitionError,
+} from "@/errors/AppError.js";
 
 // Helpers
 function boardingSelect() {
@@ -49,7 +60,7 @@ function boardingSelect() {
     } as const;
 }
 
-// GET /api/v1/boardings  (public)
+// GET /api/boardings  (public)
 export async function searchBoardings(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
         const {
@@ -124,7 +135,7 @@ export async function searchBoardings(req: Request, res: Response, next: NextFun
     }
 }
 
-// GET /api/v1/boardings/:slug  (public)
+// GET /api/boardings/:slug  (public)
 export async function getBoardingBySlug(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
 
@@ -163,4 +174,109 @@ export async function getMyListings(req: Request, res: Response, next: NextFunct
   } catch (err) {
     next(err);
   }
+}
+
+// POST /api/boardings  (owner)
+export async function createBoarding(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+        const ownerId = req.user!.userId;
+        const body = req.body as CreateBoardingInput;
+
+        if (body.currentOccupants > body.maxOccupants) {
+            throw new ValidationError('currentOccupants cannot Exceed Max Occupants');
+        }
+
+        const slug = await generateUniqueSlug(body.title);
+
+        const { rules, ...boardingData } = body;
+
+        const boarding = await prisma.boarding.create({
+
+            data: {
+                ...boardingData,
+                ownerId,
+                slug,
+                rules: rules && rules.length > 0
+                    ? { create: rules.map((rule) => ({ rule }))}
+                    : undefined,
+            },
+
+            select: boardingSelect(),
+
+        });
+
+        sendSuccess(res, { boarding }, "Boarding Created Successfully", 201);
+
+    } catch (error) {
+        next(error);
+    }
+}
+
+// PUT /api/v1/boardings/:id  (owner)
+export async function updateBoarding(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+        
+        const { id } = req.params as { id: string };
+        const ownerId = req.user!.userId;
+        const body = req.body as UpdateBoardingInput;
+
+        const existing = await prisma.boarding.findUnique({
+            where: { id } 
+        });
+        
+        if (!existing || existing.isDeleted) throw new BoardingNotFoundError();
+        
+        if (existing.ownerId !== ownerId) throw new ForbiddenError('You do not own this listing');
+
+        if (existing.status === BoardingStatus.ACTIVE || existing.status === BoardingStatus.PENDING_APPROVAL) {
+            throw new InvalidStateTransitionError(
+                'Cannot edit an active or pending listing. Deactivate first.',
+            );
+        }
+
+        const maxOccupants = body.maxOccupants ?? existing.maxOccupants;
+
+        const currentOccupants = body.currentOccupants ?? existing.currentOccupants;
+
+        if (currentOccupants > maxOccupants) {
+            throw new ValidationError('currentOccupants cannot exceed maxOccupants');
+        }
+
+        const { rules, title, ...rest } = body;
+
+        let slug = existing.slug;
+
+        if (title && title !== existing.title) {
+            slug = await generateUniqueSlug(title, id);
+        }
+
+        const boarding = await prisma.$transaction(async (tx) => {
+      
+            if (rules !== undefined) {
+                await tx.boardingRule.deleteMany({ 
+                    where: { boardingId: id } 
+                });
+            }
+
+            return tx.boarding.update({
+                where: { id },
+                data: {
+                    ...rest,
+                    ...(title && { title }),
+                    slug,
+                    ...(rules !== undefined && {
+                        rules: { create: rules.map((rule) => ({ rule })) },
+                    }),
+                },
+
+                select: boardingSelect(),
+        
+            });
+        });
+
+        sendSuccess(res, { boarding }, 'Boarding updated successfully');
+
+    } catch (err) {
+        next(err);
+    }
 }
