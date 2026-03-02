@@ -16,6 +16,7 @@ import {
     ForbiddenError,
     InvalidStateTransitionError,
 } from "@/errors/AppError.js";
+import { boardingTypeSchema } from "@/schemas/index.js";
 
 // Helpers
 function boardingSelect() {
@@ -217,7 +218,9 @@ export async function updateBoarding(req: Request, res: Response, next: NextFunc
     try {
         
         const { id } = req.params as { id: string };
+
         const ownerId = req.user!.userId;
+
         const body = req.body as UpdateBoardingInput;
 
         const existing = await prisma.boarding.findUnique({
@@ -280,3 +283,105 @@ export async function updateBoarding(req: Request, res: Response, next: NextFunc
         next(err);
     }
 }
+
+// PATCH /api/boardings/:id/submit  (owner)
+export async function submitBoarding(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+
+        const { id } = req.params as { id: string };
+        const ownerId = req.user!.userId;
+
+        const existing = await prisma.boarding.findUnique({
+            where: { id },
+            include: { images: true },
+        });
+
+        if (!existing) throw new BoardingNotFoundError();
+
+        if (existing.ownerId !== ownerId) throw new ForbiddenError("You do not own this Listing");
+
+        if (existing.status !== BoardingStatus.DRAFT && existing.status !== BoardingStatus.REJECTED) {
+            throw new InvalidStateTransitionError('Only DRAFT or REJECTED listings can be submitted for approval')
+        }
+
+        if (existing.images.length === 0) {
+            throw new ValidationError("At least 1 image is required to submit for approval");
+        }
+
+        const boarding = await prisma.boarding.update({
+            where: { id },
+            data: {
+                status: BoardingStatus.PENDING_APPROVAL, 
+                rejectionReason: null
+            },
+            select: boardingSelect(),
+        });
+
+        sendSuccess(res, { boarding }, "Boarding Submitted for Approval");
+
+    } catch(error) {
+        next(error);
+    }
+}
+
+// PATCH /api/v1/boardings/:id/deactivate  (owner)
+export async function deactivateBoarding(req: Request, res: Response, next: NextFunction): Promise<void> {
+
+    try {
+        const { id } = req.params as { id: string };
+        const ownerId = req.user!.userId;
+
+    const existing = await prisma.boarding.findUnique({ where: { id } });
+
+    if (!existing || existing.isDeleted) throw new BoardingNotFoundError();
+    
+    if (existing.ownerId !== ownerId) throw new ForbiddenError('You do not own this listing');
+
+    if (existing.status !== BoardingStatus.ACTIVE) {
+        throw new InvalidStateTransitionError('Only ACTIVE listings can be deactivated');
+    }
+
+    const boarding = await prisma.boarding.update({
+        where: { id },
+        data: { status: BoardingStatus.INACTIVE },
+        select: boardingSelect(),
+    });
+
+    sendSuccess(res, { boarding }, 'Boarding deactivated successfully');
+    
+    } catch (err) {
+        next(err);
+    }
+}
+
+// PATCH /api/v1/boardings/:id/activate  (owner)
+export async function activateBoarding(req: Request, res: Response, next: NextFunction): Promise<void> {
+    
+    try {
+        const { id } = req.params as { id: string };
+        const ownerId = req.user!.userId;
+
+        const existing = await prisma.boarding.findUnique({ where: { id } });
+        
+        if (!existing || existing.isDeleted) throw new BoardingNotFoundError();
+    
+        if (existing.ownerId !== ownerId) throw new ForbiddenError('You do not own this listing');
+
+    
+        if (existing.status !== BoardingStatus.INACTIVE) {
+            throw new InvalidStateTransitionError('Only INACTIVE listings can be activated');
+        }
+
+        const boarding = await prisma.boarding.update({
+            where: { id },
+            data: { status: BoardingStatus.ACTIVE },
+            select: boardingSelect(),
+        });
+
+        sendSuccess(res, { boarding }, 'Boarding activated successfully');
+
+    } catch (err) {
+        next(err);
+    }
+}
+
