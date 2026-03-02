@@ -2,7 +2,8 @@ import { Router } from "express";
 import authRoutes from "@/routes/auth.routes.js";
 import userRoutes from "@/routes/user.routes.js";
 import adminRoutes from "@/routes/admin.routes.js";
-import reviewRoutes from "./review.routes.js";
+import reviewRoutes from "@/routes/review.routes.js";
+import boardingRoutes from "@/routes/boarding.routes.js";
 
 const router = Router();
 
@@ -36,6 +37,9 @@ router.use("/users", userRoutes);
 
 // Admin Routes
 router.use("/admin", adminRoutes);
+
+// Boarding Routes
+router.use("/boardings", boardingRoutes);
 
 // Review routes
 router.use("/reviews", reviewRoutes);

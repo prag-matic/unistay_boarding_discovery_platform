@@ -76,3 +76,16 @@ export const adminLimiter = rateLimit({
     timestamp: new Date().toISOString(),
   },
 });
+
+export const boardingLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: 'TooManyRequests',
+    message: 'Too many requests. Please try again later.',
+    timestamp: new Date().toISOString(),
+  },
+});
