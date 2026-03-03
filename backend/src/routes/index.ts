@@ -7,6 +7,7 @@ import boardingRoutes from "@/routes/boarding.routes.js";
 import reservationRouter from "@/routes/reservation.routes.js";
 import savedBoardingRoutes from "@/routes/savedBoarding.routes.js";
 import visitRequestRoutes from "@/routes/visitRequest.routes.js";
+import paymentRoutes from "@/routes/payment.routes.js";
 
 const router = Router();
 
@@ -15,13 +16,6 @@ const router = Router();
  *
  * Routes define API endpoints and map them to controllers.
  *
- * Structure:
- * - index.ts (main router - this file)
- * - review.routes.ts
- * - user.routes.ts (future)
- * - auth.routes.ts
- * - boarding.routes.ts
- * - chat.routes.ts (future)
  */
 
 router.get("/health", (_req, res) => {
@@ -52,6 +46,9 @@ router.use('/saved-boardings', savedBoardingRoutes);
 
 // visit-requests routes
 router.use('/visit-requests', visitRequestRoutes);
+
+// payments route
+router.use('/payment', paymentRoutes);
 
 // Review routes
 router.use("/reviews", reviewRoutes);
