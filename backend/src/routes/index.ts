@@ -48,7 +48,7 @@ router.use('/saved-boardings', savedBoardingRoutes);
 router.use('/visit-requests', visitRequestRoutes);
 
 // payments route
-router.use('/payment', paymentRoutes);
+router.use('/payments', paymentRoutes);
 
 // Review routes
 router.use("/reviews", reviewRoutes);
