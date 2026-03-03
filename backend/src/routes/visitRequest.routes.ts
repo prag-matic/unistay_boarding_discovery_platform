@@ -5,6 +5,9 @@ import { visitRequestLimiter } from '@/middleware/rateLimit.js';
 
 import {
     createVisitRequest,
+    getMyVisitRequests,
+  	getMyBoardingVisitRequests,
+  	getVisitRequestById,
 } from '@/controllers/visitRequest.controller.js';
 
 import {
@@ -16,5 +19,8 @@ const router = Router();
 router.use(visitRequestLimiter);
 
 router.post('/', authenticate, requireRole('STUDENT'), validateBody(createVisitRequestSchema), createVisitRequest);
+router.get('/my-requests', authenticate, requireRole('STUDENT'), getMyVisitRequests);
+router.get('/my-boardings', authenticate, requireRole('OWNER'), getMyBoardingVisitRequests);
+router.get('/:id', authenticate, getVisitRequestById);
 
 export default router;
