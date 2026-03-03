@@ -17,13 +17,15 @@ export {
   validateParams,
   validateQuery,
 } from "./validate.js";
+
+export { errorHandler } from "@/middleware/errorHandler.js"
+
 export {
-  errorHandler,
   AppError,
   NotFoundError,
   BadRequestError,
   UnauthorizedError,
   ForbiddenError,
   ConflictError,
-} from "./errorHandler.js";
+} from "@/errors/AppError.js";
 export { uploadReviewMedia, validateReviewFiles } from "./upload.js";
