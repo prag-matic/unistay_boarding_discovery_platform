@@ -115,3 +115,16 @@ export const savedBoardingLimiter = rateLimit({
     timestamp: new Date().toISOString(),
   },
 });
+
+export const visitRequestLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: 'TooManyRequests',
+    message: 'Too many requests. Please try again later.',
+    timestamp: new Date().toISOString(),
+  },
+});
