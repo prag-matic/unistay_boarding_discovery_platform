@@ -6,6 +6,7 @@ import reviewRoutes from "@/routes/review.routes.js";
 import boardingRoutes from "@/routes/boarding.routes.js";
 import reservationRouter from "@/routes/reservation.routes.js";
 import savedBoardingRoutes from "@/routes/savedBoarding.routes.js";
+import visitRequestRoutes from "@/routes/visitRequest.routes.js";
 
 const router = Router();
 
@@ -48,6 +49,9 @@ router.use("/reservation", reservationRouter);
 
 // saved-boarding Routes
 router.use('/saved-boardings', savedBoardingRoutes);
+
+// visit-requests routes
+router.use('/visit-requests', visitRequestRoutes);
 
 // Review routes
 router.use("/reviews", reviewRoutes);
