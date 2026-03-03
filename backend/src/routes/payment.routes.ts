@@ -2,6 +2,8 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
+import { paymentLimiter } from '@/middleware/rateLimit.js';
+
 import {
   logPayment,
   getMyPayments,
@@ -9,22 +11,13 @@ import {
   confirmPayment,
   rejectPayment,
 } from '../controllers/payment.controller.js';
-import { logPaymentSchema, rejectPaymentSchema } from '../validators/payment.validators';
+
+import { 
+  logPaymentSchema, 
+  rejectPaymentSchema 
+} from  '@/schemas/payment.validators.js';
 
 const router = Router();
-
-const paymentLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 200,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    error: 'TooManyRequests',
-    message: 'Too many requests. Please try again later.',
-    timestamp: new Date().toISOString(),
-  },
-});
 
 router.use(paymentLimiter);
 
