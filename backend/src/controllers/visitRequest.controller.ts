@@ -189,3 +189,115 @@ export async function getVisitRequestById(req: Request, res: Response, next: Nex
  	}
 }
 
+// PATCH /api/v1/visit-requests/:id/approve  (owner)
+export async function approveVisitRequest(req: Request, res: Response, next: NextFunction): Promise<void> {
+  	try {
+    	const { id } = req.params as { id: string };
+    	const ownerId = req.user!.userId;
+
+    	const existing = await prisma.visitRequest.findUnique({
+      		where: { id },
+      		include: { boarding: true },
+    	});
+
+    	if (!existing) throw new NotFoundError('Visit request not found');
+    	
+		if (existing.boarding.ownerId !== ownerId) {
+      		throw new ForbiddenError('You do not own this boarding');
+    	}
+
+    	if (existing.status !== VisitRequestStatus.PENDING) {
+      		throw new BadRequestError('Only PENDING visit requests can be approved');
+    	}
+
+    	// Check date and find if expired
+    	if (new Date() > existing.expiresAt) {
+      		await prisma.visitRequest.update({ 
+				where: { id }, 
+				data: { status: VisitRequestStatus.EXPIRED } });
+      	
+			throw new GoneError('Visit request has expired');
+    	}
+
+    	const visitRequest = await prisma.visitRequest.update({
+      		where: { id },
+      		data: { status: VisitRequestStatus.APPROVED },
+      		select: visitRequestSelect(),
+    	});
+
+    	sendSuccess(res, { visitRequest }, 'Visit request approved');
+  	
+	} catch (err) {
+    	next(err);
+  	}
+}
+
+// PATCH /api/v1/visit-requests/:id/reject  (owner)
+export async function rejectVisitRequest(req: Request, res: Response, next: NextFunction): Promise<void> {
+  	try {
+    	const { id } = req.params as { id: string };
+    	const ownerId = req.user!.userId;
+    	const { reason } = req.body as RejectVisitRequestInput;
+
+    	const existing = await prisma.visitRequest.findUnique({
+      		where: { id },
+      		include: { boarding: true },
+    	});
+    
+		if (!existing) throw new NotFoundError('Visit request not found');
+    
+		if (existing.boarding.ownerId !== ownerId) {
+      		throw new ForbiddenError('You do not own this boarding');
+    	}
+    
+		if (existing.status !== VisitRequestStatus.PENDING) {
+      		throw new BadRequestError('Only PENDING visit requests can be rejected');
+    	}
+
+    	const visitRequest = await prisma.visitRequest.update({
+      		where: { id },
+      		data: { 
+				status: VisitRequestStatus.REJECTED, 
+				rejectionReason: reason },
+      		select: visitRequestSelect(),
+    	});
+
+    
+		sendSuccess(res, { visitRequest }, 'Visit request rejected');
+  
+	} catch (err) {
+    	next(err);
+  	}
+}
+
+// PATCH /api/v1/visit-requests/:id/cancel  (student)
+export async function cancelVisitRequest(req: Request, res: Response, next: NextFunction): Promise<void> {
+  	try {
+    	const { id } = req.params as { id: string };
+    	const studentId = req.user!.userId;
+
+    	const existing = await prisma.visitRequest.findUnique({ where: { id } });
+    
+		if (!existing) throw new NotFoundError('Visit request not found');
+    	
+		if (existing.studentId !== studentId) throw new ForbiddenError('This is not your visit request');
+    	
+		if (
+      		existing.status !== VisitRequestStatus.PENDING &&
+      		existing.status !== VisitRequestStatus.APPROVED
+    	) {
+      		throw new BadRequestError('Only PENDING or APPROVED visit requests can be cancelled');
+   		}
+
+    	const visitRequest = await prisma.visitRequest.update({
+      		where: { id },
+      		data: { status: VisitRequestStatus.CANCELLED },
+      		select: visitRequestSelect(),
+    	});
+
+    	sendSuccess(res, { visitRequest }, 'Visit request cancelled');
+  	
+	} catch (err) {
+    	next(err);
+  	}
+}
