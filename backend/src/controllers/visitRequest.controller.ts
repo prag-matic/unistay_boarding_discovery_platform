@@ -120,3 +120,72 @@ export async function createVisitRequest(req: Request, res: Response, next: Next
   	}
 }
 
+// GET /api/v1/visit-requests/my-requests  (student)
+export async function getMyVisitRequests(req: Request, res: Response, next: NextFunction): Promise<void> {
+  	try {
+    	const studentId = req.user!.userId;
+
+    	const visitRequests = await prisma.visitRequest.findMany({
+      		where: { studentId },
+      		orderBy: { createdAt: 'desc' },
+      		select: visitRequestSelect(),
+    	});
+
+    	sendSuccess(res, { visitRequests });
+  	
+	} catch (err) {
+    	next(err);
+  	}
+}
+
+// GET /api/v1/visit-requests/my-boardings  (owner)
+export async function getMyBoardingVisitRequests(req: Request, res: Response, next: NextFunction): Promise<void> {
+  	try {
+    	const ownerId = req.user!.userId;
+
+    	const visitRequests = await prisma.visitRequest.findMany({
+      		where: { boarding: { ownerId } },
+      		orderBy: { createdAt: 'desc' },
+      		select: visitRequestSelect(),
+   		});
+
+    sendSuccess(res, { visitRequests });
+  	
+	} catch (err) {
+    	next(err);
+  	}
+}
+
+// GET /api/v1/visit-requests/:id
+export async function getVisitRequestById(req: Request, res: Response, next: NextFunction): Promise<void> {
+  	try {
+    	const { id } = req.params as { id: string };
+    	const userId = req.user!.userId;
+    	const role = req.user!.role;
+
+    	const visitRequest = await prisma.visitRequest.findUnique({
+      		where: { id },
+      		select: visitRequestSelect(),
+    	});
+
+    	if (!visitRequest) throw new NotFoundError('Visit request not found');
+
+    	if (role !== 'ADMIN') {
+      		const isStudent = visitRequest.studentId === userId;
+      
+		if (!isStudent) {
+        	const boarding = await prisma.boarding.findUnique({ where: { id: visitRequest.boardingId } });
+        	
+			if (!boarding || boarding.ownerId !== userId) {
+          		throw new ForbiddenError('Access denied');
+        	}
+      	}
+    }
+
+    sendSuccess(res, { visitRequest });
+  	
+	} catch (err) {
+    	next(err);
+ 	}
+}
+
