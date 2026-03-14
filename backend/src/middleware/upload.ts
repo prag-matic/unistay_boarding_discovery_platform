@@ -1,5 +1,12 @@
 import multer from "multer";
 import type { Request, Response } from "express";
+import { AppError } from "@/errors/AppError.js";
+
+const ALLOWED_IMAGE_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png'];
+const ALLOWED_VIDEO_MIME_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
+const BOARDING_ALLOWED_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+export const MAX_BOARDING_IMAGES = 8;
 
 // Configure multer for memory storage (files stored in Buffer)
 const storage = multer.memoryStorage();
@@ -10,8 +17,7 @@ const imageFilter = (
   file: Express.Multer.File,
   cb: multer.FileFilterCallback,
 ) => {
-  const allowedMimes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-  if (allowedMimes.includes(file.mimetype)) {
+  if (ALLOWED_IMAGE_MIME_TYPES.includes(file.mimetype)) {
     cb(null, true);
   } else {
     cb(
@@ -28,13 +34,25 @@ const videoFilter = (
   file: Express.Multer.File,
   cb: multer.FileFilterCallback,
 ) => {
-  const allowedMimes = ["video/mp4", "video/webm", "video/quicktime"];
-  if (allowedMimes.includes(file.mimetype)) {
+
+  if (ALLOWED_VIDEO_MIME_TYPES.includes(file.mimetype)) {
     cb(null, true);
   } else {
     cb(new Error("Invalid file type. Only MP4, WebM, and MOV are allowed."));
   }
 };
+
+function boardingFileFilter(
+  _req: Request,
+  file: Express.Multer.File,
+  cb: multer.FileFilterCallback,
+): void {
+  if (BOARDING_ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new AppError('Only JPEG/PNG/WebP images are allowed', 400));
+  }
+}
 
 // Upload limits
 const limits = {
@@ -52,6 +70,20 @@ export const uploadReviewMedia = multer({
   { name: "images", maxCount: 5 },
   { name: "video", maxCount: 1 },
 ]);
+
+
+export const uploadProfileImageMiddleware = multer({
+  storage,
+  fileFilter: imageFilter,
+  limits: { fileSize: MAX_FILE_SIZE },
+}).single('profileImage');
+
+export const uploadBoardingImageMiddleware = multer({
+  storage,
+  fileFilter: boardingFileFilter,
+  limits: { fileSize: MAX_FILE_SIZE },
+}).array('images', MAX_BOARDING_IMAGES);
+
 
 // Custom middleware to validate files
 export const validateReviewFiles = (
@@ -100,6 +132,8 @@ export const validateReviewFiles = (
 
   next();
 };
+
+
 
 export default {
   uploadReviewMedia,
