@@ -76,8 +76,8 @@ export class ReviewService {
         boarding: {
           select: {
             id: true,
-            propertyName: true,
-            type: true,
+            title: true,
+            boardingType: true,
             address: true,
             city: true,
           },

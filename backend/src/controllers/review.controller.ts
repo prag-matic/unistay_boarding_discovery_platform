@@ -12,7 +12,7 @@ import {
   NotFoundError,
   BadRequestError,
   ForbiddenError,
-} from "../middleware/errorHandler.js";
+} from "@/errors/AppError.js";
 import { z } from "zod";
 
 // Schema for comment request body (only comment field, reviewId comes from URL)
