@@ -1,4 +1,5 @@
 import dotenv from "dotenv";
+import { email } from "zod";
 
 dotenv.config();
 
@@ -29,6 +30,10 @@ export const config = {
     accessExpiry: optional("JWT_ACCESS_EXPIRY", "15m"),
     refreshExpiry: optional("JWT_REFRESH_EXPIRY", "30d"),
   },
+
+  emailVerficationTokenExpiry: parseInt(optional("EMAIL_VERIFICATION_TOKEN_EXPIRY", "86400000"), 10),
+
+  saltRounds: parseInt(optional("BCRYPT_SALT_ROUNDS", "12"), 10),
 
   appUrl: optional("APP_URL", "http://localhost:3000"),
 
