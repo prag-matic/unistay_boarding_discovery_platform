@@ -5,6 +5,7 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import router from "./routes/index.js";
 import { errorHandler } from "./middleware/errorHandler.js";
+import { apiLimiter } from "./middleware/rateLimit.js";
 
 const app = express();
 
@@ -13,31 +14,11 @@ app.use(helmet());
 app.use(cors());
 
 // Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: {
-    success: false,
-    error: "TooManyRequests",
-    message: "Too many requests from this IP, please try again later",
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-app.use("/api", limiter);
+app.use("/api", apiLimiter);
 
 // Body parsing
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Health check endpoint
-app.get("/health", (_req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "Server is healthy",
-    timestamp: new Date().toISOString(),
-  });
-});
 
 // API routes
 app.use("/api", router);
@@ -52,7 +33,7 @@ app.use((_req: Request, res: Response) => {
   });
 });
 
-// Global error handler (must be last)
+// Global error handler
 app.use(errorHandler);
 
 export default app;
