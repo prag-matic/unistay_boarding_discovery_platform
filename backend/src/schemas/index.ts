@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { BoardingAmenityType } from "@prisma/client";
 
 // Gender enum schema
 export const genderSchema = z.enum([
@@ -59,6 +60,8 @@ export const boardingTypeSchema = z.enum([
   "OTHER",
 ]);
 
+export const boardingAmenitySchema = z.enum(BoardingAmenityType);
+
 // Boarding schema
 export const boardingSchema = z.object({
   propertyName: z.string().min(1, "Property name is required").max(100),
@@ -68,7 +71,7 @@ export const boardingSchema = z.object({
   state: z.string().optional(),
   zipCode: z.string().optional(),
   description: z.string().optional(),
-  amenities: z.array(z.string()).optional(),
+  amenities: z.array(boardingAmenitySchema).optional(),
   price: z.number().positive().optional(),
   available: z.boolean().default(true),
 });
@@ -91,8 +94,6 @@ export const reviewSchema = z.object({
     .default([]),
   video: z.string().url().optional().nullable(),
 });
-
-// Review creation schema
 export const createReviewSchema = reviewSchema;
 
 // Review update schema (one-time edit)
