@@ -2,7 +2,9 @@ import { Router } from "express";
 import authRoutes from "@/routes/auth.routes.js";
 import userRoutes from "@/routes/user.routes.js";
 import adminRoutes from "@/routes/admin.routes.js";
-import reviewRoutes from "./review.routes.js";
+import reviewRoutes from "@/routes/review.routes.js";
+import boardingRoutes from "@/routes/boarding.routes.js";
+import savedBoardingRoutes from "@/routes/savedBoarding.routes.js";
 
 const router = Router();
 
@@ -21,7 +23,7 @@ const router = Router();
  */
 
 router.get("/health", (_req, res) => {
-  res.status(200).json({
+  	res.status(200).json({
     success: true,
     message: "Server is healthy",
     timestamp: new Date().toISOString(),
@@ -36,6 +38,12 @@ router.use("/users", userRoutes);
 
 // Admin Routes
 router.use("/admin", adminRoutes);
+
+// Boarding Routes
+router.use("/boardings", boardingRoutes);
+
+// saved-boarding Routes
+router.use('/saved-boardings', savedBoardingRoutes);
 
 // Review routes
 router.use("/reviews", reviewRoutes);
