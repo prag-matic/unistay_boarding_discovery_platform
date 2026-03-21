@@ -68,6 +68,10 @@ export const updateBoardingSchema = z.object({
   rules: z.array(z.string().min(1)).optional(),
 });
 
+export const boardingIdParamSchema = z.object({
+  id: z.string().min(1, 'Boarding id is required'),
+});
+
 export const rejectBoardingSchema = z.object({
   reason: z.string().min(1, 'Rejection reason is required'),
 });
@@ -90,5 +94,6 @@ export const searchBoardingsQuerySchema = z.object({
 
 export type CreateBoardingInput = z.infer<typeof createBoardingSchema>;
 export type UpdateBoardingInput = z.infer<typeof updateBoardingSchema>;
+export type BoardingIdParamInput = z.infer<typeof boardingIdParamSchema>;
 export type RejectBoardingInput = z.infer<typeof rejectBoardingSchema>;
 export type SearchBoardingsQuery = z.infer<typeof searchBoardingsQuerySchema>;

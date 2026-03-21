@@ -226,11 +226,15 @@ export async function createBoarding(req: Request, res: Response, next: NextFunc
     }
 }
 
-// PUT /api/v1/boardings/:id  (owner)
+// PUT /api/boardings/:id  (owner)
 export async function updateBoarding(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
         
         const { id } = req.params as { id: string };
+
+        if (!id) {
+            throw new ValidationError('Boarding ID is required');
+        }
 
         const ownerId = req.user!.userId;
 
@@ -244,11 +248,7 @@ export async function updateBoarding(req: Request, res: Response, next: NextFunc
         
         if (existing.ownerId !== ownerId) throw new ForbiddenError('You do not own this listing');
 
-        if (existing.status === BoardingStatus.ACTIVE || existing.status === BoardingStatus.PENDING_APPROVAL) {
-            throw new InvalidStateTransitionError(
-                'Cannot edit an active or pending listing. Deactivate first.',
-            );
-        }
+        const shouldSetPendingApprovalAfterEdit = existing.status === BoardingStatus.ACTIVE;
 
         const maxOccupants = body.maxOccupants ?? existing.maxOccupants;
 
@@ -286,6 +286,10 @@ export async function updateBoarding(req: Request, res: Response, next: NextFunc
                     ...rest,
                     ...(title && { title }),
                     slug,
+                    ...(shouldSetPendingApprovalAfterEdit && {
+                        status: BoardingStatus.PENDING_APPROVAL,
+                        rejectionReason: null,
+                    }),
                     ...(amenities !== undefined && {
                         amenities: { create: amenities.map((name) => ({ name })) },
                     }),
@@ -322,8 +326,12 @@ export async function submitBoarding(req: Request, res: Response, next: NextFunc
 
         if (existing.ownerId !== ownerId) throw new ForbiddenError("You do not own this Listing");
 
-        if (existing.status !== BoardingStatus.DRAFT && existing.status !== BoardingStatus.REJECTED) {
-            throw new InvalidStateTransitionError('Only DRAFT or REJECTED listings can be submitted for approval')
+        if (
+            existing.status !== BoardingStatus.DRAFT &&
+            existing.status !== BoardingStatus.REJECTED &&
+            existing.status !== BoardingStatus.INACTIVE
+        ) {
+            throw new InvalidStateTransitionError('Only DRAFT, REJECTED, or INACTIVE listings can be submitted for approval')
         }
 
         if (existing.images.length === 0) {
