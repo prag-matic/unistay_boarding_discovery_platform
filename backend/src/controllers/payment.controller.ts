@@ -1,295 +1,323 @@
-import type { Request, Response, NextFunction } from 'express';
-import prisma from '@/lib/prisma.js';
-import { sendSuccess } from '@/lib/response.js';
+import type { Request, Response, NextFunction } from "express";
+import mongoose from "mongoose";
+import { Payment, RentalPeriod, Reservation } from "@/models/index.js";
+import { PaymentStatus, RentalPeriodStatus } from "@/types/enums.js";
+import { sendSuccess } from "@/lib/response.js";
 
 import {
-  	ForbiddenError,
-  	ConflictError,
-  	NotFoundError,
-  	BadRequestError,
-} from '@/errors/AppError.js';
+  ForbiddenError,
+  ConflictError,
+  NotFoundError,
+  BadRequestError,
+} from "@/errors/AppError.js";
 
-import type { 
-	LogPaymentInput, 
-	RejectPaymentInput 
-} from '@/schemas/payment.validators.js';
-
-import { 
-	Prisma, 
-	PaymentStatus, 
-	RentalPeriodStatus 
-} from '@prisma/client';
-
-function paymentSelect() {
-  	return {
-    	id: true,
-    	rentalPeriodId: true,
-    	reservationId: true,
-    	studentId: true,
-    	amount: true,
-    	paymentMethod: true,
-    	referenceNumber: true,
-    	proofImageUrl: true,
-    	status: true,
-    	paidAt: true,
-    	rejectionReason: true,
-    	confirmedAt: true,
-    	createdAt: true,
-    	updatedAt: true,
-  	} as const;
-}
+import type {
+  LogPaymentInput,
+  RejectPaymentInput,
+} from "@/schemas/payment.validators.js";
 
 async function recalcRentalPeriodStatus(
-  	tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
-  	rentalPeriodId: string,
+  session: mongoose.ClientSession,
+  rentalPeriodId: string,
 ): Promise<void> {
+  const rentalPeriod =
+    await RentalPeriod.findById(rentalPeriodId).session(session);
 
-  	const period = await tx.rentalPeriod.findUnique({
-    	where: { id: rentalPeriodId },
-    	include: { payments: true },
-  	});
-  
-	if (!period) return;
+  if (!rentalPeriod) return;
 
-  	const confirmedTotal = period.payments
-    	.filter((p) => p.status === PaymentStatus.CONFIRMED)
-    	.reduce((sum, p) => sum.add(p.amount), new Prisma.Decimal(0));
+  const payments = await Payment.find({
+    rentalPeriodId: new mongoose.Types.ObjectId(rentalPeriodId),
+  }).session(session);
 
-  	let newStatus = period.status;
-  	
-	if (confirmedTotal.gte(period.amountDue)) {
-    	newStatus = RentalPeriodStatus.PAID;
-  	} else if (confirmedTotal.gt(0)) {
-    	newStatus = RentalPeriodStatus.PARTIALLY_PAID;
-  	}
+  const confirmedTotal = payments
+    .filter((p) => p.status === PaymentStatus.CONFIRMED)
+    .reduce((sum, p) => sum + p.amount, 0);
 
-  	if (newStatus !== period.status) {
-    	await tx.rentalPeriod.update({
-      		where: { id: rentalPeriodId },
-      		data: { status: newStatus },
-    	});
-  	}
+  let newStatus = rentalPeriod.status;
+
+  if (confirmedTotal >= rentalPeriod.amountDue) {
+    newStatus = RentalPeriodStatus.PAID;
+  } else if (confirmedTotal > 0) {
+    newStatus = RentalPeriodStatus.PARTIALLY_PAID;
+  }
+
+  if (newStatus !== rentalPeriod.status) {
+    await RentalPeriod.findByIdAndUpdate(
+      rentalPeriodId,
+      { status: newStatus },
+      { session },
+    );
+  }
 }
 
 // POST /api/payments  (student)
-export async function logPayment(req: Request, res: Response, next: NextFunction): Promise<void> {
-  	try {
-    	const studentId = req.user!.userId;
-    	const body = req.body as LogPaymentInput;
+export async function logPayment(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const studentId = req.user!.userId;
+    const body = req.body as LogPaymentInput;
 
-    	const paidAt = new Date(body.paidAt);
-    
-		if (paidAt > new Date()) {
-      		throw new BadRequestError('paidAt cannot be in the future');
-    	}
+    const paidAt = new Date(body.paidAt);
 
-    	const payment = await prisma.$transaction(async (tx) => {
-      	const rentalPeriod = await tx.rentalPeriod.findUnique({
-        	where: { id: body.rentalPeriodId },
-        	include: { payments: true },
-      	});
-      
-		if (!rentalPeriod) throw new NotFoundError('Rental period not found');
+    if (paidAt > new Date()) {
+      throw new BadRequestError("paidAt cannot be in the future");
+    }
 
-      	const reservation = await tx.reservation.findUnique({
-        	where: { id: body.reservationId },
-      	});
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-      	if (!reservation) throw new NotFoundError('Reservation not found');
-      	
-		if (reservation.studentId !== studentId) {
-        	throw new ForbiddenError('You are not the student on this reservation');
-      	}
-      
-		if (rentalPeriod.reservationId !== body.reservationId) {
-        	throw new BadRequestError('Rental period does not belong to this reservation');
-      	}
-      	
-		if (rentalPeriod.status === RentalPeriodStatus.PAID) {
-        	throw new ConflictError('Rental period is already fully paid');
-      	}
+    try {
+      const rentalPeriod = await RentalPeriod.findById(
+        body.rentalPeriodId,
+      ).session(session);
 
-      	// Calculate remaining balance
-      	const confirmedTotal = rentalPeriod.payments
-        	.filter((p) => p.status === PaymentStatus.CONFIRMED)
-        	.reduce((sum, p) => sum.add(p.amount), new Prisma.Decimal(0));
-      	
-		const remaining = new Prisma.Decimal(rentalPeriod.amountDue).sub(confirmedTotal);
+      if (!rentalPeriod) throw new NotFoundError("Rental period not found");
 
-      	if (new Prisma.Decimal(body.amount).gt(remaining)) {
-        	throw new BadRequestError(
-          		`Amount exceeds remaining balance of ${remaining.toFixed(2)}`,
-        	);
-      	}
+      const reservation = await Reservation.findById(
+        body.reservationId,
+      ).session(session);
 
-      	return tx.payment.create({
-        	data: {
-          		rentalPeriodId: body.rentalPeriodId,
-          		reservationId: body.reservationId,
-          		studentId,
-          		amount: new Prisma.Decimal(body.amount),
-          		paymentMethod: body.paymentMethod,
-          		referenceNumber: body.referenceNumber,
-          		proofImageUrl: body.proofImageUrl,
-          		paidAt,
-        	},
+      if (!reservation) throw new NotFoundError("Reservation not found");
 
-        	select: paymentSelect(),
+      if (reservation.studentId.toString() !== studentId) {
+        throw new ForbiddenError("You are not the student on this reservation");
+      }
 
-		});
-    });
+      if (rentalPeriod.reservationId.toString() !== body.reservationId) {
+        throw new BadRequestError(
+          "Rental period does not belong to this reservation",
+        );
+      }
 
-    sendSuccess(res, { payment }, 'Payment logged successfully', 201);
-  
-	} catch (err) {
-    	next(err);
-  	}
+      if (rentalPeriod.status === RentalPeriodStatus.PAID) {
+        throw new ConflictError("Rental period is already fully paid");
+      }
+
+      const payments = await Payment.find({
+        rentalPeriodId: new mongoose.Types.ObjectId(body.rentalPeriodId),
+      }).session(session);
+
+      const confirmedTotal = payments
+        .filter((p) => p.status === PaymentStatus.CONFIRMED)
+        .reduce((sum, p) => sum + p.amount, 0);
+
+      const remaining = rentalPeriod.amountDue - confirmedTotal;
+
+      if (body.amount > remaining) {
+        throw new BadRequestError(
+          `Amount exceeds remaining balance of ${remaining.toFixed(2)}`,
+        );
+      }
+
+      const payment = await Payment.create(
+        [
+          {
+            rentalPeriodId: new mongoose.Types.ObjectId(body.rentalPeriodId),
+            reservationId: new mongoose.Types.ObjectId(body.reservationId),
+            studentId: new mongoose.Types.ObjectId(studentId),
+            amount: body.amount,
+            paymentMethod: body.paymentMethod,
+            referenceNumber: body.referenceNumber,
+            proofImageUrl: body.proofImageUrl,
+            paidAt,
+          },
+        ],
+        { session },
+      );
+
+      await session.commitTransaction();
+
+      const populatedPayment = await Payment.findById(payment[0]._id).lean();
+
+      sendSuccess(
+        res,
+        { payment: populatedPayment },
+        "Payment logged successfully",
+        201,
+      );
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  } catch (err) {
+    next(err);
+  }
 }
 
 // GET /api/v1/payments/my-payments  (student)
-export async function getMyPayments(req: Request, res: Response, next: NextFunction): Promise<void> {
-  	try {
-    	const studentId = req.user!.userId;
+export async function getMyPayments(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const studentId = req.user!.userId;
 
-    	const payments = await prisma.payment.findMany({
-      		where: { studentId },
-      		orderBy: { createdAt: 'desc' },
-      		select: paymentSelect(),
-   	 	});
+    const payments = await Payment.find({
+      studentId: new mongoose.Types.ObjectId(studentId),
+    })
+      .sort({ createdAt: -1 })
+      .lean();
 
-    	sendSuccess(res, { payments });
-  	
-	} catch (err) {
-    	next(err);
-  	}
+    sendSuccess(res, { payments });
+  } catch (err) {
+    next(err);
+  }
 }
 
 // GET /api/payments/my-boardings  (owner)
-export async function getMyBoardingPayments(req: Request, res: Response, next: NextFunction): Promise<void> {
-  	
-	try {
-    	
-		const ownerId = req.user!.userId;
+export async function getMyBoardingPayments(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const ownerId = req.user!.userId;
 
-    	const payments = await prisma.payment.findMany({
-      		where: { reservation: { boarding: { ownerId } } },
-      		orderBy: { createdAt: 'desc' },
-      		select: {
-        		...paymentSelect(),
-        		reservation: {
-          			select: {
-            			id: true,
-            			boarding: { 
-							select: { 
-								id: true, 
-								title: true 
-							} 
-						},
-          			},
-        		},
-      		},
-    	});
+    const reservations = await Reservation.find({})
+      .populate({
+        path: "boardingId",
+        match: { ownerId: new mongoose.Types.ObjectId(ownerId) },
+        select: "id ownerId",
+      })
+      .lean();
 
-    	sendSuccess(res, { payments });
-  
-	} catch (err) {
-    	next(err);
-  	}
+    const reservationIds = reservations
+      .filter((r) => r.boardingId !== null)
+      .map((r) => r._id);
+
+    const payments = await Payment.find({
+      reservationId: { $in: reservationIds },
+    })
+      .populate({
+        path: "reservationId",
+        populate: {
+          path: "boardingId",
+          select: "id title",
+        },
+      })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    sendSuccess(res, { payments });
+  } catch (err) {
+    next(err);
+  }
 }
 
 // PATCH /api/v1/payments/:id/confirm  (owner)
-export async function confirmPayment(req: Request, res: Response, next: NextFunction): Promise<void> {
-  	try {
-    	const { id } = req.params as { id: string };
-    	const ownerId = req.user!.userId;
+export async function confirmPayment(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { id } = req.params as { id: string };
+    const ownerId = req.user!.userId;
 
-    	const existing = await prisma.payment.findUnique({
-      		where: { id },
-     		include: { 
-				reservation: { 
-					include: { 
-						boarding: true 
-					} 
-				} 
-			},
-    	});
+    const existing = await Payment.findById(id)
+      .populate({
+        path: "reservationId",
+        populate: {
+          path: "boardingId",
+          select: "ownerId",
+        },
+      })
+      .lean();
 
-    	if (!existing) throw new NotFoundError('Payment not found');
-    
-		if (existing.reservation.boarding.ownerId !== ownerId) {
-      		throw new ForbiddenError('You do not own this boarding');
-    	}
-    	
-		if (existing.status !== PaymentStatus.PENDING) {
-      		throw new BadRequestError('Only PENDING payments can be confirmed');
-    	}
+    if (!existing) throw new NotFoundError("Payment not found");
 
-    	await prisma.$transaction(async (tx) => {
-      		await tx.payment.update({
-        		where: { id },
-        		data: { 
-					status: PaymentStatus.CONFIRMED, 
-					confirmedAt: new Date() 
-				},
-      		});
-      
-			await recalcRentalPeriodStatus(tx, existing.rentalPeriodId);
-    	
-		});
+    const boarding = (existing.reservationId as any)?.boardingId;
+    if (!boarding || boarding.ownerId.toString() !== ownerId) {
+      throw new ForbiddenError("You do not own this boarding");
+    }
 
-    	const payment = await prisma.payment.findUnique({ where: { id }, select: paymentSelect() });
-    
-		sendSuccess(res, { payment }, 'Payment confirmed');
-  
-	} catch (err) {
-    	next(err);
-  	}
+    if (existing.status !== PaymentStatus.PENDING) {
+      throw new BadRequestError("Only PENDING payments can be confirmed");
+    }
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      await Payment.findByIdAndUpdate(
+        id,
+        {
+          status: PaymentStatus.CONFIRMED,
+          confirmedAt: new Date(),
+        },
+        { session },
+      );
+
+      await recalcRentalPeriodStatus(
+        session,
+        existing.rentalPeriodId.toString(),
+      );
+
+      await session.commitTransaction();
+
+      const payment = await Payment.findById(id).lean();
+
+      sendSuccess(res, { payment }, "Payment confirmed");
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  } catch (err) {
+    next(err);
+  }
 }
 
 // PATCH /api/v1/payments/:id/reject  (owner)
-export async function rejectPayment(req: Request, res: Response, next: NextFunction): Promise<void> {
-  	
-	try {
-    	
-		const { id } = req.params as { id: string };
-    	const ownerId = req.user!.userId;
-    	const { reason } = req.body as RejectPaymentInput;
+export async function rejectPayment(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { id } = req.params as { id: string };
+    const ownerId = req.user!.userId;
+    const { reason } = req.body as RejectPaymentInput;
 
-    	const existing = await prisma.payment.findUnique({
-      		where: { id },
-      		include: { 
-				reservation: { 
-					include: { 
-						boarding: true 
-					} 
-				} 
-			},
-    	});
+    const existing = await Payment.findById(id)
+      .populate({
+        path: "reservationId",
+        populate: {
+          path: "boardingId",
+          select: "ownerId",
+        },
+      })
+      .lean();
 
-    	if (!existing) throw new NotFoundError('Payment not found');
-    
-		if (existing.reservation.boarding.ownerId !== ownerId) {
-      		throw new ForbiddenError('You do not own this boarding');
-    	}
-    
-		if (existing.status !== PaymentStatus.PENDING) {
-      		throw new BadRequestError('Only PENDING payments can be rejected');
-    	}
+    if (!existing) throw new NotFoundError("Payment not found");
 
-    	const payment = await prisma.payment.update({
-      		where: { id },
-      		data: { 
-				status: PaymentStatus.REJECTED, 
-				rejectionReason: reason 
-			},
+    const boarding = (existing.reservationId as any)?.boardingId;
+    if (!boarding || boarding.ownerId.toString() !== ownerId) {
+      throw new ForbiddenError("You do not own this boarding");
+    }
 
-      		select: paymentSelect(),
-		
-    	});
+    if (existing.status !== PaymentStatus.PENDING) {
+      throw new BadRequestError("Only PENDING payments can be rejected");
+    }
 
-    	sendSuccess(res, { payment }, 'Payment rejected');
-  
-	} catch (err) {
-    	next(err);
-  	}
+    const payment = await Payment.findByIdAndUpdate(
+      id,
+      {
+        status: PaymentStatus.REJECTED,
+        rejectionReason: reason,
+      },
+      { new: true },
+    ).lean();
+
+    sendSuccess(res, { payment }, "Payment rejected");
+  } catch (err) {
+    next(err);
+  }
 }
