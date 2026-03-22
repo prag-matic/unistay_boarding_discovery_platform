@@ -1,9 +1,9 @@
 import type { Request, Response, NextFunction } from "express";
 import { ZodError } from "zod";
-import { Prisma } from "@prisma/client";
-import { AppError, ValidationError } from '@/errors/AppError.js';
-import { sendError } from '@/lib/response.js';
-import { config } from '@/config/env.js';
+import mongoose from "mongoose";
+import { AppError, ValidationError } from "@/errors/AppError.js";
+import { sendError } from "@/lib/response.js";
+import { config } from "@/config/env.js";
 
 /**
  * Global error handler middleware
@@ -20,28 +20,41 @@ export const errorHandler = (
   // Zod validation errors
   if (err instanceof ZodError) {
     const details = err.issues.map((e) => ({
-      field: e.path.join('.'),
+      field: e.path.join("."),
       message: e.message,
     }));
-    sendError(res, 'ValidationError', 'Validation failed', 422, details);
+    sendError(res, "ValidationError", "Validation failed", 422, details);
     return;
   }
 
   // JWT errors
-  if (err.name === 'JsonWebTokenError') {
-    sendError(res, 'UnauthorizedError', 'Invalid token', 401);
+  if (err.name === "JsonWebTokenError") {
+    sendError(res, "UnauthorizedError", "Invalid token", 401);
     return;
   }
-  if (err.name === 'TokenExpiredError') {
-    sendError(res, 'TokenExpiredError', 'Token has expired', 401);
+  if (err.name === "TokenExpiredError") {
+    sendError(res, "TokenExpiredError", "Token has expired", 401);
     return;
   }
 
-  // Handle Prisma errors
-  if (err instanceof Prisma.PrismaClientKnownRequestError) {
-    handlePrismaError(err, res);
+  // Handle Mongoose errors
+  if (err instanceof mongoose.Error.ValidationError) {
+    handleMongooseValidationError(err, res);
     return;
   }
+  if (err instanceof mongoose.Error.CastError) {
+    sendError(res, "BadRequestError", "Invalid ID format", 400);
+    return;
+  }
+  if ((err as any).code === 11000) {
+    handleDuplicateKeyError(err, res);
+    return;
+  }
+  if (err instanceof mongoose.Error) {
+    sendError(res, "DatabaseError", "A database error occurred", 500);
+    return;
+  }
+
   // Our custom AppErrors
   if (err instanceof AppError) {
     const details = err instanceof ValidationError ? err.details : undefined;
@@ -49,43 +62,36 @@ export const errorHandler = (
     return;
   }
 
-
   // Unexpected errors
-  if (config.nodeEnv !== 'production') {
-    console.error('[Error]', err);
+  if (config.nodeEnv !== "production") {
+    console.error("[Error]", err);
   }
-  sendError(res, 'InternalServerError', 'An unexpected error occurred', 500);
-
+  sendError(res, "InternalServerError", "An unexpected error occurred", 500);
 };
 
 /**
- * Handle Prisma-specific errors
+ * Handle Mongoose validation errors
  */
-function handlePrismaError(
-  error: Prisma.PrismaClientKnownRequestError,
+function handleMongooseValidationError(
+  error: mongoose.Error.ValidationError,
   res: Response,
 ): void {
-  switch (error.code) {
-    case "P2002": // Unique constraint failed
-      const target = error.meta?.target as string[] | undefined;
-      sendError(
-        res,
-        'ConflictError',
-        `A record with this ${target?.join(', ') || 'value'} already exists`,
-        409,
-      );
-      return;
+  const details = Object.values(error.errors).map((err) => ({
+    field: err.path,
+    message: err.message,
+  }));
+  sendError(res, "ValidationError", "Validation failed", 422, details);
+}
 
-    case "P2025": // Record not found
-      sendError(res, 'NotFoundError', 'The requested resource was not found', 404);
-      return;
-
-    case "P2003": // Foreign key constraint failed
-      sendError(res, 'BadRequestError', 'Invalid reference to related resource', 400);
-      return;
-
-    default:
-      sendError(res, 'DatabaseError', 'A database error occurred', 500);
-      return;
-  }
+/**
+ * Handle MongoDB duplicate key errors
+ */
+function handleDuplicateKeyError(error: any, res: Response): void {
+  const field = Object.keys(error.keyValue || {})[0];
+  sendError(
+    res,
+    "ConflictError",
+    `A record with this ${field || "value"} already exists`,
+    409,
+  );
 }

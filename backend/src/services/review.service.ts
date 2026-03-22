@@ -1,6 +1,19 @@
-import prisma from '../lib/prisma.js';
-import { openinary } from '../lib/openinary.js';
-import type { CreateReviewInput, UpdateReviewInput, CreateReviewCommentInput, UpdateReviewCommentInput } from '../schemas/index.js';
+import mongoose from "mongoose";
+import {
+  Review,
+  ReviewComment,
+  ReviewReaction,
+  ReviewCommentReaction,
+  Boarding,
+  User,
+} from "@/models/index.js";
+import { openinary } from "../lib/openinary.js";
+import type {
+  CreateReviewInput,
+  UpdateReviewInput,
+  CreateReviewCommentInput,
+  UpdateReviewCommentInput,
+} from "../schemas/index.js";
 
 /**
  * Review Service
@@ -41,70 +54,49 @@ export class ReviewService {
     }
 
     // Create review in database
-    const review = await prisma.review.create({
-      data: {
-        boardingId,
-        studentId,
-        rating: data.rating,
-        comment: data.comment ?? null,
-        images: imagePaths,
-        video: videoPath ?? null,
-      },
-      include: {
-        boarding: true,
-        student: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-      },
+    const review = await Review.create({
+      boardingId: new mongoose.Types.ObjectId(boardingId),
+      studentId: new mongoose.Types.ObjectId(studentId),
+      rating: data.rating,
+      comment: data.comment ?? null,
+      images: imagePaths,
+      video: videoPath ?? null,
     });
 
-    return review;
+    const populatedReview = await Review.findById(review._id)
+      .populate("boardingId", "id title boardingType address city")
+      .populate("studentId", "id firstName lastName email")
+      .lean();
+
+    return populatedReview;
   }
 
   /**
    * Get a review by ID
    */
   async getReviewById(reviewId: string) {
-    const review = await prisma.review.findUnique({
-      where: { id: reviewId },
-      include: {
-        boarding: {
-          select: {
-            id: true,
-            title: true,
-            boardingType: true,
-            address: true,
-            city: true,
-          },
+    if (!mongoose.Types.ObjectId.isValid(reviewId)) {
+      return null;
+    }
+
+    const review = await Review.findById(reviewId)
+      .populate({
+        path: "boardingId",
+        select: "id title boardingType address city",
+      })
+      .populate({
+        path: "studentId",
+        select: "id firstName lastName email",
+      })
+      .populate({
+        path: "comments",
+        populate: {
+          path: "commentorId",
+          select: "id firstName lastName email",
         },
-        student: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-        comments: {
-          include: {
-            commentor: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-              },
-            },
-          },
-          orderBy: { commentedAt: 'asc' },
-        },
-      },
-    });
+        options: { sort: { commentedAt: 1 } },
+      })
+      .lean();
 
     return review;
   }
@@ -117,50 +109,41 @@ export class ReviewService {
     options?: {
       page?: number;
       limit?: number;
-      sortBy?: 'rating' | 'commentedAt';
-      sortOrder?: 'asc' | 'desc';
+      sortBy?: "rating" | "commentedAt";
+      sortOrder?: "asc" | "desc";
     },
   ) {
     const {
       page = 1,
       limit = 10,
-      sortBy = 'commentedAt',
-      sortOrder = 'desc',
+      sortBy = "commentedAt",
+      sortOrder = "desc",
     } = options ?? {};
 
     const skip = (page - 1) * limit;
 
     const [reviews, total] = await Promise.all([
-      prisma.review.findMany({
-        where: { boardingId },
-        skip,
-        take: limit,
-        orderBy: { [sortBy]: sortOrder },
-        include: {
-          student: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-            },
+      Review.find({ boardingId: new mongoose.Types.ObjectId(boardingId) })
+        .populate({
+          path: "studentId",
+          select: "id firstName lastName email",
+        })
+        .populate({
+          path: "comments",
+          populate: {
+            path: "commentorId",
+            select: "id firstName lastName email",
           },
-          comments: {
-            include: {
-              commentor: {
-                select: {
-                  id: true,
-                  firstName: true,
-                  lastName: true,
-                  email: true,
-                },
-              },
-            },
-            take: 5, // Get latest 5 comments per review
-          },
-        },
+          options: { limit: 5 },
+        })
+        .sort({ [sortBy]: sortOrder })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+
+      Review.countDocuments({
+        boardingId: new mongoose.Types.ObjectId(boardingId),
       }),
-      prisma.review.count({ where: { boardingId } }),
     ]);
 
     return {
@@ -184,21 +167,24 @@ export class ReviewService {
     images?: Express.Multer.File[],
     video?: Express.Multer.File,
   ) {
-    // Check if review exists and belongs to student
-    const existingReview = await prisma.review.findUnique({
-      where: { id: reviewId },
-    });
-
-    if (!existingReview) {
-      throw new Error('Review not found');
+    if (!mongoose.Types.ObjectId.isValid(reviewId)) {
+      throw new Error("Review not found");
     }
 
-    if (existingReview.studentId !== studentId) {
-      throw new Error('You can only edit your own reviews');
+    const existingReview = await Review.findById(reviewId);
+
+    if (!existingReview) {
+      throw new Error("Review not found");
+    }
+
+    if (existingReview.studentId.toString() !== studentId) {
+      throw new Error("You can only edit your own reviews");
     }
 
     if (existingReview.editedAt) {
-      throw new Error('This review has already been edited and cannot be modified again');
+      throw new Error(
+        "This review has already been edited and cannot be modified again",
+      );
     }
 
     // Upload new images if provided
@@ -207,7 +193,7 @@ export class ReviewService {
       // Delete old images
       for (const oldPath of existingReview.images) {
         try {
-          const publicId = oldPath.split('/').pop()?.split('.')[0] || '';
+          const publicId = oldPath.split("/").pop()?.split(".")[0] || "";
           if (publicId) await openinary.delete(publicId);
         } catch {
           // Ignore delete errors
@@ -226,12 +212,13 @@ export class ReviewService {
     }
 
     // Upload new video if provided
-    let videoPath: string | null = existingReview.video;
+    let videoPath: string | null = existingReview.video || null;
     if (video) {
       // Delete old video
       if (existingReview.video) {
         try {
-          const publicId = existingReview.video.split('/').pop()?.split('.')[0] || '';
+          const publicId =
+            existingReview.video.split("/").pop()?.split(".")[0] || "";
           if (publicId) await openinary.delete(publicId);
         } catch {
           // Ignore delete errors
@@ -247,27 +234,20 @@ export class ReviewService {
     }
 
     // Update review
-    const review = await prisma.review.update({
-      where: { id: reviewId },
-      data: {
+    const review = await Review.findByIdAndUpdate(
+      reviewId,
+      {
         ...(data.rating !== undefined && { rating: data.rating }),
         ...(data.comment !== undefined && { comment: data.comment }),
         ...(images && { images: imagePaths }),
         ...(video && { video: videoPath }),
-        editedAt: new Date(), // Mark as edited
+        editedAt: new Date(),
       },
-      include: {
-        boarding: true,
-        student: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-      },
-    });
+      { new: true },
+    )
+      .populate("boardingId")
+      .populate("studentId", "id firstName lastName email")
+      .lean();
 
     return review;
   }
@@ -276,23 +256,24 @@ export class ReviewService {
    * Delete a review
    */
   async deleteReview(reviewId: string, studentId: string) {
-    // Check if review exists and belongs to student
-    const existingReview = await prisma.review.findUnique({
-      where: { id: reviewId },
-    });
-
-    if (!existingReview) {
-      throw new Error('Review not found');
+    if (!mongoose.Types.ObjectId.isValid(reviewId)) {
+      throw new Error("Review not found");
     }
 
-    if (existingReview.studentId !== studentId) {
-      throw new Error('You can only delete your own reviews');
+    const existingReview = await Review.findById(reviewId);
+
+    if (!existingReview) {
+      throw new Error("Review not found");
+    }
+
+    if (existingReview.studentId.toString() !== studentId) {
+      throw new Error("You can only delete your own reviews");
     }
 
     // Delete images from Openinary
     for (const imagePath of existingReview.images) {
       try {
-        const publicId = imagePath.split('/').pop()?.split('.')[0] || '';
+        const publicId = imagePath.split("/").pop()?.split(".")[0] || "";
         if (publicId) await openinary.delete(publicId);
       } catch {
         // Ignore delete errors
@@ -302,7 +283,8 @@ export class ReviewService {
     // Delete video from Openinary
     if (existingReview.video) {
       try {
-        const publicId = existingReview.video.split('/').pop()?.split('.')[0] || '';
+        const publicId =
+          existingReview.video.split("/").pop()?.split(".")[0] || "";
         if (publicId) await openinary.delete(publicId);
       } catch {
         // Ignore delete errors
@@ -310,11 +292,9 @@ export class ReviewService {
     }
 
     // Delete review from database (cascade will delete comments and reactions)
-    await prisma.review.delete({
-      where: { id: reviewId },
-    });
+    await Review.findByIdAndDelete(reviewId);
 
-    return { success: true, message: 'Review deleted successfully' };
+    return { success: true, message: "Review deleted successfully" };
   }
 
   /**
@@ -323,89 +303,61 @@ export class ReviewService {
   async addReviewReaction(
     reviewId: string,
     userId: string,
-    type: 'LIKE' | 'DISLIKE',
+    type: "LIKE" | "DISLIKE",
   ) {
-    // Check if review exists
-    const review = await prisma.review.findUnique({
-      where: { id: reviewId },
-    });
-
-    if (!review) {
-      throw new Error('Review not found');
+    if (!mongoose.Types.ObjectId.isValid(reviewId)) {
+      throw new Error("Review not found");
     }
 
-    // Check if user already reacted
-    const existingReaction = await prisma.reviewReaction.findUnique({
-      where: {
-        reviewId_userId: {
-          reviewId,
-          userId,
-        },
-      },
+    const review = await Review.findById(reviewId);
+
+    if (!review) {
+      throw new Error("Review not found");
+    }
+
+    const existingReaction = await ReviewReaction.findOne({
+      reviewId: new mongoose.Types.ObjectId(reviewId),
+      userId: new mongoose.Types.ObjectId(userId),
     });
 
     if (existingReaction) {
       if (existingReaction.type === type) {
-        // Toggle off (remove reaction)
-        await prisma.reviewReaction.delete({
-          where: { id: existingReaction.id },
-        });
+        await ReviewReaction.findByIdAndDelete(existingReaction._id);
 
-        // Update counts
-        await prisma.review.update({
-          where: { id: reviewId },
-          data: {
-            [type === 'LIKE' ? 'likeCount' : 'dislikeCount']: {
-              decrement: 1,
-            },
+        await Review.findByIdAndUpdate(reviewId, {
+          $inc: {
+            [type === "LIKE" ? "likeCount" : "dislikeCount"]: -1,
           },
         });
 
-        return { action: 'removed', type };
+        return { action: "removed", type };
       } else {
-        // Change reaction
-        await prisma.reviewReaction.update({
-          where: { id: existingReaction.id },
-          data: { type },
-        });
+        await ReviewReaction.findByIdAndUpdate(existingReaction._id, { type });
 
-        // Update counts
-        await prisma.review.update({
-          where: { id: reviewId },
-          data: {
-            likeCount: {
-              increment: type === 'LIKE' ? 1 : -1,
-            },
-            dislikeCount: {
-              increment: type === 'DISLIKE' ? 1 : -1,
-            },
+        await Review.findByIdAndUpdate(reviewId, {
+          $inc: {
+            likeCount: type === "LIKE" ? 1 : -1,
+            dislikeCount: type === "DISLIKE" ? 1 : -1,
           },
         });
 
-        return { action: 'changed', type };
+        return { action: "changed", type };
       }
     }
 
-    // Add new reaction
-    await prisma.reviewReaction.create({
-      data: {
-        reviewId,
-        userId,
-        type,
+    await ReviewReaction.create({
+      reviewId: new mongoose.Types.ObjectId(reviewId),
+      userId: new mongoose.Types.ObjectId(userId),
+      type,
+    });
+
+    await Review.findByIdAndUpdate(reviewId, {
+      $inc: {
+        [type === "LIKE" ? "likeCount" : "dislikeCount"]: 1,
       },
     });
 
-    // Update counts
-    await prisma.review.update({
-      where: { id: reviewId },
-      data: {
-        [type === 'LIKE' ? 'likeCount' : 'dislikeCount']: {
-          increment: 1,
-        },
-      },
-    });
-
-    return { action: 'added', type };
+    return { action: "added", type };
   }
 
   /**
@@ -416,31 +368,22 @@ export class ReviewService {
     commentorId: string,
     data: CreateReviewCommentInput,
   ) {
-    const comment = await prisma.reviewComment.create({
-      data: {
-        reviewId,
-        commentorId,
-        comment: data.comment,
-      },
-      include: {
-        commentor: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-        review: {
-          select: {
-            id: true,
-            boardingId: true,
-          },
-        },
-      },
+    if (!mongoose.Types.ObjectId.isValid(reviewId)) {
+      throw new Error("Review not found");
+    }
+
+    const comment = await ReviewComment.create({
+      reviewId: new mongoose.Types.ObjectId(reviewId),
+      commentorId: new mongoose.Types.ObjectId(commentorId),
+      comment: data.comment,
     });
 
-    return comment;
+    const populatedComment = await ReviewComment.findById(comment._id)
+      .populate("commentorId", "id firstName lastName email")
+      .populate("reviewId", "id boardingId")
+      .lean();
+
+    return populatedComment;
   }
 
   /**
@@ -451,40 +394,36 @@ export class ReviewService {
     commentorId: string,
     data: UpdateReviewCommentInput,
   ) {
-    // Check if comment exists and belongs to user
-    const existingComment = await prisma.reviewComment.findUnique({
-      where: { id: commentId },
-    });
-
-    if (!existingComment) {
-      throw new Error('Comment not found');
+    if (!mongoose.Types.ObjectId.isValid(commentId)) {
+      throw new Error("Comment not found");
     }
 
-    if (existingComment.commentorId !== commentorId) {
-      throw new Error('You can only edit your own comments');
+    const existingComment = await ReviewComment.findById(commentId);
+
+    if (!existingComment) {
+      throw new Error("Comment not found");
+    }
+
+    if (existingComment.commentorId.toString() !== commentorId) {
+      throw new Error("You can only edit your own comments");
     }
 
     if (existingComment.editedAt) {
-      throw new Error('This comment has already been edited and cannot be modified again');
+      throw new Error(
+        "This comment has already been edited and cannot be modified again",
+      );
     }
 
-    const comment = await prisma.reviewComment.update({
-      where: { id: commentId },
-      data: {
+    const comment = await ReviewComment.findByIdAndUpdate(
+      commentId,
+      {
         comment: data.comment!,
         editedAt: new Date(),
       },
-      include: {
-        commentor: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-      },
-    });
+      { new: true },
+    )
+      .populate("commentorId", "id firstName lastName email")
+      .lean();
 
     return comment;
   }
@@ -493,24 +432,23 @@ export class ReviewService {
    * Delete a review comment
    */
   async deleteReviewComment(commentId: string, commentorId: string) {
-    // Check if comment exists and belongs to user
-    const existingComment = await prisma.reviewComment.findUnique({
-      where: { id: commentId },
-    });
+    if (!mongoose.Types.ObjectId.isValid(commentId)) {
+      throw new Error("Comment not found");
+    }
+
+    const existingComment = await ReviewComment.findById(commentId);
 
     if (!existingComment) {
-      throw new Error('Comment not found');
+      throw new Error("Comment not found");
     }
 
-    if (existingComment.commentorId !== commentorId) {
-      throw new Error('You can only delete your own comments');
+    if (existingComment.commentorId.toString() !== commentorId) {
+      throw new Error("You can only delete your own comments");
     }
 
-    await prisma.reviewComment.delete({
-      where: { id: commentId },
-    });
+    await ReviewComment.findByIdAndDelete(commentId);
 
-    return { success: true, message: 'Comment deleted successfully' };
+    return { success: true, message: "Comment deleted successfully" };
   }
 
   /**
@@ -519,101 +457,74 @@ export class ReviewService {
   async addReviewCommentReaction(
     commentId: string,
     userId: string,
-    type: 'LIKE' | 'DISLIKE',
+    type: "LIKE" | "DISLIKE",
   ) {
-    // Check if comment exists
-    const comment = await prisma.reviewComment.findUnique({
-      where: { id: commentId },
-    });
-
-    if (!comment) {
-      throw new Error('Comment not found');
+    if (!mongoose.Types.ObjectId.isValid(commentId)) {
+      throw new Error("Comment not found");
     }
 
-    // Check if user already reacted
-    const existingReaction = await prisma.reviewCommentReaction.findUnique({
-      where: {
-        reviewCommentId_userId: {
-          reviewCommentId: commentId,
-          userId,
-        },
-      },
+    const comment = await ReviewComment.findById(commentId);
+
+    if (!comment) {
+      throw new Error("Comment not found");
+    }
+
+    const existingReaction = await ReviewCommentReaction.findOne({
+      reviewCommentId: new mongoose.Types.ObjectId(commentId),
+      userId: new mongoose.Types.ObjectId(userId),
     });
 
     if (existingReaction) {
       if (existingReaction.type === type) {
-        // Toggle off (remove reaction)
-        await prisma.reviewCommentReaction.delete({
-          where: { id: existingReaction.id },
-        });
+        await ReviewCommentReaction.findByIdAndDelete(existingReaction._id);
 
-        // Update counts
-        await prisma.reviewComment.update({
-          where: { id: commentId },
-          data: {
-            [type === 'LIKE' ? 'likeCount' : 'dislikeCount']: {
-              decrement: 1,
-            },
+        await ReviewComment.findByIdAndUpdate(commentId, {
+          $inc: {
+            [type === "LIKE" ? "likeCount" : "dislikeCount"]: -1,
           },
         });
 
-        return { action: 'removed', type };
+        return { action: "removed", type };
       } else {
-        // Change reaction
-        await prisma.reviewCommentReaction.update({
-          where: { id: existingReaction.id },
-          data: { type },
+        await ReviewCommentReaction.findByIdAndUpdate(existingReaction._id, {
+          type,
         });
 
-        // Update counts
-        await prisma.reviewComment.update({
-          where: { id: commentId },
-          data: {
-            likeCount: {
-              increment: type === 'LIKE' ? 1 : -1,
-            },
-            dislikeCount: {
-              increment: type === 'DISLIKE' ? 1 : -1,
-            },
+        await ReviewComment.findByIdAndUpdate(commentId, {
+          $inc: {
+            likeCount: type === "LIKE" ? 1 : -1,
+            dislikeCount: type === "DISLIKE" ? 1 : -1,
           },
         });
 
-        return { action: 'changed', type };
+        return { action: "changed", type };
       }
     }
 
-    // Add new reaction
-    await prisma.reviewCommentReaction.create({
-      data: {
-        reviewCommentId: commentId,
-        userId,
-        type,
+    await ReviewCommentReaction.create({
+      reviewCommentId: new mongoose.Types.ObjectId(commentId),
+      userId: new mongoose.Types.ObjectId(userId),
+      type,
+    });
+
+    await ReviewComment.findByIdAndUpdate(commentId, {
+      $inc: {
+        [type === "LIKE" ? "likeCount" : "dislikeCount"]: 1,
       },
     });
 
-    // Update counts
-    await prisma.reviewComment.update({
-      where: { id: commentId },
-      data: {
-        [type === 'LIKE' ? 'likeCount' : 'dislikeCount']: {
-          increment: 1,
-        },
-      },
-    });
-
-    return { action: 'added', type };
+    return { action: "added", type };
   }
 
   /**
    * Get review statistics for a boarding
    */
   async getReviewStats(boardingId: string) {
-    const reviews = await prisma.review.findMany({
-      where: { boardingId },
-      select: {
-        rating: true,
-      },
-    });
+    const reviews = await Review.find({
+      boardingId: new mongoose.Types.ObjectId(boardingId),
+    })
+      .select("rating")
+      .lean();
 
     const totalReviews = reviews.length;
     const averageRating =

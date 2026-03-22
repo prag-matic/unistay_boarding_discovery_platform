@@ -1,303 +1,312 @@
-import type { Request, Response, NextFunction } from 'express';
-import prisma from '@/lib/prisma.js';
-import { sendSuccess } from '@/lib/response.js';;
+import type { Request, Response, NextFunction } from "express";
+import mongoose from "mongoose";
+import { VisitRequest, Boarding } from "@/models/index.js";
+import { BoardingStatus, VisitRequestStatus } from "@/types/enums.js";
+import { sendSuccess } from "@/lib/response.js";
 import {
-  	BoardingNotFoundError,
-  	ForbiddenError,
-  	ConflictError,
-  	BadRequestError,
-  	NotFoundError,
-  	GoneError,
-} from '@/errors/AppError.js';
+  BoardingNotFoundError,
+  ForbiddenError,
+  ConflictError,
+  BadRequestError,
+  NotFoundError,
+  GoneError,
+} from "@/errors/AppError.js";
 
-import type { 
-  	CreateVisitRequestInput, 
-  	RejectVisitRequestInput 
-} from '@/schemas/visitRequest.validators.js';
-
-import { 
-	BoardingStatus, 
-	VisitRequestStatus 
-} from '@prisma/client';
+import type {
+  CreateVisitRequestInput,
+  RejectVisitRequestInput,
+} from "@/schemas/visitRequest.validators.js";
 
 const VISIT_EXPIRY_HOURS = 72;
 
-function visitRequestSelect() {
-  	return {
-    	id: true,
-    	studentId: true,
-    	boardingId: true,
-    	status: true,
-    	requestedStartAt: true,
-    	requestedEndAt: true,
-    	message: true,
-    	rejectionReason: true,
-    	expiresAt: true,
-    	createdAt: true,
-    	updatedAt: true,
-    	student: { 	
-			select: { 
-				id: true, 
-				firstName: true, 
-				lastName: true, 
-				email: true } 
-			},
-
-    	boarding: { 
-			select: { 
-				id: true, 
-				title: true, 
-				slug: true, 
-				city: true, 
-				district: true 
-			} 
-		},
-
-  	} as const;
-}
-
 // POST /api/v1/visit-requests  (student)
-export async function createVisitRequest(req: Request, res: Response, next: NextFunction): Promise<void> {
-  	try {
-    	const studentId = req.user!.userId;
-    	const body = req.body as CreateVisitRequestInput;
+export async function createVisitRequest(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const studentId = req.user!.userId;
+    const body = req.body as CreateVisitRequestInput;
 
-    	const now = new Date();
-    	const requestedStartAt = new Date(body.requestedStartAt);
-    	const requestedEndAt = new Date(body.requestedEndAt);
+    const now = new Date();
+    const requestedStartAt = new Date(body.requestedStartAt);
+    const requestedEndAt = new Date(body.requestedEndAt);
 
-    	if (requestedStartAt <= now) {
-     		throw new BadRequestError('requestedStartAt must be in the future');
-    	}
+    if (requestedStartAt <= now) {
+      throw new BadRequestError("requestedStartAt must be in the future");
+    }
 
-    	if (requestedEndAt <= requestedStartAt) {
-      		throw new BadRequestError('requestedEndAt must be after requestedStartAt');
-    	}
+    if (requestedEndAt <= requestedStartAt) {
+      throw new BadRequestError(
+        "requestedEndAt must be after requestedStartAt",
+      );
+    }
 
-    	const boarding = await prisma.boarding.findUnique({ where: { id: body.boardingId } });
-    	
-		if (!boarding || boarding.isDeleted) throw new BoardingNotFoundError();
-    	
-		if (boarding.status !== BoardingStatus.ACTIVE) {
-      		throw new BadRequestError('Boarding is not available for visit requests');
-    	}
+    const boarding = await Boarding.findById(body.boardingId);
 
-    	// One pending request per boarding per student
-    	const existing = await prisma.visitRequest.findFirst({
-      		where: {
-        		studentId,
-        		boardingId: body.boardingId,
-        		status: VisitRequestStatus.PENDING,
-      		},
-    	});
+    if (!boarding || boarding.isDeleted) throw new BoardingNotFoundError();
 
-    	if (existing) {
-      		throw new ConflictError('You already have a pending visit request for this boarding');
-    	}
+    if (boarding.status !== BoardingStatus.ACTIVE) {
+      throw new BadRequestError("Boarding is not available for visit requests");
+    }
 
-    	const expiresAt = new Date();
-    	
-		expiresAt.setHours(expiresAt.getHours() + VISIT_EXPIRY_HOURS);
+    const existing = await VisitRequest.findOne({
+      studentId: new mongoose.Types.ObjectId(studentId),
+      boardingId: new mongoose.Types.ObjectId(body.boardingId),
+      status: VisitRequestStatus.PENDING,
+    });
 
-    	const visitRequest = await prisma.visitRequest.create({
-      		data: {
-        		studentId,
-        		boardingId: body.boardingId,
-        		requestedStartAt,
-        		requestedEndAt,
-        		message: body.message,
-        		expiresAt,
-      		},
+    if (existing) {
+      throw new ConflictError(
+        "You already have a pending visit request for this boarding",
+      );
+    }
 
-      		select: visitRequestSelect(),
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + VISIT_EXPIRY_HOURS);
 
-    	});
+    const visitRequest = await VisitRequest.create({
+      studentId: new mongoose.Types.ObjectId(studentId),
+      boardingId: new mongoose.Types.ObjectId(body.boardingId),
+      requestedStartAt,
+      requestedEndAt,
+      message: body.message,
+      expiresAt,
+    });
 
-    	sendSuccess(res, { visitRequest }, 'Visit request created successfully', 201);
-  	
-	} catch (err) {
-    	next(err);
-  	}
+    const populated = await VisitRequest.findById(visitRequest._id)
+      .populate("studentId", "firstName lastName email")
+      .populate("boardingId", "title slug city district")
+      .lean();
+
+    sendSuccess(
+      res,
+      { visitRequest: populated },
+      "Visit request created successfully",
+      201,
+    );
+  } catch (err) {
+    next(err);
+  }
 }
 
 // GET /api/v1/visit-requests/my-requests  (student)
-export async function getMyVisitRequests(req: Request, res: Response, next: NextFunction): Promise<void> {
-  	try {
-    	const studentId = req.user!.userId;
+export async function getMyVisitRequests(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const studentId = req.user!.userId;
 
-    	const visitRequests = await prisma.visitRequest.findMany({
-      		where: { studentId },
-      		orderBy: { createdAt: 'desc' },
-      		select: visitRequestSelect(),
-    	});
+    const visitRequests = await VisitRequest.find({
+      studentId: new mongoose.Types.ObjectId(studentId),
+    })
+      .populate("studentId", "firstName lastName email")
+      .populate("boardingId", "title slug city district")
+      .sort({ createdAt: -1 })
+      .lean();
 
-    	sendSuccess(res, { visitRequests });
-  	
-	} catch (err) {
-    	next(err);
-  	}
+    sendSuccess(res, { visitRequests });
+  } catch (err) {
+    next(err);
+  }
 }
 
 // GET /api/v1/visit-requests/my-boardings  (owner)
-export async function getMyBoardingVisitRequests(req: Request, res: Response, next: NextFunction): Promise<void> {
-  	try {
-    	const ownerId = req.user!.userId;
+export async function getMyBoardingVisitRequests(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const ownerId = req.user!.userId;
 
-    	const visitRequests = await prisma.visitRequest.findMany({
-      		where: { boarding: { ownerId } },
-      		orderBy: { createdAt: 'desc' },
-      		select: visitRequestSelect(),
-   		});
+    const visitRequests = await VisitRequest.find({})
+      .populate({
+        path: "boardingId",
+        match: { ownerId: new mongoose.Types.ObjectId(ownerId) },
+        select: "id ownerId",
+      })
+      .populate("studentId", "firstName lastName email")
+      .populate("boardingId", "title slug city district")
+      .sort({ createdAt: -1 })
+      .lean();
 
-    sendSuccess(res, { visitRequests });
-  	
-	} catch (err) {
-    	next(err);
-  	}
+    const filteredRequests = visitRequests.filter((r) => r.boardingId !== null);
+
+    sendSuccess(res, { visitRequests: filteredRequests });
+  } catch (err) {
+    next(err);
+  }
 }
 
 // GET /api/v1/visit-requests/:id
-export async function getVisitRequestById(req: Request, res: Response, next: NextFunction): Promise<void> {
-  	try {
-    	const { id } = req.params as { id: string };
-    	const userId = req.user!.userId;
-    	const role = req.user!.role;
+export async function getVisitRequestById(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { id } = req.params as { id: string };
+    const userId = req.user!.userId;
+    const role = req.user!.role;
 
-    	const visitRequest = await prisma.visitRequest.findUnique({
-      		where: { id },
-      		select: visitRequestSelect(),
-    	});
+    const visitRequest = await VisitRequest.findById(id)
+      .populate("studentId", "firstName lastName email")
+      .populate("boardingId", "title slug city district")
+      .lean();
 
-    	if (!visitRequest) throw new NotFoundError('Visit request not found');
+    if (!visitRequest) throw new NotFoundError("Visit request not found");
 
-    	if (role !== 'ADMIN') {
-      		const isStudent = visitRequest.studentId === userId;
-      
-		if (!isStudent) {
-        	const boarding = await prisma.boarding.findUnique({ where: { id: visitRequest.boardingId } });
-        	
-			if (!boarding || boarding.ownerId !== userId) {
-          		throw new ForbiddenError('Access denied');
-        	}
-      	}
+    if (role !== "ADMIN") {
+      const isStudent = visitRequest.studentId._id.toString() === userId;
+
+      if (!isStudent) {
+        const boarding = await Boarding.findById(visitRequest.boardingId._id);
+
+        if (!boarding || boarding.ownerId.toString() !== userId) {
+          throw new ForbiddenError("Access denied");
+        }
+      }
     }
 
     sendSuccess(res, { visitRequest });
-  	
-	} catch (err) {
-    	next(err);
- 	}
+  } catch (err) {
+    next(err);
+  }
 }
 
 // PATCH /api/v1/visit-requests/:id/approve  (owner)
-export async function approveVisitRequest(req: Request, res: Response, next: NextFunction): Promise<void> {
-  	try {
-    	const { id } = req.params as { id: string };
-    	const ownerId = req.user!.userId;
+export async function approveVisitRequest(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { id } = req.params as { id: string };
+    const ownerId = req.user!.userId;
 
-    	const existing = await prisma.visitRequest.findUnique({
-      		where: { id },
-      		include: { boarding: true },
-    	});
+    const existing = await VisitRequest.findById(id).populate(
+      "boardingId",
+      "ownerId",
+    );
 
-    	if (!existing) throw new NotFoundError('Visit request not found');
-    	
-		if (existing.boarding.ownerId !== ownerId) {
-      		throw new ForbiddenError('You do not own this boarding');
-    	}
+    if (!existing) throw new NotFoundError("Visit request not found");
 
-    	if (existing.status !== VisitRequestStatus.PENDING) {
-      		throw new BadRequestError('Only PENDING visit requests can be approved');
-    	}
+    if ((existing.boardingId as any).ownerId.toString() !== ownerId) {
+      throw new ForbiddenError("You do not own this boarding");
+    }
 
-    	// Check date and find if expired
-    	if (new Date() > existing.expiresAt) {
-      		await prisma.visitRequest.update({ 
-				where: { id }, 
-				data: { status: VisitRequestStatus.EXPIRED } });
-      	
-			throw new GoneError('Visit request has expired');
-    	}
+    if (existing.status !== VisitRequestStatus.PENDING) {
+      throw new BadRequestError("Only PENDING visit requests can be approved");
+    }
 
-    	const visitRequest = await prisma.visitRequest.update({
-      		where: { id },
-      		data: { status: VisitRequestStatus.APPROVED },
-      		select: visitRequestSelect(),
-    	});
+    if (new Date() > existing.expiresAt) {
+      await VisitRequest.findByIdAndUpdate(id, {
+        status: VisitRequestStatus.EXPIRED,
+      });
+      throw new GoneError("Visit request has expired");
+    }
 
-    	sendSuccess(res, { visitRequest }, 'Visit request approved');
-  	
-	} catch (err) {
-    	next(err);
-  	}
+    const visitRequest = await VisitRequest.findByIdAndUpdate(
+      id,
+      { status: VisitRequestStatus.APPROVED },
+      { new: true },
+    )
+      .populate("studentId", "firstName lastName email")
+      .populate("boardingId", "title slug city district")
+      .lean();
+
+    sendSuccess(res, { visitRequest }, "Visit request approved");
+  } catch (err) {
+    next(err);
+  }
 }
 
 // PATCH /api/v1/visit-requests/:id/reject  (owner)
-export async function rejectVisitRequest(req: Request, res: Response, next: NextFunction): Promise<void> {
-  	try {
-    	const { id } = req.params as { id: string };
-    	const ownerId = req.user!.userId;
-    	const { reason } = req.body as RejectVisitRequestInput;
+export async function rejectVisitRequest(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { id } = req.params as { id: string };
+    const ownerId = req.user!.userId;
+    const { reason } = req.body as RejectVisitRequestInput;
 
-    	const existing = await prisma.visitRequest.findUnique({
-      		where: { id },
-      		include: { boarding: true },
-    	});
-    
-		if (!existing) throw new NotFoundError('Visit request not found');
-    
-		if (existing.boarding.ownerId !== ownerId) {
-      		throw new ForbiddenError('You do not own this boarding');
-    	}
-    
-		if (existing.status !== VisitRequestStatus.PENDING) {
-      		throw new BadRequestError('Only PENDING visit requests can be rejected');
-    	}
+    const existing = await VisitRequest.findById(id).populate(
+      "boardingId",
+      "ownerId",
+    );
 
-    	const visitRequest = await prisma.visitRequest.update({
-      		where: { id },
-      		data: { 
-				status: VisitRequestStatus.REJECTED, 
-				rejectionReason: reason },
-      		select: visitRequestSelect(),
-    	});
+    if (!existing) throw new NotFoundError("Visit request not found");
 
-    
-		sendSuccess(res, { visitRequest }, 'Visit request rejected');
-  
-	} catch (err) {
-    	next(err);
-  	}
+    if ((existing.boardingId as any).ownerId.toString() !== ownerId) {
+      throw new ForbiddenError("You do not own this boarding");
+    }
+
+    if (existing.status !== VisitRequestStatus.PENDING) {
+      throw new BadRequestError("Only PENDING visit requests can be rejected");
+    }
+
+    const visitRequest = await VisitRequest.findByIdAndUpdate(
+      id,
+      {
+        status: VisitRequestStatus.REJECTED,
+        rejectionReason: reason,
+      },
+      { new: true },
+    )
+      .populate("studentId", "firstName lastName email")
+      .populate("boardingId", "title slug city district")
+      .lean();
+
+    sendSuccess(res, { visitRequest }, "Visit request rejected");
+  } catch (err) {
+    next(err);
+  }
 }
 
 // PATCH /api/v1/visit-requests/:id/cancel  (student)
-export async function cancelVisitRequest(req: Request, res: Response, next: NextFunction): Promise<void> {
-  	try {
-    	const { id } = req.params as { id: string };
-    	const studentId = req.user!.userId;
+export async function cancelVisitRequest(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { id } = req.params as { id: string };
+    const studentId = req.user!.userId;
 
-    	const existing = await prisma.visitRequest.findUnique({ where: { id } });
-    
-		if (!existing) throw new NotFoundError('Visit request not found');
-    	
-		if (existing.studentId !== studentId) throw new ForbiddenError('This is not your visit request');
-    	
-		if (
-      		existing.status !== VisitRequestStatus.PENDING &&
-      		existing.status !== VisitRequestStatus.APPROVED
-    	) {
-      		throw new BadRequestError('Only PENDING or APPROVED visit requests can be cancelled');
-   		}
+    const existing = await VisitRequest.findById(id);
 
-    	const visitRequest = await prisma.visitRequest.update({
-      		where: { id },
-      		data: { status: VisitRequestStatus.CANCELLED },
-      		select: visitRequestSelect(),
-    	});
+    if (!existing) throw new NotFoundError("Visit request not found");
 
-    	sendSuccess(res, { visitRequest }, 'Visit request cancelled');
-  	
-	} catch (err) {
-    	next(err);
-  	}
+    if (existing.studentId.toString() !== studentId) {
+      throw new ForbiddenError("This is not your visit request");
+    }
+
+    if (
+      existing.status !== VisitRequestStatus.PENDING &&
+      existing.status !== VisitRequestStatus.APPROVED
+    ) {
+      throw new BadRequestError(
+        "Only PENDING or APPROVED visit requests can be cancelled",
+      );
+    }
+
+    const visitRequest = await VisitRequest.findByIdAndUpdate(
+      id,
+      { status: VisitRequestStatus.CANCELLED },
+      { new: true },
+    )
+      .populate("studentId", "firstName lastName email")
+      .populate("boardingId", "title slug city district")
+      .lean();
+
+    sendSuccess(res, { visitRequest }, "Visit request cancelled");
+  } catch (err) {
+    next(err);
+  }
 }

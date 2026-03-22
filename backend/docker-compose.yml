@@ -1,115 +1,39 @@
 services:
-  prisma-migrate:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        - DATABASE_URL=${DATABASE_URL}
-    container_name: unistay_prisma_migrate
-    environment:
-      - DATABASE_URL=${DATABASE_URL}
-    env_file:
-      - .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-    command: sh -c "npm run prisma:generate && npm run prisma:migrate:deploy"
-    profiles:
-      - prod
-      - dev
-
-  prisma-seed:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        - DATABASE_URL=${DATABASE_URL}
-    container_name: unistay_prisma_seed
-    environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - NODE_ENV=development
-    env_file:
-      - .env
-    volumes:
-      - ./prisma:/app/prisma
-    depends_on:
-      postgres:
-        condition: service_healthy
-      prisma-migrate:
-        condition: service_completed_successfully
-    command: sh -c "sleep 3 && npm run prisma:seed || npm run prisma:seed"
-    profiles:
-      - prod
-      - dev
-
   backend:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        - DATABASE_URL=${DATABASE_URL}
     container_name: unistay_backend
     ports:
       - "${PORT}:${PORT}"
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=development
       - PORT=${PORT}
     env_file:
       - .env
     depends_on:
-      postgres:
+      mongodb:
         condition: service_healthy
       minio:
         condition: service_healthy
       openinary:
-        condition: service_healthy
-      prisma-migrate:
-        condition: service_completed_successfully
-      prisma-seed:
-        condition: service_completed_successfully
-    command: npm start
-    profiles:
-      - prod
-
-  backend-dev:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: unistay_backend_dev
-    ports:
-      - "${PORT}:${PORT}"
-    environment:
-      - NODE_ENV=development
-      - DATABASE_URL=${DATABASE_URL}
-    env_file:
-      - .env
+        condition: service_started
+    command: npm run dev
     volumes:
       - .:/app
       - /app/node_modules
-    depends_on:
-      postgres:
-        condition: service_healthy
-      openinary:
-        condition: service_started
-      prisma-migrate:
-        condition: service_completed_successfully
-      prisma-seed:
-        condition: service_completed_successfully
-    command: sh -c "npm run prisma:generate && npm run dev"
-    profiles:
-      - dev
 
-  postgres:
-    image: postgres:18-alpine
-    container_name: unistay_postgres
+  mongodb:
+    image: mongo:7
+    container_name: unistay_mongodb
     ports:
-      - "5432:5432"
+      - "27017:27017"
     env_file:
       - .env
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mongodb_data:/data/db
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -164,8 +88,14 @@ services:
         condition: service_completed_successfully
     volumes:
       - openinary_db:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3002"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
 volumes:
-  postgres_data:
+  mongodb_data:
   minio_data:
   openinary_db:

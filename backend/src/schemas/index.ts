@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { BoardingAmenityType } from "@prisma/client";
+import { BoardingAmenityType } from "@/types/enums.js";
 
 // Gender enum schema
 export const genderSchema = z.enum([
@@ -60,7 +60,7 @@ export const boardingTypeSchema = z.enum([
   "OTHER",
 ]);
 
-export const boardingAmenitySchema = z.enum(BoardingAmenityType);
+export const boardingAmenitySchema = z.enum(Object.values(BoardingAmenityType));
 
 // Boarding schema
 export const boardingSchema = z.object({

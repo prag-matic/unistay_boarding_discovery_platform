@@ -2,7 +2,19 @@
  * Application-wide TypeScript types
  */
 
-import type { User, Boarding, Review, ReviewComment } from '@prisma/client';
+import type { Document, Types } from "mongoose";
+import type {
+  IUser,
+  IBoarding,
+  IReview,
+  IReviewComment,
+  IBoardingImage,
+  IBoardingAmenity,
+  IBoardingRule,
+  IReservation,
+  IVisitRequest,
+} from "@/models/index.js";
+import type { Role } from "@/types/enums.js";
 
 /**
  * API Response types
@@ -28,9 +40,9 @@ export interface PaginatedResponse<T> {
  * JWT Payload type
  */
 export interface JWTPayload {
-  id: string;
+  userId: string;
   email: string;
-  role: 'STUDENT' | 'OWNER';
+  role: Role;
   iat?: number;
   exp?: number;
 }
@@ -38,35 +50,41 @@ export interface JWTPayload {
 /**
  * User types with relations
  */
-export type UserWithRelations = User & {
-  ownedBoardings?: Boarding[];
-  reviews?: Review[];
-};
+export interface UserWithRelations extends Omit<IUser, keyof Document> {
+  ownedBoardings?: IBoarding[];
+  reviews?: IReview[];
+}
 
 /**
  * Boarding types with relations
  */
-export type BoardingWithRelations = Boarding & {
-  owner: User;
-  reviews?: Review[];
-};
+export interface BoardingWithRelations extends Omit<IBoarding, keyof Document> {
+  owner: IUser;
+  images?: IBoardingImage[];
+  amenities?: IBoardingAmenity[];
+  rules?: IBoardingRule[];
+  reviews?: IReview[];
+}
 
 /**
  * Review types with relations
  */
-export type ReviewWithRelations = Review & {
-  boarding: Boarding;
-  student: User;
-  comments?: ReviewComment[];
-};
+export interface ReviewWithRelations extends Omit<IReview, keyof Document> {
+  boarding: IBoarding;
+  student: IUser;
+  comments?: IReviewComment[];
+}
 
 /**
  * Review Comment types with relations
  */
-export type ReviewCommentWithRelations = ReviewComment & {
-  review: Review;
-  commentor: User;
-};
+export interface ReviewCommentWithRelations extends Omit<
+  IReviewComment,
+  keyof Document
+> {
+  review: IReview;
+  commentor: IUser;
+}
 
 /**
  * File upload types
@@ -87,7 +105,7 @@ export interface PaginationParams {
   page?: number;
   limit?: number;
   sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
+  sortOrder?: "asc" | "desc";
 }
 
 /**
