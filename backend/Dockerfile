@@ -9,14 +9,15 @@ RUN apk add --no-cache openssl
 COPY package*.json ./
 
 # Install dependencies
-RUN npm install
+RUN npm install -g pnpm
+RUN pnpm install
 
 # Copy source code
 COPY tsconfig.json ./
 COPY src ./src
 
 # Build the application
-RUN npm run build
+RUN pnpm run build
 
 # Default command (overridden in docker-compose for dev)
-CMD ["npm", "start"]
+CMD ["pnpm", "start"]
