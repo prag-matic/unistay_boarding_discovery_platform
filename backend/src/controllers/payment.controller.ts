@@ -1,20 +1,18 @@
-import type { Request, Response, NextFunction } from "express";
+import type { NextFunction, Request, Response } from "express";
 import mongoose from "mongoose";
-import { Payment, RentalPeriod, Reservation } from "@/models/index.js";
-import { PaymentStatus, RentalPeriodStatus } from "@/types/enums.js";
-import { sendSuccess } from "@/lib/response.js";
-
 import {
-  ForbiddenError,
-  ConflictError,
-  NotFoundError,
   BadRequestError,
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
 } from "@/errors/AppError.js";
-
+import { sendSuccess } from "@/lib/response.js";
+import { Payment, RentalPeriod, Reservation } from "@/models/index.js";
 import type {
   LogPaymentInput,
   RejectPaymentInput,
 } from "@/schemas/payment.validators.js";
+import { PaymentStatus, RentalPeriodStatus } from "@/types/enums.js";
 
 async function recalcRentalPeriodStatus(
   session: mongoose.ClientSession,
@@ -57,7 +55,7 @@ export async function logPayment(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const studentId = req.user!.userId;
+    const studentId = req.user?.userId;
     const body = req.body as LogPaymentInput;
 
     const paidAt = new Date(body.paidAt);
@@ -156,7 +154,7 @@ export async function getMyPayments(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const studentId = req.user!.userId;
+    const studentId = req.user?.userId;
 
     const payments = await Payment.find({
       studentId: new mongoose.Types.ObjectId(studentId),
@@ -177,7 +175,7 @@ export async function getMyBoardingPayments(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const ownerId = req.user!.userId;
+    const ownerId = req.user?.userId;
 
     const reservations = await Reservation.find({})
       .populate({
@@ -218,7 +216,7 @@ export async function confirmPayment(
 ): Promise<void> {
   try {
     const { id } = req.params as { id: string };
-    const ownerId = req.user!.userId;
+    const ownerId = req.user?.userId;
 
     const existing = await Payment.findById(id)
       .populate({
@@ -232,7 +230,11 @@ export async function confirmPayment(
 
     if (!existing) throw new NotFoundError("Payment not found");
 
-    const boarding = (existing.reservationId as any)?.boardingId;
+    const boarding = (
+      existing.reservationId as typeof existing.reservationId & {
+        boardingId?: { ownerId: mongoose.Types.ObjectId };
+      }
+    )?.boardingId;
     if (!boarding || boarding.ownerId.toString() !== ownerId) {
       throw new ForbiddenError("You do not own this boarding");
     }
@@ -283,7 +285,7 @@ export async function rejectPayment(
 ): Promise<void> {
   try {
     const { id } = req.params as { id: string };
-    const ownerId = req.user!.userId;
+    const ownerId = req.user?.userId;
     const { reason } = req.body as RejectPaymentInput;
 
     const existing = await Payment.findById(id)
@@ -298,7 +300,11 @@ export async function rejectPayment(
 
     if (!existing) throw new NotFoundError("Payment not found");
 
-    const boarding = (existing.reservationId as any)?.boardingId;
+    const boarding = (
+      existing.reservationId as typeof existing.reservationId & {
+        boardingId?: { ownerId: mongoose.Types.ObjectId };
+      }
+    )?.boardingId;
     if (!boarding || boarding.ownerId.toString() !== ownerId) {
       throw new ForbiddenError("You do not own this boarding");
     }

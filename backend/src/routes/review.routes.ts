@@ -1,21 +1,14 @@
-import { Router } from "express";
-import {
-  reviewController,
-  withUpload,
-} from "../controllers/review.controller.js";
+import type { Router } from "express";
+import { Router as createRouter } from "express";
+import { reviewController } from "../controllers/review.controller.js";
 import {
   uploadReviewMedia,
   validateReviewFiles,
 } from "../middleware/upload.js";
 import { validate } from "../middleware/validate.js";
-import {
-  createReviewSchema,
-  updateReviewSchema,
-  updateReviewCommentSchema,
-  reactionSchema,
-} from "../schemas/index.js";
+import { reactionSchema, updateReviewCommentSchema } from "../schemas/index.js";
 
-const router = Router();
+const router: Router = createRouter();
 
 /**
  * Review Routes
