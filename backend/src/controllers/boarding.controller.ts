@@ -1,30 +1,27 @@
-import type { Request, Response, NextFunction } from "express";
+import type { NextFunction, Request, Response } from "express";
 import mongoose from "mongoose";
 import {
-  Boarding,
-  BoardingImage,
-  BoardingAmenity,
-  BoardingRule,
-  User,
-} from "@/models/index.js";
-import { BoardingStatus } from "@/types/enums.js";
-import { generateUniqueSlug } from "@/utils/slug.js";
-import { MAX_BOARDING_IMAGES } from "@/middleware/upload.js";
-import { uploadBoardingImage, deleteBoardingImage } from "@/lib/cloudinary.js";
-import { sendSuccess } from "@/lib/response.js";
-
-import type {
-  SearchBoardingsQuery,
-  CreateBoardingInput,
-  UpdateBoardingInput,
-} from "@/schemas/boarding.validators.js";
-
-import {
   BoardingNotFoundError,
-  ValidationError,
   ForbiddenError,
   InvalidStateTransitionError,
+  ValidationError,
 } from "@/errors/AppError.js";
+import { deleteBoardingImage, uploadBoardingImage } from "@/lib/cloudinary.js";
+import { sendSuccess } from "@/lib/response.js";
+import { MAX_BOARDING_IMAGES } from "@/middleware/upload.js";
+import {
+  Boarding,
+  BoardingAmenity,
+  BoardingImage,
+  BoardingRule,
+} from "@/models/index.js";
+import type {
+  CreateBoardingInput,
+  SearchBoardingsQuery,
+  UpdateBoardingInput,
+} from "@/schemas/boarding.validators.js";
+import { BoardingStatus } from "@/types/enums.js";
+import { generateUniqueSlug } from "@/utils/slug.js";
 
 // GET /api/boardings  (public)
 export async function searchBoardings(
@@ -49,7 +46,7 @@ export async function searchBoardings(
       sortDir,
     } = req.query as unknown as SearchBoardingsQuery;
 
-    const query: any = {
+    const query: Record<string, unknown> = {
       status: BoardingStatus.ACTIVE,
       isDeleted: false,
     };
@@ -63,9 +60,11 @@ export async function searchBoardings(
     }
 
     if (minRent !== undefined || maxRent !== undefined) {
-      query.monthlyRent = {};
-      if (minRent !== undefined) query.monthlyRent.$gte = minRent;
-      if (maxRent !== undefined) query.monthlyRent.$lte = maxRent;
+      query.monthlyRent = {} as Record<string, number>;
+      if (minRent !== undefined)
+        (query.monthlyRent as Record<string, number>).$gte = minRent;
+      if (maxRent !== undefined)
+        (query.monthlyRent as Record<string, number>).$lte = maxRent;
     }
 
     if (boardingType) {
@@ -175,7 +174,7 @@ export async function getMyListings(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const ownerId = req.user!.userId;
+    const ownerId = req.user?.userId;
 
     const boardings = await Boarding.find({ ownerId, isDeleted: false })
       .populate("ownerId", "firstName lastName phone")
@@ -207,7 +206,7 @@ export async function createBoarding(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const ownerId = req.user!.userId;
+    const ownerId = req.user?.userId;
     const body = req.body as CreateBoardingInput;
 
     if (body.currentOccupants > body.maxOccupants) {
@@ -274,7 +273,7 @@ export async function updateBoarding(
 ): Promise<void> {
   try {
     const { id } = req.params as { id: string };
-    const ownerId = req.user!.userId;
+    const ownerId = req.user?.userId;
     const body = req.body as UpdateBoardingInput;
 
     const existing = await Boarding.findById(id);
@@ -323,7 +322,7 @@ export async function updateBoarding(
       }
 
       // Update boarding
-      const boarding = await Boarding.findByIdAndUpdate(
+      const _boarding = await Boarding.findByIdAndUpdate(
         id,
         {
           ...rest,
@@ -406,7 +405,7 @@ export async function submitBoarding(
 ): Promise<void> {
   try {
     const { id } = req.params as { id: string };
-    const ownerId = req.user!.userId;
+    const ownerId = req.user?.userId;
 
     const existing = await Boarding.findById(id).populate({
       path: "images",
@@ -427,7 +426,10 @@ export async function submitBoarding(
       );
     }
 
-    if ((existing as any).images?.length === 0) {
+    if (
+      (existing as typeof existing & { images?: unknown[] }).images?.length ===
+      0
+    ) {
       throw new ValidationError(
         "At least 1 image is required to submit for approval",
       );
@@ -470,7 +472,7 @@ export async function deactivateBoarding(
 ): Promise<void> {
   try {
     const { id } = req.params as { id: string };
-    const ownerId = req.user!.userId;
+    const ownerId = req.user?.userId;
 
     const existing = await Boarding.findById(id);
 
@@ -519,7 +521,7 @@ export async function activateBoarding(
 ): Promise<void> {
   try {
     const { id } = req.params as { id: string };
-    const ownerId = req.user!.userId;
+    const ownerId = req.user?.userId;
 
     const existing = await Boarding.findById(id);
 
@@ -568,7 +570,7 @@ export async function uploadImages(
 ): Promise<void> {
   try {
     const { id } = req.params as { id: string };
-    const ownerId = req.user!.userId;
+    const ownerId = req.user?.userId;
 
     const existing = await Boarding.findById(id).populate({
       path: "images",
@@ -586,7 +588,9 @@ export async function uploadImages(
       throw new ValidationError("No images provided");
     }
 
-    const currentCount = (existing as any).images?.length || 0;
+    const currentCount =
+      (existing as typeof existing & { images?: unknown[] }).images?.length ||
+      0;
 
     if (currentCount + files.length > MAX_BOARDING_IMAGES) {
       throw new ValidationError(
@@ -620,7 +624,7 @@ export async function deleteImage(
 ): Promise<void> {
   try {
     const { id, imageId } = req.params as { id: string; imageId: string };
-    const ownerId = req.user!.userId;
+    const ownerId = req.user?.userId;
 
     const existing = await Boarding.findById(id);
 

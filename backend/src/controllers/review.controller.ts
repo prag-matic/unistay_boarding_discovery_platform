@@ -1,19 +1,14 @@
-import type { Request, Response } from "express";
-import { reviewService } from "../services/review.service.js";
+import type { NextFunction, Request, Response } from "express";
+import { z } from "zod";
+import { BadRequestError, NotFoundError } from "@/errors/AppError.js";
 import { uploadReviewMedia } from "../middleware/upload.js";
-import { validate } from "../middleware/validate.js";
 import {
   createReviewSchema,
-  updateReviewSchema,
-  updateReviewCommentSchema,
   reactionSchema,
+  updateReviewCommentSchema,
+  updateReviewSchema,
 } from "../schemas/index.js";
-import {
-  NotFoundError,
-  BadRequestError,
-  ForbiddenError,
-} from "@/errors/AppError.js";
-import { z } from "zod";
+import { reviewService } from "../services/review.service.js";
 
 // Schema for comment request body (only comment field, reviewId comes from URL)
 const commentBodySchema = z.object({
@@ -34,13 +29,6 @@ const getParam = (req: Request, name: string): string => {
 const getHeader = (req: Request, name: string): string | undefined => {
   const value = req.headers[name];
   return Array.isArray(value) ? value[0] : value;
-};
-
-const getQueryParam = (req: Request, name: string): string | undefined => {
-  const value = req.query[name] as string | string[] | undefined;
-  if (Array.isArray(value)) return value[0];
-  if (typeof value === "string") return value;
-  return undefined;
 };
 
 // Helper to safely parse query params (handles ParsedQs objects)
@@ -65,14 +53,14 @@ export class ReviewController {
       const validatedData = createReviewSchema.parse(reviewData);
 
       // Get user ID from request (assuming auth middleware sets req.user)
-      const studentId = (req as any).user?.id || getHeader(req, "x-user-id");
+      const studentId = req.user?.userId || getHeader(req, "x-user-id");
 
       if (!studentId) {
         throw new BadRequestError("User ID is required");
       }
 
       // Get files from multer (using .fields() returns object with arrays)
-      const files = (req as any).files as
+      const files = req.files as
         | { [fieldname: string]: Express.Multer.File[] }
         | undefined;
       const images = files?.images || [];
@@ -97,10 +85,10 @@ export class ReviewController {
         data: review,
         message: "Review created successfully",
       });
-    } catch (error: any) {
-      if (error.name === "ZodError") {
+    } catch (error: unknown) {
+      if (error instanceof z.ZodError) {
         throw new BadRequestError(
-          error.errors[0]?.message || "Validation failed",
+          error.issues[0]?.message || "Validation failed",
         );
       }
       throw error;
@@ -134,8 +122,8 @@ export class ReviewController {
     const boardingId = getParam(req, "boardingId");
 
     const result = await reviewService.getReviewsByBoarding(boardingId, {
-      page: parseInt(getQueryParamSafe(req, "page") || "1"),
-      limit: parseInt(getQueryParamSafe(req, "limit") || "10"),
+      page: parseInt(getQueryParamSafe(req, "page") || "1", 10),
+      limit: parseInt(getQueryParamSafe(req, "limit") || "10", 10),
       sortBy:
         (getQueryParamSafe(req, "sortBy") as "rating" | "commentedAt") ||
         "commentedAt",
@@ -176,14 +164,14 @@ export class ReviewController {
 
       const validatedData = updateReviewSchema.parse(reviewData);
 
-      const studentId = (req as any).user?.id || getHeader(req, "x-user-id");
+      const studentId = req.user?.userId || getHeader(req, "x-user-id");
 
       if (!studentId) {
         throw new BadRequestError("User ID is required");
       }
 
       // Get files from multer (using .fields() returns object with arrays)
-      const files = (req as any).files as
+      const files = req.files as
         | { [fieldname: string]: Express.Multer.File[] }
         | undefined;
       const images = files?.images || [];
@@ -202,10 +190,10 @@ export class ReviewController {
         data: review,
         message: "Review updated successfully",
       });
-    } catch (error: any) {
-      if (error.name === "ZodError") {
+    } catch (error: unknown) {
+      if (error instanceof z.ZodError) {
         throw new BadRequestError(
-          error.errors[0]?.message || "Validation failed",
+          error.issues[0]?.message || "Validation failed",
         );
       }
       throw error;
@@ -218,7 +206,7 @@ export class ReviewController {
    */
   deleteReview = async (req: Request, res: Response) => {
     const id = getParam(req, "id");
-    const studentId = (req as any).user?.id || getHeader(req, "x-user-id");
+    const studentId = req.user?.userId || getHeader(req, "x-user-id");
 
     if (!studentId) {
       throw new BadRequestError("User ID is required");
@@ -240,7 +228,7 @@ export class ReviewController {
     const id = getParam(req, "id");
     const { type } = reactionSchema.parse(req.body);
 
-    const userId = (req as any).user?.id || getHeader(req, "x-user-id");
+    const userId = req.user?.userId || getHeader(req, "x-user-id");
 
     if (!userId) {
       throw new BadRequestError("User ID is required");
@@ -263,7 +251,7 @@ export class ReviewController {
     const reviewId = getParam(req, "id");
     const { comment } = commentBodySchema.parse(req.body);
 
-    const commentorId = (req as any).user?.id || getHeader(req, "x-user-id");
+    const commentorId = req.user?.userId || getHeader(req, "x-user-id");
 
     if (!commentorId) {
       throw new BadRequestError("User ID is required");
@@ -290,7 +278,7 @@ export class ReviewController {
     const id = getParam(req, "id");
     const { comment } = updateReviewCommentSchema.parse(req.body);
 
-    const commentorId = (req as any).user?.id || getHeader(req, "x-user-id");
+    const commentorId = req.user?.userId || getHeader(req, "x-user-id");
 
     if (!commentorId) {
       throw new BadRequestError("User ID is required");
@@ -315,7 +303,7 @@ export class ReviewController {
    */
   deleteReviewComment = async (req: Request, res: Response) => {
     const id = getParam(req, "id");
-    const commentorId = (req as any).user?.id || getHeader(req, "x-user-id");
+    const commentorId = req.user?.userId || getHeader(req, "x-user-id");
 
     if (!commentorId) {
       throw new BadRequestError("User ID is required");
@@ -337,7 +325,7 @@ export class ReviewController {
     const id = getParam(req, "id");
     const { type } = reactionSchema.parse(req.body);
 
-    const userId = (req as any).user?.id || getHeader(req, "x-user-id");
+    const userId = req.user?.userId || getHeader(req, "x-user-id");
 
     if (!userId) {
       throw new BadRequestError("User ID is required");
@@ -358,14 +346,17 @@ export class ReviewController {
 }
 
 // Middleware wrapper for multer with error handling
-export const withUpload = (fn: Function) => {
-  return (req: Request, res: Response, next: Function) => {
-    uploadReviewMedia(req, res, (err: any) => {
+export const withUpload = (
+  fn: (req: Request, res: Response, next: NextFunction) => Promise<void>,
+) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    uploadReviewMedia(req, res, (err: unknown) => {
       if (err) {
+        const message = err instanceof Error ? err.message : "Upload failed";
         return res.status(400).json({
           success: false,
           error: "UploadError",
-          message: err.message,
+          message,
         });
       }
       fn(req, res, next);
