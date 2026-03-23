@@ -1,21 +1,20 @@
-import type { Request, Response, NextFunction } from "express";
+import type { NextFunction, Request, Response } from "express";
 import mongoose from "mongoose";
-import { Reservation, Boarding, RentalPeriod } from "@/models/index.js";
-import { BoardingStatus, ReservationStatus } from "@/types/enums.js";
+import {
+  BadRequestError,
+  BoardingNotFoundError,
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+} from "@/errors/AppError.js";
 import { sendSuccess } from "@/lib/response.js";
+import { Boarding, RentalPeriod, Reservation } from "@/models/index.js";
 
 import type {
   CreateReservationInput,
   RejectReservationInput,
 } from "@/schemas/reservation.validators.js";
-
-import {
-  BadRequestError,
-  BoardingNotFoundError,
-  ConflictError,
-  NotFoundError,
-  ForbiddenError,
-} from "@/errors/AppError.js";
+import { BoardingStatus, ReservationStatus } from "@/types/enums.js";
 
 const RESERVATION_EXPIRY_HOURS = 72;
 
@@ -63,7 +62,7 @@ export async function createReservation(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const studentId = req.user!.userId;
+    const studentId = req.user?.userId;
     const body = req.body as CreateReservationInput;
 
     const today = new Date();
@@ -185,7 +184,7 @@ export async function getMyRequests(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const studentId = req.user!.userId;
+    const studentId = req.user?.userId;
 
     const reservations = await Reservation.find({
       studentId: new mongoose.Types.ObjectId(studentId),
@@ -208,7 +207,7 @@ export async function getMyBoardingRequests(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const ownerId = req.user!.userId;
+    const ownerId = req.user?.userId;
 
     const reservations = await Reservation.find({})
       .populate({
@@ -239,8 +238,8 @@ export async function getReservationById(
 ): Promise<void> {
   try {
     const { id } = req.params as { id: string };
-    const userId = req.user!.userId;
-    const role = req.user!.role;
+    const userId = req.user?.userId;
+    const role = req.user?.role;
 
     const reservation = await Reservation.findById(id)
       .populate("studentId", "firstName lastName email")
@@ -270,12 +269,12 @@ export async function getReservationById(
 // PATCH /api/reservations/:id/approve  (owner)
 export async function approveReservation(
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction,
 ): Promise<void> {
   try {
     const { id } = req.params as { id: string };
-    const ownerId = req.user!.userId;
+    const ownerId = req.user?.userId;
 
     const session = await mongoose.startSession();
     session.startTransaction();
@@ -290,7 +289,10 @@ export async function approveReservation(
 
       if (!res) throw new NotFoundError("Reservation not found");
 
-      if ((res.boardingId as any).ownerId.toString() !== ownerId) {
+      const boarding = res.boardingId as typeof res.boardingId & {
+        ownerId?: mongoose.Types.ObjectId;
+      };
+      if (!boarding || boarding.ownerId?.toString() !== ownerId) {
         throw new ForbiddenError("You do not own this boarding");
       }
 
@@ -307,7 +309,11 @@ export async function approveReservation(
         throw new BadRequestError("Reservation has expired");
       }
 
-      const boarding = res.boardingId as any;
+      const boarding = res.boardingId as unknown as {
+        _id: string;
+        currentOccupants: number;
+        maxOccupants: number;
+      };
       if (boarding.currentOccupants >= boarding.maxOccupants) {
         throw new ConflictError("Boarding is full");
       }
@@ -340,7 +346,7 @@ export async function approveReservation(
         .populate("boardingId", "title slug city district")
         .lean();
 
-      (res as any).status(200).json({
+      res.status(200).json({
         success: true,
         message: "Reservation approved",
         data: { reservation: updatedReservation },
@@ -365,7 +371,7 @@ export async function rejectReservation(
 ): Promise<void> {
   try {
     const { id } = req.params as { id: string };
-    const ownerId = req.user!.userId;
+    const ownerId = req.user?.userId;
     const { reason } = req.body as RejectReservationInput;
 
     const existing = await Reservation.findById(id).populate(
@@ -375,7 +381,10 @@ export async function rejectReservation(
 
     if (!existing) throw new NotFoundError("Reservation not found");
 
-    if ((existing.boardingId as any).ownerId.toString() !== ownerId) {
+    const boarding = existing.boardingId as typeof existing.boardingId & {
+      ownerId?: mongoose.Types.ObjectId;
+    };
+    if (!boarding || boarding.ownerId?.toString() !== ownerId) {
       throw new ForbiddenError("You do not own this boarding");
     }
 
@@ -406,7 +415,7 @@ export async function cancelReservation(
 ): Promise<void> {
   try {
     const { id } = req.params as { id: string };
-    const studentId = req.user!.userId;
+    const studentId = req.user?.userId;
 
     const existing = await Reservation.findById(id);
 
@@ -470,7 +479,7 @@ export async function completeReservation(
 ): Promise<void> {
   try {
     const { id } = req.params as { id: string };
-    const ownerId = req.user!.userId;
+    const ownerId = req.user?.userId;
 
     const existing = await Reservation.findById(id).populate(
       "boardingId",
@@ -479,7 +488,10 @@ export async function completeReservation(
 
     if (!existing) throw new NotFoundError("Reservation not found");
 
-    if ((existing.boardingId as any).ownerId.toString() !== ownerId) {
+    const boarding = existing.boardingId as typeof existing.boardingId & {
+      ownerId?: mongoose.Types.ObjectId;
+    };
+    if (!boarding || boarding.ownerId?.toString() !== ownerId) {
       throw new ForbiddenError("You do not own this boarding");
     }
 

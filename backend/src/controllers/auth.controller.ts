@@ -1,39 +1,37 @@
-import type { Request, Response, NextFunction } from "express";
+import bcrypt from "bcryptjs";
+import type { NextFunction, Request, Response } from "express";
+import { config } from "@/config/env.js";
+// Error Imports
 import {
-  User,
+  AccountDeactivatedError,
+  InvalidCredentialsError,
+  TokenExpiredError,
+  UnauthorizedError,
+  UserAlreadyExistsError,
+  UserNotFoundError,
+} from "@/errors/AppError.js";
+import { sendPasswordResetEmail, sendVerificationEmail } from "@/lib/email.js";
+import { generateSecureToken, sha256 } from "@/lib/hash.js";
+import { parseDurationMs, signAccessToken } from "@/lib/jwt.js";
+import { sendSuccess } from "@/lib/response.js";
+import {
   EmailVerificationToken,
   PasswordResetToken,
   RefreshToken,
+  User,
 } from "@/models/index.js";
-import bcrypt from "bcryptjs";
-import { config } from "@/config/env.js";
-import { Role } from "@/types/enums.js";
-import { generateSecureToken, sha256 } from "@/lib/hash.js";
-import { sendVerificationEmail, sendPasswordResetEmail } from "@/lib/email.js";
-import { sendSuccess } from "@/lib/response.js";
-import { sanitizeUser } from "@/utils/index.js";
-import { signAccessToken, parseDurationMs } from "@/lib/jwt.js";
-
 // zod validator types
-import {
-  type RegisterInput,
-  type LoginInput,
-  type RefreshTokenInput,
-  type LogoutInput,
-  type ResendVerificationInput,
-  type ForgotPasswordInput,
-  type ResetPasswordInput,
+import type {
+  ForgotPasswordInput,
+  LoginInput,
+  LogoutInput,
+  RefreshTokenInput,
+  RegisterInput,
+  ResendVerificationInput,
+  ResetPasswordInput,
 } from "@/schemas/auth.validators.js";
-
-// Error Imports
-import {
-  UserAlreadyExistsError,
-  InvalidCredentialsError,
-  AccountDeactivatedError,
-  UnauthorizedError,
-  UserNotFoundError,
-  TokenExpiredError,
-} from "@/errors/AppError.js";
+import type { Role } from "@/types/enums.js";
+import { sanitizeUser } from "@/utils/index.js";
 
 // POST /api/auth/register
 export async function register(
@@ -86,7 +84,7 @@ export async function register(
 
     sendSuccess(
       res,
-      sanitizeUser(newUser.toObject() as any),
+      sanitizeUser(newUser.toObject() as Record<string, unknown>),
       "Registration successful. Please check your email to verify your account.",
       201,
     );

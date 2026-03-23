@@ -1,8 +1,8 @@
-import type { Request, Response, NextFunction } from "express";
+import type { NextFunction, Request, Response } from "express";
 import mongoose from "mongoose";
-import { RentalPeriod, Reservation, Boarding } from "@/models/index.js";
-import { sendSuccess } from "@/lib/response.js";
 import { ForbiddenError, NotFoundError } from "@/errors/AppError.js";
+import { sendSuccess } from "@/lib/response.js";
+import { RentalPeriod, Reservation } from "@/models/index.js";
 
 // GET /api/reservations/:resId/rental-periods  (participant)
 export async function getRentalPeriods(
@@ -12,8 +12,8 @@ export async function getRentalPeriods(
 ): Promise<void> {
   try {
     const { resId } = req.params as { resId: string };
-    const userId = req.user!.userId;
-    const role = req.user!.role;
+    const userId = req.user?.userId;
+    const role = req.user?.role;
 
     const reservation = await Reservation.findById(resId)
       .populate("boardingId", "ownerId")
@@ -23,8 +23,11 @@ export async function getRentalPeriods(
 
     if (role !== "ADMIN") {
       const isStudent = reservation.studentId.toString() === userId;
-      const isOwner =
-        (reservation.boardingId as any)?.ownerId.toString() === userId;
+      const boarding =
+        reservation.boardingId as typeof reservation.boardingId & {
+          ownerId?: mongoose.Types.ObjectId;
+        };
+      const isOwner = boarding?.ownerId?.toString() === userId;
 
       if (!isStudent && !isOwner) {
         throw new ForbiddenError("Access denied");

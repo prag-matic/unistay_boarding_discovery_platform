@@ -1,21 +1,20 @@
-import type { Request, Response, NextFunction } from "express";
+import type { NextFunction, Request, Response } from "express";
 import mongoose from "mongoose";
-import { VisitRequest, Boarding } from "@/models/index.js";
-import { BoardingStatus, VisitRequestStatus } from "@/types/enums.js";
-import { sendSuccess } from "@/lib/response.js";
 import {
-  BoardingNotFoundError,
-  ForbiddenError,
-  ConflictError,
   BadRequestError,
-  NotFoundError,
+  BoardingNotFoundError,
+  ConflictError,
+  ForbiddenError,
   GoneError,
+  NotFoundError,
 } from "@/errors/AppError.js";
-
+import { sendSuccess } from "@/lib/response.js";
+import { Boarding, VisitRequest } from "@/models/index.js";
 import type {
   CreateVisitRequestInput,
   RejectVisitRequestInput,
 } from "@/schemas/visitRequest.validators.js";
+import { BoardingStatus, VisitRequestStatus } from "@/types/enums.js";
 
 const VISIT_EXPIRY_HOURS = 72;
 
@@ -26,7 +25,7 @@ export async function createVisitRequest(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const studentId = req.user!.userId;
+    const studentId = req.user?.userId;
     const body = req.body as CreateVisitRequestInput;
 
     const now = new Date();
@@ -98,7 +97,7 @@ export async function getMyVisitRequests(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const studentId = req.user!.userId;
+    const studentId = req.user?.userId;
 
     const visitRequests = await VisitRequest.find({
       studentId: new mongoose.Types.ObjectId(studentId),
@@ -121,7 +120,7 @@ export async function getMyBoardingVisitRequests(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const ownerId = req.user!.userId;
+    const ownerId = req.user?.userId;
 
     const visitRequests = await VisitRequest.find({})
       .populate({
@@ -150,8 +149,8 @@ export async function getVisitRequestById(
 ): Promise<void> {
   try {
     const { id } = req.params as { id: string };
-    const userId = req.user!.userId;
-    const role = req.user!.role;
+    const userId = req.user?.userId;
+    const role = req.user?.role;
 
     const visitRequest = await VisitRequest.findById(id)
       .populate("studentId", "firstName lastName email")
@@ -186,7 +185,7 @@ export async function approveVisitRequest(
 ): Promise<void> {
   try {
     const { id } = req.params as { id: string };
-    const ownerId = req.user!.userId;
+    const ownerId = req.user?.userId;
 
     const existing = await VisitRequest.findById(id).populate(
       "boardingId",
@@ -195,7 +194,10 @@ export async function approveVisitRequest(
 
     if (!existing) throw new NotFoundError("Visit request not found");
 
-    if ((existing.boardingId as any).ownerId.toString() !== ownerId) {
+    const boarding = existing.boardingId as typeof existing.boardingId & {
+      ownerId?: mongoose.Types.ObjectId;
+    };
+    if (!boarding || boarding.ownerId?.toString() !== ownerId) {
       throw new ForbiddenError("You do not own this boarding");
     }
 
@@ -233,7 +235,7 @@ export async function rejectVisitRequest(
 ): Promise<void> {
   try {
     const { id } = req.params as { id: string };
-    const ownerId = req.user!.userId;
+    const ownerId = req.user?.userId;
     const { reason } = req.body as RejectVisitRequestInput;
 
     const existing = await VisitRequest.findById(id).populate(
@@ -243,7 +245,10 @@ export async function rejectVisitRequest(
 
     if (!existing) throw new NotFoundError("Visit request not found");
 
-    if ((existing.boardingId as any).ownerId.toString() !== ownerId) {
+    const boarding = existing.boardingId as typeof existing.boardingId & {
+      ownerId?: mongoose.Types.ObjectId;
+    };
+    if (!boarding || boarding.ownerId?.toString() !== ownerId) {
       throw new ForbiddenError("You do not own this boarding");
     }
 
@@ -277,7 +282,7 @@ export async function cancelVisitRequest(
 ): Promise<void> {
   try {
     const { id } = req.params as { id: string };
-    const studentId = req.user!.userId;
+    const studentId = req.user?.userId;
 
     const existing = await VisitRequest.findById(id);
 
