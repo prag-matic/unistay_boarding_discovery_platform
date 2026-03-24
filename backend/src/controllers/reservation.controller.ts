@@ -20,7 +20,6 @@ const RESERVATION_EXPIRY_HOURS = 72;
 
 // Helper: generate rental periods for an active reservation
 async function generateRentalPeriods(
-	session: mongoose.ClientSession,
 	reservationId: string,
 	moveInDate: Date,
 	monthlyRent: number,
@@ -52,7 +51,7 @@ async function generateRentalPeriods(
 		});
 	}
 
-	await RentalPeriod.insertMany(periods, { session });
+	await RentalPeriod.insertMany(periods);
 }
 
 // POST /api/reservations
@@ -83,98 +82,77 @@ export async function createReservation(
 			);
 		}
 
-		const session = await mongoose.startSession();
-		session.startTransaction();
+		const boarding = await Boarding.findById(body.boardingId);
 
-		try {
-			const boarding = await Boarding.findById(body.boardingId).session(
-				session,
-			);
+		if (!boarding || boarding.isDeleted) throw new BoardingNotFoundError();
 
-			if (!boarding || boarding.isDeleted) throw new BoardingNotFoundError();
-
-			if (boarding.status !== BoardingStatus.ACTIVE) {
-				throw new BadRequestError("Boarding is not available for reservation");
-			}
-
-			if (boarding.currentOccupants >= boarding.maxOccupants) {
-				throw new ConflictError("Boarding is full");
-			}
-
-			const activeReservation = await Reservation.findOne({
-				studentId: new mongoose.Types.ObjectId(studentId),
-				status: ReservationStatus.ACTIVE,
-			}).session(session);
-
-			if (activeReservation) {
-				throw new ConflictError("You already have an active reservation");
-			}
-
-			const existingForBoarding = await Reservation.findOne({
-				studentId: new mongoose.Types.ObjectId(studentId),
-				boardingId: new mongoose.Types.ObjectId(body.boardingId),
-				status: { $in: [ReservationStatus.PENDING, ReservationStatus.ACTIVE] },
-			}).session(session);
-
-			if (existingForBoarding) {
-				throw new ConflictError(
-					"You already have a pending or active reservation for this boarding",
-				);
-			}
-
-			const expiresAt = new Date();
-			expiresAt.setHours(expiresAt.getHours() + RESERVATION_EXPIRY_HOURS);
-
-			const boardingSnapshot = {
-				id: boarding._id.toString(),
-				title: boarding.title,
-				slug: boarding.slug,
-				city: boarding.city,
-				district: boarding.district,
-				address: boarding.address,
-				boardingType: boarding.boardingType,
-				genderPref: boarding.genderPref,
-				monthlyRent: boarding.monthlyRent,
-				maxOccupants: boarding.maxOccupants,
-				nearUniversity: boarding.nearUniversity,
-			};
-
-			const reservation = await Reservation.create(
-				[
-					{
-						studentId: new mongoose.Types.ObjectId(studentId),
-						boardingId: new mongoose.Types.ObjectId(body.boardingId),
-						moveInDate,
-						specialRequests: body.specialRequests,
-						rentSnapshot: boarding.monthlyRent,
-						boardingSnapshot,
-						expiresAt,
-					},
-				],
-				{ session },
-			);
-
-			await session.commitTransaction();
-
-			const populatedReservation = await Reservation.findById(
-				reservation[0]._id,
-			)
-				.populate("studentId", "id firstName lastName email")
-				.populate("boardingId", "id title slug city district")
-				.lean();
-
-			sendSuccess(
-				res,
-				{ reservation: populatedReservation },
-				"Reservation request created successfully",
-				201,
-			);
-		} catch (error) {
-			await session.abortTransaction();
-			throw error;
-		} finally {
-			session.endSession();
+		if (boarding.status !== BoardingStatus.ACTIVE) {
+			throw new BadRequestError("Boarding is not available for reservation");
 		}
+
+		if (boarding.currentOccupants >= boarding.maxOccupants) {
+			throw new ConflictError("Boarding is full");
+		}
+
+		const activeReservation = await Reservation.findOne({
+			studentId: new mongoose.Types.ObjectId(studentId),
+			status: ReservationStatus.ACTIVE,
+		});
+
+		if (activeReservation) {
+			throw new ConflictError("You already have an active reservation");
+		}
+
+		const existingForBoarding = await Reservation.findOne({
+			studentId: new mongoose.Types.ObjectId(studentId),
+			boardingId: new mongoose.Types.ObjectId(body.boardingId),
+			status: { $in: [ReservationStatus.PENDING, ReservationStatus.ACTIVE] },
+		});
+
+		if (existingForBoarding) {
+			throw new ConflictError(
+				"You already have a pending or active reservation for this boarding",
+			);
+		}
+
+		const expiresAt = new Date();
+		expiresAt.setHours(expiresAt.getHours() + RESERVATION_EXPIRY_HOURS);
+
+		const boardingSnapshot = {
+			id: boarding._id.toString(),
+			title: boarding.title,
+			slug: boarding.slug,
+			city: boarding.city,
+			district: boarding.district,
+			address: boarding.address,
+			boardingType: boarding.boardingType,
+			genderPref: boarding.genderPref,
+			monthlyRent: boarding.monthlyRent,
+			maxOccupants: boarding.maxOccupants,
+			nearUniversity: boarding.nearUniversity,
+		};
+
+		const reservation = await Reservation.create({
+			studentId: new mongoose.Types.ObjectId(studentId),
+			boardingId: new mongoose.Types.ObjectId(body.boardingId),
+			moveInDate,
+			specialRequests: body.specialRequests,
+			rentSnapshot: boarding.monthlyRent,
+			boardingSnapshot,
+			expiresAt,
+		});
+
+		const populatedReservation = await Reservation.findById(reservation._id)
+			.populate("studentId", "id firstName lastName email")
+			.populate("boardingId", "id title slug city district")
+			.lean();
+
+		sendSuccess(
+			res,
+			{ reservation: populatedReservation },
+			"Reservation request created successfully",
+			201,
+		);
 	} catch (err) {
 		next(err);
 	}
@@ -299,93 +277,69 @@ export async function approveReservation(
 		const { id } = req.params as { id: string };
 		const ownerId = req.user.userId;
 
-		const session = await mongoose.startSession();
-		session.startTransaction();
+		const reservation = await Reservation.findById(id).populate({
+			path: "boardingId",
+			select: "ownerId currentOccupants maxOccupants",
+		});
 
-		try {
-			const reservation = await Reservation.findById(id)
-				.populate({
-					path: "boardingId",
-					select: "ownerId currentOccupants maxOccupants",
-				})
-				.session(session);
+		if (!reservation) throw new NotFoundError("Reservation not found");
 
-			if (!reservation) throw new NotFoundError("Reservation not found");
-
-			const boardingInfo =
-				reservation.boardingId as typeof reservation.boardingId & {
-					ownerId?: mongoose.Types.ObjectId;
-				};
-			if (!boardingInfo || boardingInfo.ownerId?.toString() !== ownerId) {
-				throw new ForbiddenError("You do not own this boarding");
-			}
-
-			if (reservation.status !== ReservationStatus.PENDING) {
-				throw new BadRequestError("Only PENDING reservations can be approved");
-			}
-
-			if (new Date() > reservation.expiresAt) {
-				await Reservation.findByIdAndUpdate(
-					id,
-					{ status: ReservationStatus.EXPIRED },
-					{ session },
-				);
-				throw new BadRequestError("Reservation has expired");
-			}
-
-			const boarding = reservation.boardingId as unknown as {
-				_id: string;
-				currentOccupants: number;
-				maxOccupants: number;
+		const boardingInfo =
+			reservation.boardingId as typeof reservation.boardingId & {
+				ownerId?: mongoose.Types.ObjectId;
 			};
-			if (boarding.currentOccupants >= boarding.maxOccupants) {
-				throw new ConflictError("Boarding is full");
-			}
-
-			await Boarding.findByIdAndUpdate(
-				boarding._id,
-				{
-					$inc: { currentOccupants: 1 },
-				},
-				{ session },
-			);
-
-			await Reservation.findByIdAndUpdate(
-				id,
-				{ status: ReservationStatus.ACTIVE },
-				{ session },
-			);
-
-			await generateRentalPeriods(
-				session,
-				id,
-				reservation.moveInDate,
-				reservation.rentSnapshot,
-			);
-
-			await session.commitTransaction();
-
-			const updatedReservation = await Reservation.findById(id, undefined, {
-				populate: [
-					{ path: "studentId", select: "firstName lastName email" },
-					{ path: "boardingId", select: "title slug city district" },
-				],
-				lean: true,
-				session,
-			});
-
-			res.status(200).json({
-				success: true,
-				message: "Reservation approved",
-				data: { reservation: updatedReservation },
-				timestamp: new Date().toISOString(),
-			});
-		} catch (error) {
-			await session.abortTransaction();
-			throw error;
-		} finally {
-			session.endSession();
+		if (!boardingInfo || boardingInfo.ownerId?.toString() !== ownerId) {
+			throw new ForbiddenError("You do not own this boarding");
 		}
+
+		if (reservation.status !== ReservationStatus.PENDING) {
+			throw new BadRequestError("Only PENDING reservations can be approved");
+		}
+
+		if (new Date() > reservation.expiresAt) {
+			await Reservation.findByIdAndUpdate(id, {
+				status: ReservationStatus.EXPIRED,
+			});
+			throw new BadRequestError("Reservation has expired");
+		}
+
+		const boarding = reservation.boardingId as unknown as {
+			_id: string;
+			currentOccupants: number;
+			maxOccupants: number;
+		};
+		if (boarding.currentOccupants >= boarding.maxOccupants) {
+			throw new ConflictError("Boarding is full");
+		}
+
+		await Boarding.findByIdAndUpdate(boarding._id, {
+			$inc: { currentOccupants: 1 },
+		});
+
+		await Reservation.findByIdAndUpdate(id, {
+			status: ReservationStatus.ACTIVE,
+		});
+
+		await generateRentalPeriods(
+			id,
+			reservation.moveInDate,
+			reservation.rentSnapshot,
+		);
+
+		const updatedReservation = await Reservation.findById(id, undefined, {
+			populate: [
+				{ path: "studentId", select: "firstName lastName email" },
+				{ path: "boardingId", select: "title slug city district" },
+			],
+			lean: true,
+		});
+
+		res.status(200).json({
+			success: true,
+			message: "Reservation approved",
+			data: { reservation: updatedReservation },
+			timestamp: new Date().toISOString(),
+		});
 	} catch (err) {
 		next(err);
 	}

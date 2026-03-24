@@ -84,7 +84,18 @@ export const updateBoardingSchema = boardingSchema.partial();
 
 // Review schema
 export const reviewSchema = z.object({
-	boardingId: z.string().cuid("Invalid boarding ID"),
+	boardingId: z
+		.string()
+		.min(1, "boardingId is required")
+		.refine(
+			(val) => {
+				// Accept either cuid or MongoDB ObjectId format
+				return (
+					val.length === 24 && /^[0-9a-fA-F]{24}$/.test(val) // ObjectId
+				);
+			},
+			{ message: "Invalid boarding ID" },
+		),
 	rating: z.number().int().min(1).max(5, "Rating must be between 1 and 5"),
 	comment: z.string().max(1000).optional().nullable(),
 	images: z
