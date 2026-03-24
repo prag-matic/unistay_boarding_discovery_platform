@@ -19,18 +19,14 @@ import type {
 } from "@/schemas/payment.validators.js";
 import { PaymentStatus, RentalPeriodStatus } from "@/types/enums.js";
 
-async function recalcRentalPeriodStatus(
-	session: mongoose.ClientSession,
-	rentalPeriodId: string,
-): Promise<void> {
-	const rentalPeriod =
-		await RentalPeriod.findById(rentalPeriodId).session(session);
+async function recalcRentalPeriodStatus(rentalPeriodId: string): Promise<void> {
+	const rentalPeriod = await RentalPeriod.findById(rentalPeriodId);
 
 	if (!rentalPeriod) return;
 
 	const payments = await Payment.find({
 		rentalPeriodId: new mongoose.Types.ObjectId(rentalPeriodId),
-	}).session(session);
+	});
 
 	const confirmedTotal = payments
 		.filter((p) => p.status === PaymentStatus.CONFIRMED)
@@ -45,11 +41,7 @@ async function recalcRentalPeriodStatus(
 	}
 
 	if (newStatus !== rentalPeriod.status) {
-		await RentalPeriod.findByIdAndUpdate(
-			rentalPeriodId,
-			{ status: newStatus },
-			{ session },
-		);
+		await RentalPeriod.findByIdAndUpdate(rentalPeriodId, { status: newStatus });
 	}
 }
 
@@ -72,84 +64,63 @@ export async function logPayment(
 			throw new BadRequestError("paidAt cannot be in the future");
 		}
 
-		const session = await mongoose.startSession();
-		session.startTransaction();
+		const rentalPeriod = await RentalPeriod.findById(body.rentalPeriodId);
 
-		try {
-			const rentalPeriod = await RentalPeriod.findById(
-				body.rentalPeriodId,
-			).session(session);
+		if (!rentalPeriod) throw new NotFoundError("Rental period not found");
 
-			if (!rentalPeriod) throw new NotFoundError("Rental period not found");
+		const reservation = await Reservation.findById(body.reservationId);
 
-			const reservation = await Reservation.findById(
-				body.reservationId,
-			).session(session);
+		if (!reservation) throw new NotFoundError("Reservation not found");
 
-			if (!reservation) throw new NotFoundError("Reservation not found");
-
-			if (reservation.studentId.toString() !== studentId) {
-				throw new ForbiddenError("You are not the student on this reservation");
-			}
-
-			if (rentalPeriod.reservationId.toString() !== body.reservationId) {
-				throw new BadRequestError(
-					"Rental period does not belong to this reservation",
-				);
-			}
-
-			if (rentalPeriod.status === RentalPeriodStatus.PAID) {
-				throw new ConflictError("Rental period is already fully paid");
-			}
-
-			const payments = await Payment.find({
-				rentalPeriodId: new mongoose.Types.ObjectId(body.rentalPeriodId),
-			}).session(session);
-
-			const confirmedTotal = payments
-				.filter((p) => p.status === PaymentStatus.CONFIRMED)
-				.reduce((sum, p) => sum + p.amount, 0);
-
-			const remaining = rentalPeriod.amountDue - confirmedTotal;
-
-			if (body.amount > remaining) {
-				throw new BadRequestError(
-					`Amount exceeds remaining balance of ${remaining.toFixed(2)}`,
-				);
-			}
-
-			const payment = await Payment.create(
-				[
-					{
-						rentalPeriodId: new mongoose.Types.ObjectId(body.rentalPeriodId),
-						reservationId: new mongoose.Types.ObjectId(body.reservationId),
-						studentId: new mongoose.Types.ObjectId(studentId),
-						amount: body.amount,
-						paymentMethod: body.paymentMethod,
-						referenceNumber: body.referenceNumber,
-						proofImageUrl: body.proofImageUrl,
-						paidAt,
-					},
-				],
-				{ session },
-			);
-
-			await session.commitTransaction();
-
-			const populatedPayment = await Payment.findById(payment[0]._id).lean();
-
-			sendSuccess(
-				res,
-				{ payment: populatedPayment },
-				"Payment logged successfully",
-				201,
-			);
-		} catch (error) {
-			await session.abortTransaction();
-			throw error;
-		} finally {
-			session.endSession();
+		if (reservation.studentId.toString() !== studentId) {
+			throw new ForbiddenError("You are not the student on this reservation");
 		}
+
+		if (rentalPeriod.reservationId.toString() !== body.reservationId) {
+			throw new BadRequestError(
+				"Rental period does not belong to this reservation",
+			);
+		}
+
+		if (rentalPeriod.status === RentalPeriodStatus.PAID) {
+			throw new ConflictError("Rental period is already fully paid");
+		}
+
+		const payments = await Payment.find({
+			rentalPeriodId: new mongoose.Types.ObjectId(body.rentalPeriodId),
+		});
+
+		const confirmedTotal = payments
+			.filter((p) => p.status === PaymentStatus.CONFIRMED)
+			.reduce((sum, p) => sum + p.amount, 0);
+
+		const remaining = rentalPeriod.amountDue - confirmedTotal;
+
+		if (body.amount > remaining) {
+			throw new BadRequestError(
+				`Amount exceeds remaining balance of ${remaining.toFixed(2)}`,
+			);
+		}
+
+		const payment = await Payment.create({
+			rentalPeriodId: new mongoose.Types.ObjectId(body.rentalPeriodId),
+			reservationId: new mongoose.Types.ObjectId(body.reservationId),
+			studentId: new mongoose.Types.ObjectId(studentId),
+			amount: body.amount,
+			paymentMethod: body.paymentMethod,
+			referenceNumber: body.referenceNumber,
+			proofImageUrl: body.proofImageUrl,
+			paidAt,
+		});
+
+		const populatedPayment = await Payment.findById(payment._id).lean();
+
+		sendSuccess(
+			res,
+			{ payment: populatedPayment },
+			"Payment logged successfully",
+			201,
+		);
 	} catch (err) {
 		next(err);
 	}
@@ -272,35 +243,16 @@ export async function confirmPayment(
 			throw new BadRequestError("Only PENDING payments can be confirmed");
 		}
 
-		const session = await mongoose.startSession();
-		session.startTransaction();
+		await Payment.findByIdAndUpdate(id, {
+			status: PaymentStatus.CONFIRMED,
+			confirmedAt: new Date(),
+		});
 
-		try {
-			await Payment.findByIdAndUpdate(
-				id,
-				{
-					status: PaymentStatus.CONFIRMED,
-					confirmedAt: new Date(),
-				},
-				{ session },
-			);
+		await recalcRentalPeriodStatus(existing.rentalPeriodId.toString());
 
-			await recalcRentalPeriodStatus(
-				session,
-				existing.rentalPeriodId.toString(),
-			);
+		const payment = await Payment.findById(id).lean();
 
-			await session.commitTransaction();
-
-			const payment = await Payment.findById(id).lean();
-
-			sendSuccess(res, { payment }, "Payment confirmed");
-		} catch (error) {
-			await session.abortTransaction();
-			throw error;
-		} finally {
-			session.endSession();
-		}
+		sendSuccess(res, { payment }, "Payment confirmed");
 	} catch (err) {
 		next(err);
 	}

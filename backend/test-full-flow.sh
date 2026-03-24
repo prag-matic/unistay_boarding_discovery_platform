@@ -167,27 +167,28 @@ print_header "🏠 Phase 2: Boarding Creation"
 
 # 2.1 Create Boarding
 print_step "Create New Boarding Listing"
-BOARDING_RESPONSE=$(curl -s -X POST "${API_ENDPOINT}/boarding" \
+BOARDING_RESPONSE=$(curl -s -X POST "${API_ENDPOINT}/boardings" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer ${OWNER_TOKEN}" \
     -d "{
         \"title\": \"Cozy Room Near University\",
         \"description\": \"A comfortable and affordable room perfect for students. Located just 5 minutes walk from the university campus. Includes all amenities.\",
-        \"type\": \"ROOM\",
+        \"boardingType\": \"SINGLE_ROOM\",
         \"city\": \"Colombo\",
         \"district\": \"Colombo 7\",
         \"address\": \"123 University Avenue\",
         \"latitude\": 6.9271,
         \"longitude\": 79.8612,
-        \"rent\": 25000,
+        \"monthlyRent\": 25000,
         \"maxOccupants\": 2,
+        \"currentOccupants\": 0,
         \"bedrooms\": 1,
         \"bathrooms\": 1,
         \"balconies\": 0,
         \"amenities\": [\"WIFI\", \"LAUNDRY\", \"PARKING\", \"SECURITY\"],
-        \"availableFrom\": \"2025-04-01\",
+        \"availableFrom\": \"$(date -d '+30 days' +%Y-%m-%d)\",
         \"rentalPeriod\": \"MONTHLY\",
-        \"genderPreference\": \"ANY\"
+        \"genderPref\": \"ANY\"
     }")
 
 BOARDING_ID=$(extract_json_value "$BOARDING_RESPONSE" ".data.boarding._id")
@@ -204,30 +205,17 @@ else
     echo "Response: $BOARDING_RESPONSE"
 fi
 
-# 2.2 Submit Boarding for Approval
-print_step "Submit Boarding for Approval"
-SUBMIT_RESPONSE=$(curl -s -X PATCH "${API_ENDPOINT}/boarding/${BOARDING_ID}/submit" \
-    -H "Authorization: Bearer ${OWNER_TOKEN}")
-
-SUBMIT_STATUS=$(extract_json_value "$SUBMIT_RESPONSE" ".data.boarding.status")
-if [ "$SUBMIT_STATUS" == "PENDING_APPROVAL" ]; then
-    print_success "Boarding submitted for approval"
-else
-    print_failure "Boarding submission failed"
-    echo "Response: $SUBMIT_RESPONSE"
-fi
-
-# 2.3 Search Boardings (Student)
+# 2.2 Search Boardings (Student)
 print_step "Search Boardings (Student)"
-SEARCH_RESPONSE=$(curl -s -X GET "${API_ENDPOINT}/boarding?city=Colombo&status=ACTIVE" \
+SEARCH_RESPONSE=$(curl -s -X GET "${API_ENDPOINT}/boardings?city=Colombo" \
     -H "Authorization: Bearer ${STUDENT_TOKEN}")
 
 SEARCH_COUNT=$(extract_json_value "$SEARCH_RESPONSE" ".data.boardings | length")
 print_success "Found $SEARCH_COUNT boarding(s) in search results"
 
-# 2.4 Get Boarding by Slug
+# 2.3 Get Boarding by Slug
 print_step "Get Boarding Details by Slug"
-BOARDING_DETAIL_RESPONSE=$(curl -s -X GET "${API_ENDPOINT}/boarding/${BOARDING_SLUG}" \
+BOARDING_DETAIL_RESPONSE=$(curl -s -X GET "${API_ENDPOINT}/boardings/${BOARDING_SLUG}" \
     -H "Authorization: Bearer ${STUDENT_TOKEN}")
 
 RETRIEVED_SLUG=$(extract_json_value "$BOARDING_DETAIL_RESPONSE" ".data.boarding.slug")
@@ -249,7 +237,7 @@ RESERVATION_RESPONSE=$(curl -s -X POST "${API_ENDPOINT}/reservation" \
     -H "Authorization: Bearer ${STUDENT_TOKEN}" \
     -d "{
         \"boardingId\": \"${BOARDING_ID}\",
-        \"moveInDate\": \"2025-04-01\",
+        \"moveInDate\": \"$(date -d '+30 days' +%Y-%m-%d)\",
         \"specialRequests\": \"Would prefer a quiet room\"
     }")
 
@@ -301,16 +289,28 @@ print_header "💳 Phase 4: Payment Process"
 
 # 4.1 Log Payment (Student)
 print_step "Student Logs Payment"
-PAYMENT_RESPONSE=$(curl -s -X POST "${API_ENDPOINT}/payment" \
-    -H "Content-Type: application/json" \
-    -H "Authorization: Bearer ${STUDENT_TOKEN}" \
-    -d "{
-        \"reservationId\": \"${RESERVATION_ID}\",
-        \"amount\": 25000,
-        \"paymentMethod\": \"BANK_TRANSFER\",
-        \"referenceNumber\": \"REF${RANDOM_ID}\",
-        \"paidAt\": \"$(date -Iseconds)\"
-    }")
+# First get the rental periods for this reservation
+RENTAL_PERIODS_RESPONSE=$(curl -s -X GET "${API_ENDPOINT}/reservation/${RESERVATION_ID}/rental-periods" \
+    -H "Authorization: Bearer ${STUDENT_TOKEN}")
+
+RENTAL_PERIOD_ID=$(extract_json_value "$RENTAL_PERIODS_RESPONSE" ".data.rentalPeriods[0]._id")
+
+if [ -z "$RENTAL_PERIOD_ID" ] || [ "$RENTAL_PERIOD_ID" == "null" ]; then
+    print_failure "Could not get rental period ID"
+    echo "Response: $RENTAL_PERIODS_RESPONSE"
+else
+    PAYMENT_RESPONSE=$(curl -s -X POST "${API_ENDPOINT}/payments" \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer ${STUDENT_TOKEN}" \
+        -d "{
+            \"rentalPeriodId\": \"${RENTAL_PERIOD_ID}\",
+            \"reservationId\": \"${RESERVATION_ID}\",
+            \"amount\": 25000,
+            \"paymentMethod\": \"BANK_TRANSFER\",
+            \"referenceNumber\": \"REF${RANDOM_ID}\",
+            \"paidAt\": \"$(date -Iseconds)\"
+        }")
+fi
 
 PAYMENT_ID=$(extract_json_value "$PAYMENT_RESPONSE" ".data.payment._id")
 PAYMENT_STATUS=$(extract_json_value "$PAYMENT_RESPONSE" ".data.payment.status")
@@ -326,7 +326,7 @@ fi
 
 # 4.2 Get My Payments (Student)
 print_step "Get Student's Payments"
-MY_PAYMENTS_RESPONSE=$(curl -s -X GET "${API_ENDPOINT}/payment/my-payments" \
+MY_PAYMENTS_RESPONSE=$(curl -s -X GET "${API_ENDPOINT}/payments/my-payments" \
     -H "Authorization: Bearer ${STUDENT_TOKEN}")
 
 MY_PAY_COUNT=$(extract_json_value "$MY_PAYMENTS_RESPONSE" ".data.payments | length")
@@ -334,7 +334,7 @@ print_success "Student has $MY_PAY_COUNT payment(s)"
 
 # 4.3 Get Boarding Payments (Owner)
 print_step "Get Owner's Boarding Payments"
-OWNER_PAYMENTS_RESPONSE=$(curl -s -X GET "${API_ENDPOINT}/payment/my-boardings" \
+OWNER_PAYMENTS_RESPONSE=$(curl -s -X GET "${API_ENDPOINT}/payments/my-boardings" \
     -H "Authorization: Bearer ${OWNER_TOKEN}")
 
 OWNER_PAY_COUNT=$(extract_json_value "$OWNER_PAYMENTS_RESPONSE" ".data.payments | length")
@@ -342,11 +342,11 @@ print_success "Owner has $OWNER_PAY_COUNT payment(s)"
 
 # 4.4 Confirm Payment (Owner)
 print_step "Owner Confirms Payment"
-CONFIRM_RESPONSE=$(curl -s -X PATCH "${API_ENDPOINT}/payment/${PAYMENT_ID}/confirm" \
+CONFIRM_RESPONSE=$(curl -s -X PATCH "${API_ENDPOINT}/payments/${PAYMENT_ID}/confirm" \
     -H "Authorization: Bearer ${OWNER_TOKEN}")
 
 CONFIRMED_STATUS=$(extract_json_value "$CONFIRM_RESPONSE" ".data.payment.status")
-if [ "$CONFIRMED_STATUS" == "APPROVED" ]; then
+if [ "$CONFIRMED_STATUS" == "CONFIRMED" ]; then
     print_success "Payment confirmed successfully"
 else
     print_failure "Payment confirmation failed"
@@ -360,21 +360,14 @@ print_header "⭐ Phase 5: Review System"
 
 # 5.1 Create Review
 print_step "Student Creates Review"
-REVIEW_RESPONSE=$(curl -s -X POST "${API_ENDPOINT}/review" \
-    -H "Content-Type: application/json" \
+# Create review using form-data (required for file uploads)
+REVIEW_RESPONSE=$(curl -s -X POST "${API_ENDPOINT}/reviews" \
     -H "Authorization: Bearer ${STUDENT_TOKEN}" \
-    -d "{
-        \"boardingId\": \"${BOARDING_ID}\",
-        \"reservationId\": \"${RESERVATION_ID}\",
-        \"rating\": 5,
-        \"title\": \"Excellent Place to Stay!\",
-        \"comment\": \"Had a wonderful experience staying here. The room was clean, well-maintained, and the owner was very responsive. Highly recommended for students!\",
-        \"pros\": [\"Clean\", \"Good Location\", \"Responsive Owner\", \"Affordable\"],
-        \"cons\": [\"Limited Parking\"]
-    }")
+    -F "data={\"boardingId\":\"${BOARDING_ID}\",\"rating\":5,\"comment\":\"Had a wonderful experience staying here. The room was clean, well-maintained, and the owner was very responsive. Highly recommended for students!\"}")
 
-REVIEW_ID=$(extract_json_value "$REVIEW_RESPONSE" ".data.review._id")
-REVIEW_RATING=$(extract_json_value "$REVIEW_RESPONSE" ".data.review.rating")
+# Extract review ID - response structure is .data._id not .data.review._id
+REVIEW_ID=$(extract_json_value "$REVIEW_RESPONSE" ".data._id")
+REVIEW_RATING=$(extract_json_value "$REVIEW_RESPONSE" ".data.rating")
 
 if [ -n "$REVIEW_ID" ] && [ "$REVIEW_ID" != "null" ]; then
     print_success "Review created successfully"
@@ -387,14 +380,14 @@ fi
 
 # 5.2 Get Reviews by Boarding
 print_step "Get Reviews for Boarding"
-REVIEWS_RESPONSE=$(curl -s -X GET "${API_ENDPOINT}/review/boarding/${BOARDING_ID}")
+REVIEWS_RESPONSE=$(curl -s -X GET "${API_ENDPOINT}/reviews/boarding/${BOARDING_ID}")
 
 REVIEWS_COUNT=$(extract_json_value "$REVIEWS_RESPONSE" ".data.reviews | length")
 print_success "Found $REVIEWS_COUNT review(s) for boarding"
 
 # 5.3 Get Review Statistics
 print_step "Get Review Statistics"
-STATS_RESPONSE=$(curl -s -X GET "${API_ENDPOINT}/review/boarding/${BOARDING_ID}/stats")
+STATS_RESPONSE=$(curl -s -X GET "${API_ENDPOINT}/reviews/boarding/${BOARDING_ID}/stats")
 
 AVG_RATING=$(extract_json_value "$STATS_RESPONSE" ".data.stats.averageRating")
 TOTAL_REVIEWS=$(extract_json_value "$STATS_RESPONSE" ".data.stats.totalReviews")
@@ -402,7 +395,7 @@ print_success "Average Rating: $AVG_RATING/5 (Total: $TOTAL_REVIEWS reviews)"
 
 # 5.4 Add Reaction to Review
 print_step "Add Helpful Reaction to Review"
-REACTION_RESPONSE=$(curl -s -X POST "${API_ENDPOINT}/review/${REVIEW_ID}/reactions" \
+REACTION_RESPONSE=$(curl -s -X POST "${API_ENDPOINT}/reviews/${REVIEW_ID}/reactions" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer ${OWNER_TOKEN}" \
     -d "{
@@ -414,14 +407,15 @@ print_success "Review has $REACTION_COUNT helpful reaction(s)"
 
 # 5.5 Create Comment on Review
 print_step "Owner Comments on Review"
-COMMENT_RESPONSE=$(curl -s -X POST "${API_ENDPOINT}/review/${REVIEW_ID}/comments" \
+COMMENT_RESPONSE=$(curl -s -X POST "${API_ENDPOINT}/reviews/${REVIEW_ID}/comments" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer ${OWNER_TOKEN}" \
     -d "{
         \"comment\": \"Thank you for your kind words! We're glad you enjoyed your stay. You're always welcome back!\"
     }")
 
-COMMENT_ID=$(extract_json_value "$COMMENT_RESPONSE" ".data.comment._id")
+# Extract comment ID - response structure is .data._id not .data.comment._id
+COMMENT_ID=$(extract_json_value "$COMMENT_RESPONSE" ".data._id")
 if [ -n "$COMMENT_ID" ] && [ "$COMMENT_ID" != "null" ]; then
     print_success "Comment added successfully"
 else
