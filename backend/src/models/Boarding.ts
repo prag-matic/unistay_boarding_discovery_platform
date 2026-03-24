@@ -1,5 +1,8 @@
 import mongoose, { type Document, Schema, type Types } from "mongoose";
 import { BoardingStatus, BoardingType, GenderPref } from "@/types/enums.js";
+import type { IBoardingAmenity } from "./BoardingAmenity.js";
+import type { IBoardingImage } from "./BoardingImage.js";
+import type { IBoardingRule } from "./BoardingRule.js";
 
 export interface IBoarding extends Document {
 	ownerId: Types.ObjectId;
@@ -22,6 +25,9 @@ export interface IBoarding extends Document {
 	isDeleted: boolean;
 	createdAt: Date;
 	updatedAt: Date;
+	images?: IBoardingImage[];
+	amenities?: IBoardingAmenity[];
+	rules?: IBoardingRule[];
 }
 
 const boardingSchema = new Schema<IBoarding>(
@@ -97,8 +103,29 @@ const boardingSchema = new Schema<IBoarding>(
 	},
 	{
 		timestamps: true,
+		toJSON: { virtuals: true },
+		toObject: { virtuals: true },
 	},
 );
+
+// Virtual populations for related documents
+boardingSchema.virtual("images", {
+	ref: "BoardingImage",
+	localField: "_id",
+	foreignField: "boardingId",
+});
+
+boardingSchema.virtual("amenities", {
+	ref: "BoardingAmenity",
+	localField: "_id",
+	foreignField: "boardingId",
+});
+
+boardingSchema.virtual("rules", {
+	ref: "BoardingRule",
+	localField: "_id",
+	foreignField: "boardingId",
+});
 
 boardingSchema.index({ slug: 1 });
 boardingSchema.index({ ownerId: 1 });

@@ -1,9 +1,9 @@
 import type { Router } from "express";
 import { Router as createRouter } from "express";
 import {
-  getSavedBoardings,
-  saveBoarding,
-  unsaveBoarding,
+	getSavedBoardings,
+	saveBoarding,
+	unsaveBoarding,
 } from "@/controllers/savedBoarding.controller.js";
 import { authenticate, requireRole } from "@/middleware/auth.js";
 import { savedBoardingLimiter } from "@/middleware/rateLimit.js";
