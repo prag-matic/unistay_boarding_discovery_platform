@@ -4,10 +4,10 @@
  * @returns User object without sensitive data
  */
 export const sanitizeUser = <T extends Record<string, unknown>>(
-  user: T,
+	user: T,
 ): Omit<T, "password"> => {
-  const { password, ...sanitized } = user as T & { password?: string };
-  return sanitized;
+	const { password, ...sanitized } = user as T & { password?: string };
+	return sanitized;
 };
 
 /**
@@ -16,13 +16,13 @@ export const sanitizeUser = <T extends Record<string, unknown>>(
  * @returns Random string
  */
 export const generateRandomString = (length: number = 32): string => {
-  const chars =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  let result = "";
-  for (let i = 0; i < length; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
+	const chars =
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+	let result = "";
+	for (let i = 0; i < length; i++) {
+		result += chars.charAt(Math.floor(Math.random() * chars.length));
+	}
+	return result;
 };
 
 /**
@@ -31,8 +31,8 @@ export const generateRandomString = (length: number = 32): string => {
  * @returns True if valid email
  */
 export const isValidEmail = (email: string): boolean => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
+	const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+	return emailRegex.test(email);
 };
 
 /**
@@ -41,8 +41,8 @@ export const isValidEmail = (email: string): boolean => {
  * @returns True if valid phone
  */
 export const isValidPhone = (phone: string): boolean => {
-  const phoneRegex = /^\+?[\d\s-()]{10,}$/;
-  return phoneRegex.test(phone);
+	const phoneRegex = /^\+?[\d\s-()]{10,}$/;
+	return phoneRegex.test(phone);
 };
 
 /**
@@ -51,7 +51,7 @@ export const isValidPhone = (phone: string): boolean => {
  * @returns ISO formatted date string
  */
 export const formatDate = (date: Date): string => {
-  return date.toISOString();
+	return date.toISOString();
 };
 
 /**
@@ -62,17 +62,17 @@ export const formatDate = (date: Date): string => {
  * @returns Pagination object
  */
 export const calculatePagination = (
-  page: number = 1,
-  limit: number = 10,
-  total: number,
+	page: number = 1,
+	limit: number = 10,
+	total: number,
 ) => {
-  const totalPages = Math.ceil(total / limit);
-  return {
-    page,
-    limit,
-    total,
-    totalPages,
-  };
+	const totalPages = Math.ceil(total / limit);
+	return {
+		page,
+		limit,
+		total,
+		totalPages,
+	};
 };
 
 /**
@@ -81,7 +81,7 @@ export const calculatePagination = (
  * @returns Promise that resolves after the delay
  */
 export const sleep = (ms: number): Promise<void> => {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+	return new Promise((resolve) => setTimeout(resolve, ms));
 };
 
 /**
@@ -90,7 +90,7 @@ export const sleep = (ms: number): Promise<void> => {
  * @returns True if date is in the past
  */
 export const isPastDate = (date: Date): boolean => {
-  return date.getTime() < Date.now();
+	return date.getTime() < Date.now();
 };
 
 /**
@@ -99,5 +99,5 @@ export const isPastDate = (date: Date): boolean => {
  * @returns True if date is in the future
  */
 export const isFutureDate = (date: Date): boolean => {
-  return date.getTime() > Date.now();
+	return date.getTime() > Date.now();
 };

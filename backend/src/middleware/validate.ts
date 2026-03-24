@@ -1,78 +1,75 @@
-import type { Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
-import { sendError } from '@/lib/response.js';
+import type { NextFunction, Request, Response } from "express";
+import type { z } from "zod";
+import { sendError } from "@/lib/response.js";
 
-type ValidationTarget = 'body' | 'query' | 'params';
+type ValidationTarget = "body" | "query" | "params";
 
-export function validate(schema: z.ZodType, target: ValidationTarget = 'body') {
+export function validate(schema: z.ZodType, target: ValidationTarget = "body") {
+	return (req: Request, res: Response, next: NextFunction): void => {
+		const input = req[target];
+		const result = schema.safeParse(input);
 
-  	return (req: Request, res: Response, next: NextFunction): void => {
-    	const input = req[target];
-    	const result = schema.safeParse(input);
+		if (!result.success) {
+			const details = result.error.issues.map((e) => ({
+				field: e.path.join("."),
+				message: e.message,
+			}));
 
-    	if (!result.success) {
-      		const details = result.error.issues.map((e) => ({
-        			field: e.path.join('.'),
-        			message: e.message,
-      			})
-			);
+			sendError(res, "ValidationError", "Validation failed", 422, details);
+			return;
+		}
 
-      		sendError(res, 'ValidationError', 'Validation failed', 422, details);
-      		return;
-    	}
+		if (target === "body") {
+			req.body = result.data;
+			next();
+			return;
+		}
 
-    	if (target === 'body') {
-    		req.body = result.data;
-      		next();
-      		return;
-    	}
+		if (target === "query") {
+			Object.defineProperty(req, "query", {
+				value: result.data,
+				writable: true,
+				configurable: true,
+				enumerable: true,
+			});
 
-    	if (target === 'query') {
-      		Object.defineProperty(req, 'query', {
-        		value: result.data,
-        		writable: true,
-        		configurable: true,
-        		enumerable: true,
-      		});
+			next();
+			return;
+		}
 
-      		next();
-      		return;
-    	}
+		if (target === "params") {
+			Object.defineProperty(req, "params", {
+				value: result.data,
+				writable: true,
+				configurable: true,
+				enumerable: true,
+			});
 
-    	if (target === 'params') {
-      		Object.defineProperty(req, 'params', {
-        		value: result.data,
-        		writable: true,
-        		configurable: true,
-        		enumerable: true,
-      		});
+			next();
+			return;
+		}
 
-      		next();
-     		return;
-    	}
+		const current = req[target] as Record<string, unknown>;
+		const parsed = result.data as Record<string, unknown>;
 
-    	const current = req[target] as Record<string, unknown>;
-    	const parsed = result.data as Record<string, unknown>;
+		for (const key of Object.keys(current)) {
+			delete current[key];
+		}
 
-    	for (const key of Object.keys(current)) {
-    		delete current[key];
-    	}
+		Object.assign(current, parsed);
 
-    	Object.assign(current, parsed);
-
-    next();
-	
-  };
+		next();
+	};
 }
 
 export function validateBody(schema: z.ZodType) {
-  	return validate(schema, 'body');
+	return validate(schema, "body");
 }
 
 export function validateQuery(schema: z.ZodType) {
-  	return validate(schema, 'query');
+	return validate(schema, "query");
 }
 
 export function validateParams(schema: z.ZodType) {
-  	return validate(schema, 'params');
+	return validate(schema, "params");
 }
