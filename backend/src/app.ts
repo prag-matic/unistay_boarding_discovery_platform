@@ -24,12 +24,12 @@ app.use("/api", router);
 
 // 404 handler
 app.use((_req: Request, res: Response) => {
-  res.status(404).json({
-    success: false,
-    error: "NotFound",
-    message: "The requested resource was not found",
-    timestamp: new Date().toISOString(),
-  });
+	res.status(404).json({
+		success: false,
+		error: "NotFound",
+		message: "The requested resource was not found",
+		timestamp: new Date().toISOString(),
+	});
 });
 
 // Global error handler

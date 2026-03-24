@@ -2,8 +2,8 @@ import type { Router } from "express";
 import { Router as createRouter } from "express";
 import { reviewController } from "../controllers/review.controller.js";
 import {
-  uploadReviewMedia,
-  validateReviewFiles,
+	uploadReviewMedia,
+	validateReviewFiles,
 } from "../middleware/upload.js";
 import { validate } from "../middleware/validate.js";
 import { reactionSchema, updateReviewCommentSchema } from "../schemas/index.js";
@@ -19,10 +19,10 @@ const router: Router = createRouter();
 
 // Create review (with file upload)
 router.post(
-  "/",
-  uploadReviewMedia,
-  validateReviewFiles,
-  reviewController.createReview,
+	"/",
+	uploadReviewMedia,
+	validateReviewFiles,
+	reviewController.createReview,
 );
 
 // Get review by ID
@@ -30,10 +30,10 @@ router.get("/:id", reviewController.getReview);
 
 // Update review (with file upload)
 router.put(
-  "/:id",
-  uploadReviewMedia,
-  validateReviewFiles,
-  reviewController.updateReview,
+	"/:id",
+	uploadReviewMedia,
+	validateReviewFiles,
+	reviewController.updateReview,
 );
 
 // Delete review
@@ -41,9 +41,9 @@ router.delete("/:id", reviewController.deleteReview);
 
 // Add reaction to review
 router.post(
-  "/:id/reactions",
-  validate(reactionSchema, "body"),
-  reviewController.addReviewReaction,
+	"/:id/reactions",
+	validate(reactionSchema, "body"),
+	reviewController.addReviewReaction,
 );
 
 // Get reviews by boarding (separate route for boarding-specific queries)
@@ -57,9 +57,9 @@ router.post("/:id/comments", reviewController.createReviewComment);
 
 // Update comment
 router.put(
-  "/comments/:id",
-  validate(updateReviewCommentSchema, "body"),
-  reviewController.updateReviewComment,
+	"/comments/:id",
+	validate(updateReviewCommentSchema, "body"),
+	reviewController.updateReviewComment,
 );
 
 // Delete comment
@@ -67,9 +67,9 @@ router.delete("/comments/:id", reviewController.deleteReviewComment);
 
 // Add reaction to comment
 router.post(
-  "/comments/:id/reactions",
-  validate(reactionSchema, "body"),
-  reviewController.addReviewCommentReaction,
+	"/comments/:id/reactions",
+	validate(reactionSchema, "body"),
+	reviewController.addReviewCommentReaction,
 );
 
 export default router;
