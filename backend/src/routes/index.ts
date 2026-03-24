@@ -3,6 +3,7 @@ import { Router as createRouter } from "express";
 import adminRoutes from "@/routes/admin.routes.js";
 import authRoutes from "@/routes/auth.routes.js";
 import boardingRoutes from "@/routes/boarding.routes.js";
+import chatRoutes from "@/routes/chat.routes.js";
 import paymentRoutes from "@/routes/payment.routes.js";
 import reservationRouter from "@/routes/reservation.routes.js";
 import reviewRoutes from "@/routes/review.routes.js";
@@ -56,5 +57,8 @@ router.use("/reviews", reviewRoutes);
 
 // Boarding routes (review access via boarding)
 router.use("/boardings", reviewRoutes);
+
+// Chat Routes
+router.use("/chat", chatRoutes);
 
 export default router;
