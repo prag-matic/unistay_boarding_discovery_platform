@@ -1,13 +1,13 @@
 import type { Router } from "express";
 import { Router as createRouter } from "express";
 import {
-  activateUser,
-  approveBoarding,
-  deactivateUser,
-  getUserById,
-  listPendingBoardings,
-  listUsers,
-  rejectBoarding,
+	activateUser,
+	approveBoarding,
+	deactivateUser,
+	getUserById,
+	listPendingBoardings,
+	listUsers,
+	rejectBoarding,
 } from "@/controllers/admin.controller.js";
 import { authenticate, requireRole } from "@/middleware/auth.js";
 import { adminLimiter } from "@/middleware/rateLimit.js";
@@ -27,9 +27,9 @@ router.patch("/users/:id/activate", activateUser);
 router.get("/boardings/pending", listPendingBoardings);
 router.patch("/boardings/:id/approve", approveBoarding);
 router.patch(
-  "/boardings/:id/reject",
-  validateBody(rejectBoardingSchema),
-  rejectBoarding,
+	"/boardings/:id/reject",
+	validateBody(rejectBoardingSchema),
+	rejectBoarding,
 );
 
 export default router;

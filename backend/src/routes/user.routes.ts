@@ -1,10 +1,10 @@
 import type { Router } from "express";
 import { Router as createRouter } from "express";
 import {
-  changePassword,
-  getMe,
-  updateMe,
-  uploadProfileImageHandler,
+	changePassword,
+	getMe,
+	updateMe,
+	uploadProfileImageHandler,
 } from "@/controllers/user.controller.js";
 import { authenticate } from "@/middleware/auth.js";
 import { userLimiter } from "@/middleware/rateLimit.js";
@@ -21,9 +21,9 @@ router.get("/me", getMe);
 router.put("/me", validateBody(updateUserSchema), updateMe);
 router.put("/me/password", validateBody(changePasswordSchema), changePassword);
 router.put(
-  "/me/profile-image",
-  uploadProfileImageMiddleware,
-  uploadProfileImageHandler,
+	"/me/profile-image",
+	uploadProfileImageMiddleware,
+	uploadProfileImageHandler,
 );
 
 export default router;
