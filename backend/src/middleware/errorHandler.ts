@@ -46,7 +46,12 @@ export const errorHandler = (
 		sendError(res, "BadRequestError", "Invalid ID format", 400);
 		return;
 	}
-	if ("code" in err && (err as { code: unknown }).code === 11000) {
+	if (
+		typeof err === "object" &&
+		err !== null &&
+		"code" in err &&
+		(err as { code: unknown }).code === 11000
+	) {
 		handleDuplicateKeyError(err as { keyValue?: Record<string, unknown> }, res);
 		return;
 	}

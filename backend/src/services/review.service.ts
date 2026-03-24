@@ -94,7 +94,7 @@ export class ReviewService {
 				},
 				options: { sort: { commentedAt: 1 } },
 			})
-			.lean();
+			.lean({ virtuals: true });
 
 		return review;
 	}
@@ -137,7 +137,7 @@ export class ReviewService {
 				.sort({ [sortBy]: sortOrder })
 				.skip(skip)
 				.limit(limit)
-				.lean(),
+				.lean({ virtuals: true }),
 
 			Review.countDocuments({
 				boardingId: new mongoose.Types.ObjectId(boardingId),
@@ -245,7 +245,7 @@ export class ReviewService {
 		)
 			.populate("boardingId")
 			.populate("studentId", "id firstName lastName email")
-			.lean();
+			.lean({ virtuals: true });
 
 		return review;
 	}
@@ -379,7 +379,7 @@ export class ReviewService {
 		const populatedComment = await ReviewComment.findById(comment._id)
 			.populate("commentorId", "id firstName lastName email")
 			.populate("reviewId", "id boardingId")
-			.lean();
+			.lean({ virtuals: true });
 
 		return populatedComment;
 	}
@@ -421,7 +421,7 @@ export class ReviewService {
 			{ new: true },
 		)
 			.populate("commentorId", "id firstName lastName email")
-			.lean();
+			.lean({ virtuals: true });
 
 		return comment;
 	}
@@ -522,7 +522,7 @@ export class ReviewService {
 			boardingId: new mongoose.Types.ObjectId(boardingId),
 		})
 			.select("rating")
-			.lean();
+			.lean({ virtuals: true });
 
 		const totalReviews = reviews.length;
 		const averageRating =

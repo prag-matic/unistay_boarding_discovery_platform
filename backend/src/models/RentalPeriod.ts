@@ -1,5 +1,6 @@
 import mongoose, { type Document, Schema } from "mongoose";
 import { RentalPeriodStatus } from "@/types/enums.js";
+import type { IPayment } from "./Payment.js";
 
 export interface IRentalPeriod extends Document {
 	reservationId: mongoose.Types.ObjectId;
@@ -9,6 +10,7 @@ export interface IRentalPeriod extends Document {
 	status: RentalPeriodStatus;
 	createdAt: Date;
 	updatedAt: Date;
+	payments?: IPayment[];
 }
 
 const rentalPeriodSchema = new Schema<IRentalPeriod>(
@@ -38,8 +40,17 @@ const rentalPeriodSchema = new Schema<IRentalPeriod>(
 	},
 	{
 		timestamps: true,
+		toJSON: { virtuals: true },
+		toObject: { virtuals: true },
 	},
 );
+
+// Virtual population for payments
+rentalPeriodSchema.virtual("payments", {
+	ref: "Payment",
+	localField: "_id",
+	foreignField: "rentalPeriodId",
+});
 
 rentalPeriodSchema.index({ reservationId: 1 });
 rentalPeriodSchema.index({ status: 1 });

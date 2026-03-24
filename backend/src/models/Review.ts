@@ -1,4 +1,5 @@
 import mongoose, { type Document, Schema, type Types } from "mongoose";
+import type { IReviewComment } from "./ReviewComment.js";
 
 export interface IReview extends Document {
 	boardingId: Types.ObjectId;
@@ -13,6 +14,7 @@ export interface IReview extends Document {
 	video?: string;
 	createdAt: Date;
 	updatedAt: Date;
+	comments?: IReviewComment[];
 }
 
 const reviewSchema = new Schema<IReview>(
@@ -55,8 +57,17 @@ const reviewSchema = new Schema<IReview>(
 	},
 	{
 		timestamps: true,
+		toJSON: { virtuals: true },
+		toObject: { virtuals: true },
 	},
 );
+
+// Virtual population for comments
+reviewSchema.virtual("comments", {
+	ref: "ReviewComment",
+	localField: "_id",
+	foreignField: "reviewId",
+});
 
 reviewSchema.index({ boardingId: 1 });
 reviewSchema.index({ studentId: 1 });
