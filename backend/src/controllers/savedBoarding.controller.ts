@@ -1,6 +1,10 @@
 import type { NextFunction, Request, Response } from "express";
 import mongoose from "mongoose";
-import { BoardingNotFoundError, ValidationError } from "@/errors/AppError.js";
+import {
+	BoardingNotFoundError,
+	ForbiddenError,
+	ValidationError,
+} from "@/errors/AppError.js";
 import { sendSuccess } from "@/lib/response.js";
 import { Boarding, SavedBoarding } from "@/models/index.js";
 import { BoardingStatus } from "@/types/enums.js";
@@ -12,8 +16,11 @@ export async function saveBoarding(
 	next: NextFunction,
 ): Promise<void> {
 	try {
+		if (!req.user?.userId) {
+			throw new ForbiddenError("User is not authenticated");
+		}
 		const { boardingId } = req.params as { boardingId: string };
-		const studentId = req.user?.userId;
+		const studentId = req.user.userId;
 
 		const boarding = await Boarding.findById(boardingId);
 
@@ -52,8 +59,11 @@ export async function unsaveBoarding(
 	next: NextFunction,
 ): Promise<void> {
 	try {
+		if (!req.user?.userId) {
+			throw new ForbiddenError("User is not authenticated");
+		}
 		const { boardingId } = req.params as { boardingId: string };
-		const studentId = req.user?.userId;
+		const studentId = req.user.userId;
 
 		const existing = await SavedBoarding.findOne({
 			boardingId: new mongoose.Types.ObjectId(boardingId),
@@ -79,7 +89,10 @@ export async function getSavedBoardings(
 	next: NextFunction,
 ): Promise<void> {
 	try {
-		const studentId = req.user?.userId;
+		if (!req.user?.userId) {
+			throw new ForbiddenError("User is not authenticated");
+		}
+		const studentId = req.user.userId;
 
 		const saved = await SavedBoarding.find({
 			studentId: new mongoose.Types.ObjectId(studentId),
