@@ -13,16 +13,4 @@
  * - chat.controller.ts (future)
  */
 
-export {
-	createReview,
-	getReview,
-	updateReview,
-	deleteReview,
-	addReviewReaction,
-	getReviewsByBoarding,
-	getReviewStats,
-	createReviewComment,
-	updateReviewComment,
-	deleteReviewComment,
-	addReviewCommentReaction,
-} from "./review.controller.js";
+export { ReviewController, reviewController } from "./review.controller.js";
