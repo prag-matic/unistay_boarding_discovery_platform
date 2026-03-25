@@ -6,7 +6,8 @@ import { validateBody, validateParams, validateQuery } from "@/middleware/valida
 import { 
     searchBoardingsQuerySchema,
     createBoardingSchema,
-    updateBoardingSchema, 
+    updateBoardingSchema,
+    boardingIdParamSchema,
 } from "@/schemas/boarding.validators.js";
 
 import { 
@@ -32,7 +33,7 @@ router.get('/', validateQuery(searchBoardingsQuerySchema), searchBoardings);
 // Owner-only routes
 router.get('/my-listings', authenticate, requireRole('OWNER'), getMyListings);
 router.post('/', authenticate, requireRole('OWNER'), validateBody(createBoardingSchema), createBoarding);
-router.put('/:id', authenticate, requireRole('OWNER'), validateParams(updateBoardingSchema), updateBoarding);
+router.put('/:id', authenticate, requireRole('OWNER'), validateParams(boardingIdParamSchema), validateBody(updateBoardingSchema), updateBoarding);
 router.patch('/:id/submit', authenticate, requireRole('OWNER'), submitBoarding);
 router.patch('/:id/deactivate', authenticate, requireRole('OWNER'), deactivateBoarding);
 router.patch('/:id/activate', authenticate, requireRole('OWNER'), activateBoarding);

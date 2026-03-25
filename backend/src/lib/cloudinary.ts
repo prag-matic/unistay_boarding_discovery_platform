@@ -98,6 +98,38 @@ export async function uploadBoardingImage(fileBuffer: Buffer, mimetype: string,)
 	});
 }
 
+export async function uploadPaymentProofImage(
+  	fileBuffer: Buffer,
+  	mimetype: string,
+	
+): Promise<string> {
+  
+	if (!ensureConfigured()) {
+    	throw new Error('Cloudinary is not configured. Please set CLOUDINARY_* environment variables.');
+  	}
+  
+	return new Promise((resolve, reject) => {
+    	const uploadStream = cloudinary.uploader.upload_stream({
+        	folder: 'unistay/payment-proofs',
+        	resource_type: 'image',
+        	format: mimetype === 'image/png' ? 'png' : 'jpg',
+      	},
+
+      	(error, result) => {
+			
+        	if (error || !result) {
+          		return reject(error ?? new Error('Upload failed'));
+        	}
+        
+			resolve(result.secure_url);
+      	},
+    );
+
+    uploadStream.end(fileBuffer);
+  
+	});
+}
+
 export async function deleteBoardingImage(publicId: string): Promise<void> {
   	if (!ensureConfigured()) {
     	throw new Error('Cloudinary is not configured. Please set CLOUDINARY_* environment variables.');
@@ -105,3 +137,4 @@ export async function deleteBoardingImage(publicId: string): Promise<void> {
 
   	await cloudinary.uploader.destroy(publicId);
 }
+
