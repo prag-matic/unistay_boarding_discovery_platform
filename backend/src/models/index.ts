@@ -6,6 +6,7 @@ export {
 	EmailVerificationToken,
 	type IEmailVerificationToken,
 } from "./EmailVerificationToken.js";
+export { type IIssue, Issue } from "./Issue.js";
 export {
 	type IPasswordResetToken,
 	PasswordResetToken,
