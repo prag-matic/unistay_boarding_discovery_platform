@@ -1,26 +1,31 @@
-import type { Request, Response, NextFunction } from "express";
-import { z } from "zod";
-import { reviewService } from "@/services/review.service.js";
-import { sendSuccess } from "@/lib/response.js";
-import { verifyAccessToken } from "@/lib/jwt.js";
+import type { Request, Response } from "express";
+import { reviewService } from "../services/review.service.js";
+import { uploadReviewMedia } from "../middleware/upload.js";
+import { validate } from "../middleware/validate.js";
 import {
   createReviewSchema,
   updateReviewSchema,
   updateReviewCommentSchema,
   reactionSchema,
-} from "@/schemas/index.js";
+} from "../schemas/index.js";
 import {
   NotFoundError,
   BadRequestError,
   ForbiddenError,
 } from "@/errors/AppError.js";
+import { z } from "zod";
 
 // Schema for comment request body (only comment field, reviewId comes from URL)
 const commentBodySchema = z.object({
   comment: z.string().min(1, "Comment is required").max(500),
 });
 
-// Helper functions to safely get values from Express request
+/**
+ * Review Controller
+ * Handles HTTP requests for review operations
+ */
+
+// Helper functions to safely get values from Express request (handles string | string[] types)
 const getParam = (req: Request, name: string): string => {
   const value = req.params[name];
   return Array.isArray(value) ? value[0] : value;
@@ -31,6 +36,14 @@ const getHeader = (req: Request, name: string): string | undefined => {
   return Array.isArray(value) ? value[0] : value;
 };
 
+const getQueryParam = (req: Request, name: string): string | undefined => {
+  const value = req.query[name] as string | string[] | undefined;
+  if (Array.isArray(value)) return value[0];
+  if (typeof value === "string") return value;
+  return undefined;
+};
+
+// Helper to safely parse query params (handles ParsedQs objects)
 const getQueryParamSafe = (req: Request, name: string): string | undefined => {
   const value = req.query[name] as string | string[] | undefined;
   if (typeof value === "string") return value;
@@ -38,128 +51,86 @@ const getQueryParamSafe = (req: Request, name: string): string | undefined => {
   return undefined;
 };
 
-const getUserId = (req: Request): string | undefined => {
-  const userIdFromAuth = req.user?.userId;
-  if (userIdFromAuth) return userIdFromAuth;
+export class ReviewController {
+  /**
+   * Create a new review
+   * POST /api/reviews
+   */
+  createReview = async (req: Request, res: Response) => {
+    try {
+      // Parse form data
+      const reviewData = JSON.parse(req.body.data || "{}");
 
-  const userIdFromHeader = getHeader(req, "x-user-id");
-  if (userIdFromHeader) return userIdFromHeader;
+      // Validate
+      const validatedData = createReviewSchema.parse(reviewData);
 
-  const authHeader = getHeader(req, "authorization");
-  if (!authHeader?.startsWith("Bearer ")) return undefined;
+      // Get user ID from request (assuming auth middleware sets req.user)
+      const studentId = (req as any).user?.id || getHeader(req, "x-user-id");
 
-  const token = authHeader.slice(7);
+      if (!studentId) {
+        throw new BadRequestError("User ID is required");
+      }
 
-  try {
-    return verifyAccessToken(token).userId;
-  } catch {
-    return undefined;
-  }
-};
+      // Get files from multer (using .fields() returns object with arrays)
+      const files = (req as any).files as
+        | { [fieldname: string]: Express.Multer.File[] }
+        | undefined;
+      const images = files?.images || [];
+      const video = files?.video?.[0];
 
-const parseReviewMultipartData = <T extends z.ZodTypeAny>(
-  req: Request,
-  schema: T,
-): z.infer<T> => {
-  let parsed: unknown;
+      // Validate file limits
+      if (images.length > 5) {
+        throw new BadRequestError("Maximum 5 images allowed");
+      }
 
-  try {
-    parsed = JSON.parse(req.body.data || "{}");
-  } catch {
-    throw new BadRequestError("Invalid JSON in form field 'data'");
-  }
+      // Create review
+      const review = await reviewService.createReview(
+        studentId,
+        validatedData.boardingId,
+        validatedData,
+        images,
+        video,
+      );
 
-  const result = schema.safeParse(parsed);
-  if (!result.success) {
-    throw new BadRequestError(
-      result.error.issues[0]?.message ?? "Validation failed",
-    );
-  }
-
-  return result.data;
-};
-
-const mapReviewServiceError = (error: unknown): never => {
-  if (!(error instanceof Error)) throw error;
-
-  switch (error.message) {
-    case "Review not found":
-      throw new NotFoundError("Review");
-    case "Comment not found":
-      throw new NotFoundError("Comment");
-    case "You can only edit your own reviews":
-    case "You can only delete your own reviews":
-    case "You can only edit your own comments":
-    case "You can only delete your own comments":
-      throw new ForbiddenError(error.message);
-    case "This review has already been edited and cannot be modified again":
-    case "This comment has already been edited and cannot be modified again":
-      throw new BadRequestError(error.message);
-    default:
+      res.status(201).json({
+        success: true,
+        data: review,
+        message: "Review created successfully",
+      });
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        throw new BadRequestError(
+          error.errors[0]?.message || "Validation failed",
+        );
+      }
       throw error;
-  }
-};
-
-// POST /api/reviews
-export async function createReview(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> {
-  try {
-    const validatedData = parseReviewMultipartData(req, createReviewSchema);
-    const studentId = getUserId(req);
-
-    if (!studentId) throw new BadRequestError("User ID is required");
-    const files = req.files as
-      | { [fieldname: string]: Express.Multer.File[] }
-      | undefined;
-    const images = files?.images || [];
-    const video = files?.video?.[0];
-
-    if (images.length > 5) {
-      throw new BadRequestError("Maximum 5 images allowed");
     }
+  };
 
-    const review = await reviewService.createReview(
-      studentId,
-      validatedData.boardingId,
-      validatedData,
-      images,
-      video,
-    );
-
-    sendSuccess(res, review, "Review created successfully", 201);
-  } catch (error) {
-    next(error);
-  }
-}
-
-// GET /api/reviews/:id
-export async function getReview(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> {
-  try {
+  /**
+   * Get review by ID
+   * GET /api/reviews/:id
+   */
+  getReview = async (req: Request, res: Response) => {
     const id = getParam(req, "id");
+
     const review = await reviewService.getReviewById(id);
 
-    if (!review) throw new NotFoundError("Review");
+    if (!review) {
+      throw new NotFoundError("Review");
+    }
 
-    sendSuccess(res, review);
-  } catch (error) {
-    next(error);
-  }
-}
+    res.json({
+      success: true,
+      data: review,
+    });
+  };
 
-// GET /api/reviews/boarding/:boardingId
-export async function getReviewsByBoarding(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> {
-  try {
+  /**
+   * Get reviews by boarding
+   * GET /api/boardings/:boardingId/reviews
+   */
+  getReviewsByBoarding = async (req: Request, res: Response) => {
     const boardingId = getParam(req, "boardingId");
 
     const result = await reviewService.getReviewsByBoarding(boardingId, {
@@ -172,133 +143,131 @@ export async function getReviewsByBoarding(
         (getQueryParamSafe(req, "sortOrder") as "asc" | "desc") || "desc",
     });
 
-    sendSuccess(res, {
-      reviews: result.data,
+    res.json({
+      success: true,
+      data: result.data,
       pagination: result.pagination,
     });
-  } catch (error) {
-    next(error);
-  }
-}
+  };
 
-// GET /api/reviews/boarding/:boardingId/stats
-export async function getReviewStats(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> {
-  try {
+  /**
+   * Get review statistics
+   * GET /api/boardings/:boardingId/reviews/stats
+   */
+  getReviewStats = async (req: Request, res: Response) => {
     const boardingId = getParam(req, "boardingId");
+
     const stats = await reviewService.getReviewStats(boardingId);
 
-    sendSuccess(res, stats);
-  } catch (error) {
-    next(error);
-  }
-}
+    res.json({
+      success: true,
+      data: stats,
+    });
+  };
 
-// PUT /api/reviews/:id
-export async function updateReview(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> {
-  try {
-    const id = getParam(req, "id");
-    const validatedData = parseReviewMultipartData(req, updateReviewSchema);
-    const studentId = getUserId(req);
-
-    if (!studentId) throw new BadRequestError("User ID is required");
-
-    const files = req.files as
-      | { [fieldname: string]: Express.Multer.File[] }
-      | undefined;
-    const images = files?.images || [];
-    const video = files?.video?.[0];
-
-    const review = await reviewService.updateReview(
-      id,
-      studentId,
-      validatedData,
-      images,
-      video,
-    );
-
-    sendSuccess(res, review, "Review updated successfully");
-  } catch (error) {
+  /**
+   * Update a review
+   * PUT /api/reviews/:id
+   */
+  updateReview = async (req: Request, res: Response) => {
     try {
-      mapReviewServiceError(error);
-    } catch (mappedError) {
-      next(mappedError);
+      const id = getParam(req, "id");
+      const reviewData = JSON.parse(req.body.data || "{}");
+
+      const validatedData = updateReviewSchema.parse(reviewData);
+
+      const studentId = (req as any).user?.id || getHeader(req, "x-user-id");
+
+      if (!studentId) {
+        throw new BadRequestError("User ID is required");
+      }
+
+      // Get files from multer (using .fields() returns object with arrays)
+      const files = (req as any).files as
+        | { [fieldname: string]: Express.Multer.File[] }
+        | undefined;
+      const images = files?.images || [];
+      const video = files?.video?.[0];
+
+      const review = await reviewService.updateReview(
+        id,
+        studentId,
+        validatedData,
+        images,
+        video,
+      );
+
+      res.json({
+        success: true,
+        data: review,
+        message: "Review updated successfully",
+      });
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        throw new BadRequestError(
+          error.errors[0]?.message || "Validation failed",
+        );
+      }
+      throw error;
     }
-  }
-}
+  };
 
-// DELETE /api/reviews/:id
-export async function deleteReview(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> {
-  try {
+  /**
+   * Delete a review
+   * DELETE /api/reviews/:id
+   */
+  deleteReview = async (req: Request, res: Response) => {
     const id = getParam(req, "id");
-    const studentId = getUserId(req);
+    const studentId = (req as any).user?.id || getHeader(req, "x-user-id");
 
-    if (!studentId) throw new BadRequestError("User ID is required");
+    if (!studentId) {
+      throw new BadRequestError("User ID is required");
+    }
 
     const result = await reviewService.deleteReview(id, studentId);
 
-    sendSuccess(res, null, result.message);
-  } catch (error) {
-    try {
-      mapReviewServiceError(error);
-    } catch (mappedError) {
-      next(mappedError);
-    }
-  }
-}
+    res.json({
+      success: true,
+      message: result.message,
+    });
+  };
 
-// POST /api/reviews/:id/reactions
-export async function addReviewReaction(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> {
-  try {
+  /**
+   * Add reaction to review
+   * POST /api/reviews/:id/reactions
+   */
+  addReviewReaction = async (req: Request, res: Response) => {
     const id = getParam(req, "id");
     const { type } = reactionSchema.parse(req.body);
-    const userId = getUserId(req);
 
-    if (!userId) throw new BadRequestError("User ID is required");
+    const userId = (req as any).user?.id || getHeader(req, "x-user-id");
+
+    if (!userId) {
+      throw new BadRequestError("User ID is required");
+    }
 
     const result = await reviewService.addReviewReaction(id, userId, type);
 
-    sendSuccess(
-      res,
-      result,
-      `Review ${result.action === "added" ? "liked" : result.action === "removed" ? "unliked" : "reaction updated"}`,
-    );
-  } catch (error) {
-    try {
-      mapReviewServiceError(error);
-    } catch (mappedError) {
-      next(mappedError);
-    }
-  }
-}
+    res.json({
+      success: true,
+      data: result,
+      message: `Review ${result.action === "added" ? "liked" : result.action === "removed" ? "unliked" : "reaction updated"}`,
+    });
+  };
 
-// POST /api/reviews/:id/comments
-export async function createReviewComment(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> {
-  try {
+  /**
+   * Create a comment on a review
+   * POST /api/reviews/:id/comments
+   */
+  createReviewComment = async (req: Request, res: Response) => {
     const reviewId = getParam(req, "id");
     const { comment } = commentBodySchema.parse(req.body);
-    const commentorId = getUserId(req);
 
-    if (!commentorId) throw new BadRequestError("User ID is required");
+    const commentorId = (req as any).user?.id || getHeader(req, "x-user-id");
+
+    if (!commentorId) {
+      throw new BadRequestError("User ID is required");
+    }
 
     const reviewComment = await reviewService.createReviewComment(
       reviewId,
@@ -306,28 +275,26 @@ export async function createReviewComment(
       { comment },
     );
 
-    sendSuccess(res, reviewComment, "Comment added successfully", 201);
-  } catch (error) {
-    try {
-      mapReviewServiceError(error);
-    } catch (mappedError) {
-      next(mappedError);
-    }
-  }
-}
+    res.status(201).json({
+      success: true,
+      data: reviewComment,
+      message: "Comment added successfully",
+    });
+  };
 
-// PUT /api/reviews/comments/:id
-export async function updateReviewComment(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> {
-  try {
+  /**
+   * Update a review comment
+   * PUT /api/reviews/comments/:id
+   */
+  updateReviewComment = async (req: Request, res: Response) => {
     const id = getParam(req, "id");
     const { comment } = updateReviewCommentSchema.parse(req.body);
-    const commentorId = getUserId(req);
 
-    if (!commentorId) throw new BadRequestError("User ID is required");
+    const commentorId = (req as any).user?.id || getHeader(req, "x-user-id");
+
+    if (!commentorId) {
+      throw new BadRequestError("User ID is required");
+    }
 
     const reviewComment = await reviewService.updateReviewComment(
       id,
@@ -335,65 +302,76 @@ export async function updateReviewComment(
       { comment },
     );
 
-    sendSuccess(res, reviewComment, "Comment updated successfully");
-  } catch (error) {
-    try {
-      mapReviewServiceError(error);
-    } catch (mappedError) {
-      next(mappedError);
-    }
-  }
-}
+    res.json({
+      success: true,
+      data: reviewComment,
+      message: "Comment updated successfully",
+    });
+  };
 
-// DELETE /api/reviews/comments/:id
-export async function deleteReviewComment(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> {
-  try {
+  /**
+   * Delete a review comment
+   * DELETE /api/reviews/comments/:id
+   */
+  deleteReviewComment = async (req: Request, res: Response) => {
     const id = getParam(req, "id");
-    const commentorId = getUserId(req);
+    const commentorId = (req as any).user?.id || getHeader(req, "x-user-id");
 
-    if (!commentorId) throw new BadRequestError("User ID is required");
+    if (!commentorId) {
+      throw new BadRequestError("User ID is required");
+    }
 
     const result = await reviewService.deleteReviewComment(id, commentorId);
 
-    sendSuccess(res, null, result.message);
-  } catch (error) {
-    try {
-      mapReviewServiceError(error);
-    } catch (mappedError) {
-      next(mappedError);
-    }
-  }
-}
+    res.json({
+      success: true,
+      message: result.message,
+    });
+  };
 
-// POST /api/reviews/comments/:id/reactions
-export async function addReviewCommentReaction(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> {
-  try {
+  /**
+   * Add reaction to review comment
+   * POST /api/reviews/comments/:id/reactions
+   */
+  addReviewCommentReaction = async (req: Request, res: Response) => {
     const id = getParam(req, "id");
     const { type } = reactionSchema.parse(req.body);
-    const userId = getUserId(req);
 
-    if (!userId) throw new BadRequestError("User ID is required");
+    const userId = (req as any).user?.id || getHeader(req, "x-user-id");
 
-    const result = await reviewService.addReviewCommentReaction(id, userId, type);
-
-    sendSuccess(
-      res,
-      result,
-      `Comment ${result.action === "added" ? "liked" : result.action === "removed" ? "unliked" : "reaction updated"}`,
-    );
-  } catch (error) {
-    try {
-      mapReviewServiceError(error);
-    } catch (mappedError) {
-      next(mappedError);
+    if (!userId) {
+      throw new BadRequestError("User ID is required");
     }
-  }
+
+    const result = await reviewService.addReviewCommentReaction(
+      id,
+      userId,
+      type,
+    );
+
+    res.json({
+      success: true,
+      data: result,
+      message: `Comment ${result.action === "added" ? "liked" : result.action === "removed" ? "unliked" : "reaction updated"}`,
+    });
+  };
 }
+
+// Middleware wrapper for multer with error handling
+export const withUpload = (fn: Function) => {
+  return (req: Request, res: Response, next: Function) => {
+    uploadReviewMedia(req, res, (err: any) => {
+      if (err) {
+        return res.status(400).json({
+          success: false,
+          error: "UploadError",
+          message: err.message,
+        });
+      }
+      fn(req, res, next);
+    });
+  };
+};
+
+export const reviewController = new ReviewController();
+export default reviewController;
