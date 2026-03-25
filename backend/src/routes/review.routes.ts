@@ -1,16 +1,7 @@
 import { Router } from "express";
 import {
-  createReview,
-  getReview,
-  updateReview,
-  deleteReview,
-  addReviewReaction,
-  getReviewsByBoarding,
-  getReviewStats,
-  createReviewComment,
-  updateReviewComment,
-  deleteReviewComment,
-  addReviewCommentReaction,
+  reviewController,
+  withUpload,
 } from "../controllers/review.controller.js";
 import {
   uploadReviewMedia,
@@ -18,6 +9,8 @@ import {
 } from "../middleware/upload.js";
 import { validate } from "../middleware/validate.js";
 import {
+  createReviewSchema,
+  updateReviewSchema,
   updateReviewCommentSchema,
   reactionSchema,
 } from "../schemas/index.js";
@@ -36,54 +29,54 @@ router.post(
   "/",
   uploadReviewMedia,
   validateReviewFiles,
-  createReview,
+  reviewController.createReview,
 );
 
 // Get review by ID
-router.get("/:id", getReview);
+router.get("/:id", reviewController.getReview);
 
 // Update review (with file upload)
 router.put(
   "/:id",
   uploadReviewMedia,
   validateReviewFiles,
-  updateReview,
+  reviewController.updateReview,
 );
 
 // Delete review
-router.delete("/:id", deleteReview);
+router.delete("/:id", reviewController.deleteReview);
 
 // Add reaction to review
 router.post(
   "/:id/reactions",
   validate(reactionSchema, "body"),
-  addReviewReaction,
+  reviewController.addReviewReaction,
 );
 
 // Get reviews by boarding (separate route for boarding-specific queries)
-router.get("/boarding/:boardingId", getReviewsByBoarding);
+router.get("/boarding/:boardingId", reviewController.getReviewsByBoarding);
 
 // Get review statistics for boarding
-router.get("/boarding/:boardingId/stats", getReviewStats);
+router.get("/boarding/:boardingId/stats", reviewController.getReviewStats);
 
 // Create comment on review (validation done in controller with commentBodySchema)
-router.post("/:id/comments", createReviewComment);
+router.post("/:id/comments", reviewController.createReviewComment);
 
 // Update comment
 router.put(
   "/comments/:id",
   validate(updateReviewCommentSchema, "body"),
-  updateReviewComment,
+  reviewController.updateReviewComment,
 );
 
 // Delete comment
-router.delete("/comments/:id", deleteReviewComment);
+router.delete("/comments/:id", reviewController.deleteReviewComment);
 
 // Add reaction to comment
 router.post(
   "/comments/:id/reactions",
   validate(reactionSchema, "body"),
-  addReviewCommentReaction,
+  reviewController.addReviewCommentReaction,
 );
 
 export default router;
