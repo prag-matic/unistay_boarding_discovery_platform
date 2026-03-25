@@ -1,11 +1,13 @@
 import type { Request, Response, NextFunction } from 'express';
 import prisma from '@/lib/prisma.js';
 import { sendSuccess } from '@/lib/response.js';
+import { uploadPaymentProofImage } from '@/lib/cloudinary.js';
 
 import {
   	ForbiddenError,
   	ConflictError,
   	NotFoundError,
+	UnauthorizedError,
   	BadRequestError,
 } from '@/errors/AppError.js';
 
@@ -26,6 +28,37 @@ function paymentSelect() {
     	rentalPeriodId: true,
     	reservationId: true,
     	studentId: true,
+		student: {
+			select: {
+				id: true,
+				firstName: true,
+				lastName: true,
+				email: true,
+			},
+		},
+		rentalPeriod: {
+			select: {
+				id: true,
+				periodLabel: true,
+				dueDate: true,
+				amountDue: true,
+				status: true,
+			},
+		},
+		reservation: {
+			select: {
+				id: true,
+				status: true,
+				moveInDate: true,
+				boardingId: true,
+				boarding: {
+					select: {
+						id: true,
+						title: true,
+					},
+				},
+			},
+		},
     	amount: true,
     	paymentMethod: true,
     	referenceNumber: true,
@@ -174,20 +207,7 @@ export async function getMyBoardingPayments(req: Request, res: Response, next: N
     	const payments = await prisma.payment.findMany({
       		where: { reservation: { boarding: { ownerId } } },
       		orderBy: { createdAt: 'desc' },
-      		select: {
-        		...paymentSelect(),
-        		reservation: {
-          			select: {
-            			id: true,
-            			boarding: { 
-							select: { 
-								id: true, 
-								title: true 
-							} 
-						},
-          			},
-        		},
-      		},
+	      	select: paymentSelect(),
     	});
 
     	sendSuccess(res, { payments });
@@ -241,6 +261,21 @@ export async function confirmPayment(req: Request, res: Response, next: NextFunc
     
 		sendSuccess(res, { payment }, 'Payment confirmed');
   
+	} catch (err) {
+    	next(err);
+  	}
+}
+
+// PUT /api/payments/:id/proof-image  (student)
+export async function uploadProofImage(req: Request, res: Response, next: NextFunction): Promise<void> {
+  	try {
+		if (!req.user) throw new UnauthorizedError();
+		if (!req.file) throw new BadRequestError('No image file provided');
+    
+		const proofImageUrl = await uploadPaymentProofImage(req.file.buffer, req.file.mimetype);
+
+    	sendSuccess(res, { proofImageUrl }, 'Proof image uploaded successfully');
+  	
 	} catch (err) {
     	next(err);
   	}
