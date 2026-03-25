@@ -52,4 +52,9 @@ export const config = {
 		baseUrl: optional("OPENINARY_URL", "http://localhost:3001"),
 		apiKey: optional("OPENINARY_API_KEY", ""),
 	},
+
+	openrouter: {
+		apiKey: optional("OPENROUTER_API_KEY", ""),
+		model: optional("OPENROUTER_MODEL", "minimax/minimax-m2.5:free"),
+	},
 };
