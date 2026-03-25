@@ -4,10 +4,11 @@ import {
   Text,
   StyleSheet,
   FlatList,
+  TouchableOpacity,
+  TextInput,
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
-  TouchableOpacity,
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -20,23 +21,19 @@ import { ChatInput } from "@/components/chat/ChatInput";
 import { IssueBanner } from "@/components/chat/IssueBanner";
 import { CreateChatRoomModal } from "@/components/chat/CreateChatRoomModal";
 import { ISSUE_BACKGROUND_COLORS } from "@/types/chat.types";
-import type { ChatMessage, Issue } from "@/types/chat.types";
+import type { ChatRoom, ChatMessage, Issue } from "@/types/chat.types";
 
 export default function MessagesScreen() {
   const { user } = useAuthStore();
   const {
     currentRoom,
     messages,
-    issues,
     currentIssue,
     backgroundType,
     isTyping,
     typingUserId,
     isLoading,
-    hasMoreMessages,
     loadMessages,
-    loadMoreMessages,
-    addMessage,
     sendTyping,
     joinRoom,
     createRoom,
@@ -46,21 +43,25 @@ export default function MessagesScreen() {
     disconnectSocket,
   } = useChatStore();
 
+  const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
+  const [isLoadingRooms, setIsLoadingRooms] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
   const [messageText, setMessageText] = useState("");
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showChatInterface, setShowChatInterface] = useState(false);
+
   const flatListRef = useRef<FlatList>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Connect to socket on mount
   useEffect(() => {
+    loadChatRooms();
     connectSocket();
     return () => {
       disconnectSocket();
     };
   }, []);
 
-  // Scroll to bottom when new message arrives
   useEffect(() => {
     if (messages.length > 0 && flatListRef.current) {
       setTimeout(() => {
@@ -69,29 +70,60 @@ export default function MessagesScreen() {
     }
   }, [messages.length]);
 
-  // Handle typing indicator
+  const loadChatRooms = async () => {
+    setIsLoadingRooms(true);
+    try {
+      const { getChatRooms } = await import("@/lib/chat");
+      const response = await getChatRooms(50);
+      const { rooms } = response.data;
+      setChatRooms(rooms);
+    } catch (error: unknown) {
+      console.error(
+        "Failed to load chat rooms:",
+        error instanceof Error ? error.message : error,
+      );
+    } finally {
+      setIsLoadingRooms(false);
+    }
+  };
+
+  const handleSelectRoom = async (room: ChatRoom) => {
+    try {
+      await joinRoom(room.id);
+      setCurrentRoom(room);
+      await loadMessages(room.id);
+      setShowChatInterface(true);
+    } catch (error: unknown) {
+      console.error(
+        "Failed to join room:",
+        error instanceof Error ? error.message : error,
+      );
+      Alert.alert("Error", "Failed to load chat. Please try again.");
+    }
+  };
+
   const handleTyping = (text: string) => {
     setMessageText(text);
 
     if (currentRoom) {
-      // Clear previous timeout
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
       }
-
-      // Send typing indicator
       sendTyping(currentRoom.id, true);
-
-      // Stop typing after 2 seconds of inactivity
       typingTimeoutRef.current = setTimeout(() => {
         sendTyping(currentRoom.id, false);
       }, 2000) as unknown as NodeJS.Timeout;
     }
   };
 
-  // Send message
   const handleSend = async () => {
-    if (!messageText.trim() || !currentRoom || isSending) return;
+    if (!messageText.trim() || isSending) return;
+
+    // If no room, show modal to create room first
+    if (!currentRoom) {
+      setShowCreateModal(true);
+      return;
+    }
 
     setIsSending(true);
     try {
@@ -104,7 +136,6 @@ export default function MessagesScreen() {
 
       if (result.success) {
         setMessageText("");
-        // Message will be added via socket event
       } else {
         Alert.alert("Error", result.error || "Failed to send message");
       }
@@ -118,37 +149,105 @@ export default function MessagesScreen() {
     }
   };
 
-  // Create chat room (from modal)
   const handleCreateRoom = async (otherUserId: string) => {
     try {
-      const boardingId = undefined; // TODO: Get from active reservation/boarding
+      const boardingId = undefined;
       const room = await createRoom(otherUserId, boardingId);
 
-      // Join the room and load messages
       await joinRoom(room.id);
       setCurrentRoom(room);
       await loadMessages(room.id);
+      setShowCreateModal(false);
+
+      // Send pending message if exists
+      if (messageText.trim()) {
+        setTimeout(() => handleSend(), 500);
+      }
     } catch (error: unknown) {
+      Alert.alert(
+        "Error",
+        error instanceof Error ? error.message : "Failed to create chat",
+      );
       throw error;
     }
   };
 
-  // Handle issue banner press
   const handleIssuePress = (issue: Issue) => {
-    // For resolved issues, just show details (view-only)
-    // For open issues, user can continue chatting
-    // Background color already changed based on issue type
+    // Handle issue details if needed
   };
 
-  // Load more messages (pull up to refresh)
-  const handleLoadMore = async () => {
-    if (!currentRoom || !hasMoreMessages) return;
-
-    // In a real implementation, we'd use the last cursor from the store
-    await loadMoreMessages(currentRoom.id, "cursor_placeholder", 15);
+  const handleBackToHistory = () => {
+    clearChat();
+    setShowChatInterface(false);
+    setMessageText("");
+    loadChatRooms();
   };
 
-  // Render message item
+  const filteredRooms = searchQuery
+    ? chatRooms.filter((room) => {
+        const otherUser =
+          user?.role === "STUDENT"
+            ? room.participants.owner
+            : room.participants.student;
+        return (
+          otherUser.firstName
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase()) ||
+          otherUser.lastName.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+      })
+    : chatRooms;
+
+  const renderRoom = ({ item }: { item: ChatRoom }) => {
+    const otherUser =
+      user?.role === "STUDENT"
+        ? item.participants.owner
+        : item.participants.student;
+    const lastMessage = item.lastMessage;
+    const timeAgo = lastMessage?.createdAt
+      ? formatTimeAgo(lastMessage.createdAt)
+      : "";
+
+    return (
+      <TouchableOpacity
+        style={styles.roomCard}
+        onPress={() => handleSelectRoom(item)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>
+            {otherUser.firstName.charAt(0)}
+            {otherUser.lastName.charAt(0)}
+          </Text>
+        </View>
+
+        <View style={styles.info}>
+          <Text style={styles.userName} numberOfLines={1}>
+            {otherUser.firstName} {otherUser.lastName}
+          </Text>
+          {lastMessage && (
+            <View style={styles.lastMessageRow}>
+              <Text style={styles.lastMessage} numberOfLines={1}>
+                {lastMessage.content}
+              </Text>
+              <Text style={styles.time}>{timeAgo}</Text>
+            </View>
+          )}
+          {item.boardingId && (
+            <View style={styles.boardingTag}>
+              <Ionicons name="home-outline" size={12} color={COLORS.gray} />
+              <Text style={styles.boardingTagText} numberOfLines={1}>
+                {item.boardingId.propertyName}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
+      </TouchableOpacity>
+    );
+  };
+
   const renderMessage = ({ item }: { item: ChatMessage }) => {
     const isOwn = item.senderId === user?.id;
     const sender = isOwn
@@ -167,7 +266,6 @@ export default function MessagesScreen() {
     );
   };
 
-  // Render typing indicator
   const renderTypingIndicator = () => {
     if (!isTyping || !typingUserId) return null;
 
@@ -184,51 +282,9 @@ export default function MessagesScreen() {
     );
   };
 
-  // Show create modal if no current room
-  if (!currentRoom) {
+  // Show chat interface
+  if (showChatInterface && currentRoom) {
     return (
-      <>
-        <SafeAreaView style={styles.container}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Messages</Text>
-          </View>
-
-          <View style={styles.emptyContainer}>
-            <View style={styles.emptyIcon}>
-              <Ionicons
-                name="chatbubbles-outline"
-                size={48}
-                color={COLORS.primary}
-              />
-            </View>
-            <Text style={styles.emptyTitle}>No Chat Selected</Text>
-            <Text style={styles.emptyText}>
-              Start a conversation with{" "}
-              {user?.role === "STUDENT" ? "your boarding owner" : "a student"}
-            </Text>
-            <TouchableOpacity
-              style={styles.startChatBtn}
-              onPress={() => setShowCreateModal(true)}
-            >
-              <Ionicons name="add" size={20} color={COLORS.white} />
-              <Text style={styles.startChatBtnText}>Start New Chat</Text>
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
-
-        <CreateChatRoomModal
-          visible={showCreateModal}
-          userType={user?.role === "STUDENT" ? "student" : "owner"}
-          onSubmit={handleCreateRoom}
-          onClose={() => setShowCreateModal(false)}
-        />
-      </>
-    );
-  }
-
-  // Main chat screen with messages
-  return (
-    <>
       <SafeAreaView
         style={[
           styles.container,
@@ -236,23 +292,16 @@ export default function MessagesScreen() {
         ]}
       >
         {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => {
-              clearChat();
-              disconnectSocket();
-            }}
-          >
+        <View style={styles.chatHeader}>
+          <TouchableOpacity onPress={handleBackToHistory}>
             <Ionicons name="arrow-back" size={24} color={COLORS.text} />
           </TouchableOpacity>
 
           <View style={styles.headerInfo}>
             <Text style={styles.headerTitle}>
-              {
-                currentRoom.participants[
-                  user?.role === "STUDENT" ? "owner" : "student"
-                ].firstName
-              }
+              {user?.role === "STUDENT"
+                ? currentRoom.participants.owner.firstName
+                : currentRoom.participants.student.firstName}
             </Text>
             {currentRoom.boardingId && (
               <Text style={styles.headerSubtitle} numberOfLines={1}>
@@ -260,13 +309,9 @@ export default function MessagesScreen() {
               </Text>
             )}
           </View>
-
-          <TouchableOpacity style={styles.historyBtn}>
-            <Ionicons name="time-outline" size={22} color={COLORS.text} />
-          </TouchableOpacity>
         </View>
 
-        {/* Issue Banner (if there's an active issue) */}
+        {/* Issue Banner */}
         {currentIssue && (
           <IssueBanner
             issue={currentIssue}
@@ -281,8 +326,6 @@ export default function MessagesScreen() {
           renderItem={renderMessage}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.messagesList}
-          onEndReached={handleLoadMore}
-          onEndReachedThreshold={0.3}
           ListEmptyComponent={
             <View style={styles.emptyMessages}>
               <Ionicons
@@ -315,10 +358,6 @@ export default function MessagesScreen() {
             value={messageText}
             onChangeText={handleTyping}
             onSend={handleSend}
-            onShowHistory={() => {
-              // Navigate to chat history screen
-              console.log("Show history");
-            }}
             disabled={currentIssue?.status === "RESOLVED"}
             loading={isSending}
             placeholder={
@@ -328,17 +367,143 @@ export default function MessagesScreen() {
             }
           />
         </KeyboardAvoidingView>
+
+        {/* Create Room Modal */}
+        <CreateChatRoomModal
+          visible={showCreateModal}
+          userType={user?.role === "STUDENT" ? "student" : "owner"}
+          onSubmit={handleCreateRoom}
+          onClose={() => {
+            setShowCreateModal(false);
+            if (!currentRoom) {
+              setShowChatInterface(false);
+              setMessageText("");
+            }
+          }}
+        />
       </SafeAreaView>
+    );
+  }
+
+  // Show chat history list
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.title}>Messages</Text>
+      </View>
+
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchBar}>
+          <Ionicons name="search-outline" size={18} color={COLORS.gray} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search conversations..."
+            placeholderTextColor={COLORS.gray}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery("")}>
+              <Ionicons name="close-circle" size={20} color={COLORS.gray} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      {/* Results Info */}
+      {searchQuery.length > 0 && (
+        <View style={styles.resultsInfo}>
+          <Text style={styles.resultsText}>
+            {filteredRooms.length} conversation
+            {filteredRooms.length !== 1 ? "s" : ""} found
+          </Text>
+        </View>
+      )}
+
+      {/* Chat Rooms List */}
+      {isLoadingRooms ? (
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={filteredRooms}
+          renderItem={renderRoom}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <View style={styles.emptyIcon}>
+                <Ionicons
+                  name="chatbubbles-outline"
+                  size={48}
+                  color={COLORS.primary}
+                />
+              </View>
+              <Text style={styles.emptyTitle}>No messages yet</Text>
+              <Text style={styles.emptyText}>
+                Start a conversation to see your chat history here
+              </Text>
+            </View>
+          }
+        />
+      )}
+
+      {/* Start New Chat FAB */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => {
+          connectSocket();
+          setShowChatInterface(true);
+          setShowCreateModal(true);
+        }}
+      >
+        <Ionicons name="add" size={28} color={COLORS.white} />
+      </TouchableOpacity>
 
       {/* Create Room Modal */}
       <CreateChatRoomModal
         visible={showCreateModal}
         userType={user?.role === "STUDENT" ? "student" : "owner"}
         onSubmit={handleCreateRoom}
-        onClose={() => setShowCreateModal(false)}
+        onClose={() => {
+          setShowCreateModal(false);
+          if (!currentRoom) {
+            setShowChatInterface(false);
+            setMessageText("");
+          }
+        }}
       />
-    </>
+    </SafeAreaView>
   );
+}
+
+function formatTimeAgo(isoString: string): string {
+  try {
+    const date = new Date(isoString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins}m`;
+
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h`;
+
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) return `${diffDays}d`;
+
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return "";
+  }
 }
 
 const styles = StyleSheet.create({
@@ -347,6 +512,162 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   header: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 12,
+    backgroundColor: COLORS.white,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: COLORS.text,
+  },
+  searchContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: COLORS.white,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.grayBorder,
+  },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: COLORS.grayLight,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: COLORS.text,
+    padding: 0,
+  },
+  resultsInfo: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    backgroundColor: COLORS.white,
+  },
+  resultsText: {
+    fontSize: 13,
+    color: COLORS.gray,
+  },
+  listContent: {
+    padding: 20,
+    paddingBottom: 100,
+  },
+  roomCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    padding: 14,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: COLORS.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarText: {
+    fontSize: 18,
+    color: COLORS.white,
+    fontWeight: "700",
+  },
+  info: {
+    flex: 1,
+    gap: 2,
+  },
+  userName: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: COLORS.text,
+  },
+  lastMessageRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 2,
+  },
+  lastMessage: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    flex: 1,
+  },
+  time: {
+    fontSize: 12,
+    color: COLORS.gray,
+  },
+  boardingTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 4,
+  },
+  boardingTagText: {
+    fontSize: 11,
+    color: COLORS.gray,
+  },
+  separator: {
+    height: 8,
+  },
+  loaderContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 80,
+    gap: 16,
+  },
+  emptyIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: COLORS.primary + "15",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: COLORS.text,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    textAlign: "center",
+    paddingHorizontal: 24,
+    lineHeight: 20,
+  },
+  fab: {
+    position: "absolute",
+    bottom: 24,
+    right: 24,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: COLORS.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  chatHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
@@ -368,19 +689,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textSecondary,
     marginTop: 2,
-  },
-  historyBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: COLORS.grayLight,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: COLORS.text,
   },
   messagesList: {
     flexGrow: 1,
@@ -425,47 +733,5 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: COLORS.gray,
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
-    gap: 16,
-  },
-  emptyIcon: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: COLORS.primary + "15",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: COLORS.text,
-    textAlign: "center",
-  },
-  emptyText: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    textAlign: "center",
-    lineHeight: 20,
-  },
-  startChatBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginTop: 16,
-  },
-  startChatBtnText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: COLORS.white,
   },
 });

@@ -7,14 +7,12 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
 import { COLORS } from "@/lib/constants";
 
 interface ChatInputProps {
   value: string;
   onChangeText: (text: string) => void;
   onSend: () => void;
-  onShowHistory: () => void;
   disabled?: boolean;
   loading?: boolean;
   placeholder?: string;
@@ -24,7 +22,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   value,
   onChangeText,
   onSend,
-  onShowHistory,
   disabled = false,
   loading = false,
   placeholder = "Type a message...",
@@ -37,24 +34,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
   };
 
-  const handleShowHistory = () => {
-    router.push("../chat-history" as any);
-  };
-
   return (
     <View style={[styles.container, isFocused && styles.containerFocused]}>
-      <TouchableOpacity
-        style={styles.historyBtn}
-        onPress={handleShowHistory}
-        disabled={disabled}
-      >
-        <Ionicons
-          name="chatbubbles-outline"
-          size={22}
-          color={disabled ? COLORS.gray : COLORS.primary}
-        />
-      </TouchableOpacity>
-
       <View style={[styles.inputContainer, isFocused && styles.inputFocused]}>
         <TextInput
           style={[styles.input, disabled && styles.inputDisabled]}
@@ -113,14 +94,6 @@ const styles = StyleSheet.create({
   },
   containerFocused: {
     backgroundColor: COLORS.white,
-  },
-  historyBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.grayLight,
-    alignItems: "center",
-    justifyContent: "center",
   },
   inputContainer: {
     flex: 1,
