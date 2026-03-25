@@ -1,6 +1,7 @@
 import type { Server as HTTPServer } from "node:http";
 import { Types } from "mongoose";
 import { Server as SocketIOServer } from "socket.io";
+import { config } from "@/config/env.js";
 import type { JwtPayload } from "@/lib/jwt.js";
 import { verifyAccessToken } from "@/lib/jwt.js";
 import { ChatMessage } from "@/models/ChatMessage.js";
@@ -13,6 +14,7 @@ import {
 	socketSendMessageSchema,
 	socketTypingSchema,
 } from "@/schemas/chat.validators.js";
+import { chatAnalysisService } from "@/services/chatAnalysis.service.js";
 
 interface SocketData {
 	user: JwtPayload;
@@ -32,6 +34,14 @@ interface ServerToClientEvents {
 	join: (data: { roomId: string; userId: string }) => void;
 	leave: (data: { roomId: string; userId: string }) => void;
 	error: (data: { message: string; code: string }) => void;
+	issueAnalysis: (data: {
+		messageId: string;
+		roomId: string;
+		isIssue: boolean;
+		reason: string;
+		category?: string;
+		suggestedPriority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+	}) => void;
 }
 
 interface ClientToServerEvents {
@@ -148,9 +158,12 @@ export function setupSocketIO(httpServer: HTTPServer): SocketIOType {
 				if (!result.success) {
 					const roomId = payload?.roomId;
 					const roomIdType = typeof roomId;
-					const roomIdLength = roomIdType === "string" ? roomId.length : null;
+					const roomIdLength =
+						roomIdType === "string" && roomId ? roomId.length : null;
 					const roomIdMatchesObjectId =
-						roomIdType === "string" ? /^[0-9a-fA-F]{24}$/.test(roomId) : false;
+						roomIdType === "string" && roomId
+							? /^[0-9a-fA-F]{24}$/.test(roomId)
+							: false;
 
 					console.error("[Socket.io] joinRoom validation failed", {
 						roomId,
@@ -316,6 +329,48 @@ export function setupSocketIO(httpServer: HTTPServer): SocketIOType {
 				};
 
 				io.to(roomId).emit("message", messageData);
+
+				// Analyze the message for potential issues (only for text messages)
+				if (messageType === "text" && config.openrouter.apiKey) {
+					// Get recent message context for better analysis
+					const recentMessages = await ChatMessage.find({
+						roomId: new Types.ObjectId(roomId),
+						createdAt: { $lte: message.createdAt },
+					})
+						.sort({ createdAt: -1 })
+						.limit(10)
+						.populate("senderId", "role")
+						.lean();
+
+					const messageContext = recentMessages.map((msg) => ({
+						content: msg.content,
+						senderRole: (msg.senderId as unknown as { role: string }).role,
+						createdAt: msg.createdAt,
+					}));
+
+					// Analyze the message asynchronously (don't block the response)
+					chatAnalysisService
+						.analyzeMessage(message.content, messageContext)
+						.then((analysis) => {
+							if (analysis.isIssue) {
+								// Emit the analysis to all participants in the room
+								io.to(roomId).emit("issueAnalysis", {
+									messageId: message._id.toString(),
+									roomId,
+									isIssue: analysis.isIssue,
+									reason: analysis.reason,
+									category: analysis.category,
+									suggestedPriority: analysis.suggestedPriority,
+								});
+							}
+						})
+						.catch((err) => {
+							console.error(
+								"[Socket.io] Error analyzing message for issues:",
+								err,
+							);
+						});
+				}
 
 				callback({ success: true });
 			} catch (error) {
