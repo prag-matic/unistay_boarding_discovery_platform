@@ -139,12 +139,19 @@ export async function login(
 			accessToken,
 			refreshToken: rawRefreshToken,
 			user: {
-				id: loginUser._id,
+				id: loginUser._id.toString(),
 				email: loginUser.email,
 				firstName: loginUser.firstName,
 				lastName: loginUser.lastName,
 				role: loginUser.role,
 				isVerified: loginUser.isVerified,
+				isActive: loginUser.isActive,
+				phone: loginUser.phone,
+				university: loginUser.university,
+				nicNumber: loginUser.nicNumber,
+				profileImageUrl: loginUser.profileImageUrl,
+				createdAt: loginUser.createdAt.toISOString(),
+				updatedAt: loginUser.updatedAt.toISOString(),
 			},
 		});
 	} catch (error) {

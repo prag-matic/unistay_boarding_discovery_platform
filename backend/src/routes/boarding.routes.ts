@@ -21,6 +21,7 @@ import {
 	validateQuery,
 } from "@/middleware/validate.js";
 import {
+	boardingIdParamSchema,
 	createBoardingSchema,
 	searchBoardingsQuerySchema,
 	updateBoardingSchema,
@@ -46,7 +47,8 @@ router.put(
 	"/:id",
 	authenticate,
 	requireRole("OWNER"),
-	validateParams(updateBoardingSchema),
+	validateParams(boardingIdParamSchema),
+	validateBody(updateBoardingSchema),
 	updateBoarding,
 );
 router.patch("/:id/submit", authenticate, requireRole("OWNER"), submitBoarding);
