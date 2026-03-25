@@ -1,5 +1,9 @@
 import prisma from '../lib/prisma.js';
-import { openinary } from '../lib/openinary.js';
+import {
+  uploadReviewImage,
+  uploadReviewVideo,
+  deleteCloudinaryAsset,
+} from '../lib/cloudinary.js';
 import type { CreateReviewInput, UpdateReviewInput, CreateReviewCommentInput, UpdateReviewCommentInput } from '../schemas/index.js';
 
 /**
@@ -8,6 +12,11 @@ import type { CreateReviewInput, UpdateReviewInput, CreateReviewCommentInput, Up
  */
 
 export class ReviewService {
+  private extractCloudinaryPublicId(assetUrl: string): string | null {
+    const match = assetUrl.match(/\/upload\/(?:v\d+\/)?(.+?)\.[^./?]+(?:\?.*)?$/);
+    return match?.[1] ?? null;
+  }
+
   /**
    * Create a new review
    */
@@ -18,26 +27,27 @@ export class ReviewService {
     images?: Express.Multer.File[],
     video?: Express.Multer.File,
   ) {
-    // Upload images to Openinary (convert to WebP)
+    // Upload images to Cloudinary
     const imagePaths: string[] = [];
     if (images && images.length > 0) {
       for (const image of images) {
-        const result = await openinary.uploadImageWebp(
+        const result = await uploadReviewImage(
           image.buffer,
-          `reviews/${boardingId}/images`,
+          image.mimetype,
+          boardingId,
         );
-        imagePaths.push(result.path);
+        imagePaths.push(result.url);
       }
     }
 
-    // Upload video to Openinary (convert to WebM)
+    // Upload video to Cloudinary
     let videoPath: string | null = null;
     if (video) {
-      const result = await openinary.uploadVideoWebm(
+      const result = await uploadReviewVideo(
         video.buffer,
-        `reviews/${boardingId}/videos`,
+        boardingId,
       );
-      videoPath = result.path;
+      videoPath = result.url;
     }
 
     // Create review in database
@@ -207,8 +217,8 @@ export class ReviewService {
       // Delete old images
       for (const oldPath of existingReview.images) {
         try {
-          const publicId = oldPath.split('/').pop()?.split('.')[0] || '';
-          if (publicId) await openinary.delete(publicId);
+          const publicId = this.extractCloudinaryPublicId(oldPath);
+          if (publicId) await deleteCloudinaryAsset(publicId, 'image');
         } catch {
           // Ignore delete errors
         }
@@ -217,11 +227,12 @@ export class ReviewService {
       // Upload new images
       imagePaths = [];
       for (const image of images) {
-        const result = await openinary.uploadImageWebp(
+        const result = await uploadReviewImage(
           image.buffer,
-          `reviews/${existingReview.boardingId}/images`,
+          image.mimetype,
+          existingReview.boardingId,
         );
-        imagePaths.push(result.path);
+        imagePaths.push(result.url);
       }
     }
 
@@ -231,19 +242,19 @@ export class ReviewService {
       // Delete old video
       if (existingReview.video) {
         try {
-          const publicId = existingReview.video.split('/').pop()?.split('.')[0] || '';
-          if (publicId) await openinary.delete(publicId);
+          const publicId = this.extractCloudinaryPublicId(existingReview.video);
+          if (publicId) await deleteCloudinaryAsset(publicId, 'video');
         } catch {
           // Ignore delete errors
         }
       }
 
       // Upload new video
-      const result = await openinary.uploadVideoWebm(
+      const result = await uploadReviewVideo(
         video.buffer,
-        `reviews/${existingReview.boardingId}/videos`,
+        existingReview.boardingId,
       );
-      videoPath = result.path;
+      videoPath = result.url;
     }
 
     // Update review
@@ -289,21 +300,21 @@ export class ReviewService {
       throw new Error('You can only delete your own reviews');
     }
 
-    // Delete images from Openinary
+    // Delete images from Cloudinary
     for (const imagePath of existingReview.images) {
       try {
-        const publicId = imagePath.split('/').pop()?.split('.')[0] || '';
-        if (publicId) await openinary.delete(publicId);
+        const publicId = this.extractCloudinaryPublicId(imagePath);
+        if (publicId) await deleteCloudinaryAsset(publicId, 'image');
       } catch {
         // Ignore delete errors
       }
     }
 
-    // Delete video from Openinary
+    // Delete video from Cloudinary
     if (existingReview.video) {
       try {
-        const publicId = existingReview.video.split('/').pop()?.split('.')[0] || '';
-        if (publicId) await openinary.delete(publicId);
+        const publicId = this.extractCloudinaryPublicId(existingReview.video);
+        if (publicId) await deleteCloudinaryAsset(publicId, 'video');
       } catch {
         // Ignore delete errors
       }
