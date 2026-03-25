@@ -130,11 +130,87 @@ export async function uploadPaymentProofImage(
 	});
 }
 
+export async function uploadReviewImage(
+	fileBuffer: Buffer,
+	mimetype: string,
+	boardingId: string,
+): Promise<CloudinaryUploadResult> {
+	if (!ensureConfigured()) {
+		throw new Error('Cloudinary is not configured. Please set CLOUDINARY_* environment variables.');
+	}
+
+	let format: string | undefined;
+	if (mimetype === 'image/png') {
+		format = 'png';
+	} else if (mimetype === 'image/webp') {
+		format = 'webp';
+	} else if (mimetype === 'image/jpeg' || mimetype === 'image/jpg') {
+		format = 'jpg';
+	}
+
+	return new Promise((resolve, reject) => {
+		const uploadStream = cloudinary.uploader.upload_stream(
+			{
+				folder: `unistay/reviews/${boardingId}/images`,
+				resource_type: 'image',
+				...(format ? { format } : {}),
+			},
+			(error, result) => {
+				if (error || !result) {
+					return reject(error ?? new Error('Upload failed'));
+				}
+
+				resolve({ url: result.secure_url, publicId: result.public_id });
+			},
+		);
+
+		uploadStream.end(fileBuffer);
+	});
+}
+
+export async function uploadReviewVideo(
+	fileBuffer: Buffer,
+	boardingId: string,
+): Promise<CloudinaryUploadResult> {
+	if (!ensureConfigured()) {
+		throw new Error('Cloudinary is not configured. Please set CLOUDINARY_* environment variables.');
+	}
+
+	return new Promise((resolve, reject) => {
+		const uploadStream = cloudinary.uploader.upload_stream(
+			{
+				folder: `unistay/reviews/${boardingId}/videos`,
+				resource_type: 'video',
+			},
+			(error, result) => {
+				if (error || !result) {
+					return reject(error ?? new Error('Upload failed'));
+				}
+
+				resolve({ url: result.secure_url, publicId: result.public_id });
+			},
+		);
+
+		uploadStream.end(fileBuffer);
+	});
+}
+
 export async function deleteBoardingImage(publicId: string): Promise<void> {
   	if (!ensureConfigured()) {
     	throw new Error('Cloudinary is not configured. Please set CLOUDINARY_* environment variables.');
   	}
 
   	await cloudinary.uploader.destroy(publicId);
+}
+
+export async function deleteCloudinaryAsset(
+	publicId: string,
+	resourceType: 'image' | 'video' = 'image',
+): Promise<void> {
+	if (!ensureConfigured()) {
+		throw new Error('Cloudinary is not configured. Please set CLOUDINARY_* environment variables.');
+	}
+
+	await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
 }
 
