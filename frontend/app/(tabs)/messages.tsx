@@ -57,6 +57,7 @@ export default function MessagesScreen() {
   } = useChatStore();
 
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
+  const [roomIssues, setRoomIssues] = useState<Record<string, Issue>>({});
   const [isLoadingRooms, setIsLoadingRooms] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [messageText, setMessageText] = useState("");
@@ -86,10 +87,33 @@ export default function MessagesScreen() {
   const loadChatRooms = async () => {
     setIsLoadingRooms(true);
     try {
-      const { getChatRooms } = await import("@/lib/chat");
-      const response = await getChatRooms(50);
-      const { rooms } = response.data;
+      const { getChatRooms, getRoomIssues } = await import("@/lib/chat");
+      const [roomsResponse, issuesResponse] = await Promise.all([
+        getChatRooms(50),
+        // Fetch all active issues
+        (async () => {
+          try {
+            const response = await getRoomIssues("");
+            return response.data.issues;
+          } catch {
+            return [];
+          }
+        })(),
+      ]);
+
+      const { rooms } = roomsResponse.data;
+      const issues = issuesResponse;
+
+      // Create a map of room issues (only active ones)
+      const issueMap: Record<string, Issue> = {};
+      issues.forEach((issue: Issue) => {
+        if (issue.status === "OPEN" || issue.status === "IN_PROGRESS") {
+          issueMap[issue.roomId] = issue;
+        }
+      });
+
       setChatRooms(rooms);
+      setRoomIssues(issueMap);
     } catch (error: unknown) {
       console.error(
         "Failed to load chat rooms:",
@@ -232,9 +256,20 @@ export default function MessagesScreen() {
         ? formatTimeAgo(lastMessage.createdAt)
         : "";
 
+      const activeIssue = roomIssues[item.id];
+      const hasIssue = !!activeIssue;
+
       return (
         <TouchableOpacity
-          style={styles.roomCard}
+          style={[
+            styles.roomCard,
+            hasIssue && {
+              backgroundColor:
+                ISSUE_BACKGROUND_COLORS[
+                  `issue_${activeIssue.category}` as keyof typeof ISSUE_BACKGROUND_COLORS
+                ] || ISSUE_BACKGROUND_COLORS.issue_other,
+            },
+          ]}
           onPress={() => handleSelectRoom(item)}
           activeOpacity={0.7}
         >
@@ -249,15 +284,64 @@ export default function MessagesScreen() {
             <Text style={styles.userName} numberOfLines={1}>
               {otherUser.firstName} {otherUser.lastName}
             </Text>
-            {lastMessage && (
-              <View style={styles.lastMessageRow}>
-                <Text style={styles.lastMessage} numberOfLines={1}>
-                  {lastMessage.content}
-                </Text>
-                <Text style={styles.time}>{timeAgo}</Text>
+
+            {hasIssue ? (
+              <View style={styles.issueInfo}>
+                <View style={styles.issueRow}>
+                  <Ionicons name="warning" size={12} color={COLORS.primary} />
+                  <Text style={styles.issueTitle} numberOfLines={1}>
+                    {activeIssue.title}
+                  </Text>
+                </View>
+                <View style={styles.issueBadges}>
+                  <View
+                    style={[
+                      styles.issueBadge,
+                      {
+                        backgroundColor:
+                          ISSUE_BADGE_COLORS[activeIssue.category]?.bg ||
+                          COLORS.gray,
+                      },
+                    ]}
+                  >
+                    <Text style={styles.issueBadgeText}>
+                      {activeIssue.category.replace("_", " ")}
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.issueBadge,
+                      {
+                        backgroundColor: COLORS.white,
+                        borderColor: getIssueStatusColor(activeIssue.status),
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.issueBadgeText,
+                        {
+                          color: getIssueStatusColor(activeIssue.status),
+                        },
+                      ]}
+                    >
+                      {activeIssue.status.replace("_", " ")}
+                    </Text>
+                  </View>
+                </View>
               </View>
+            ) : (
+              lastMessage && (
+                <View style={styles.lastMessageRow}>
+                  <Text style={styles.lastMessage} numberOfLines={1}>
+                    {lastMessage.content}
+                  </Text>
+                  <Text style={styles.time}>{timeAgo}</Text>
+                </View>
+              )
             )}
-            {item.boardingId && (
+
+            {item.boardingId && !hasIssue && (
               <View style={styles.boardingTag}>
                 <Ionicons name="home-outline" size={12} color={COLORS.gray} />
                 <Text style={styles.boardingTagText} numberOfLines={1}>
@@ -271,7 +355,7 @@ export default function MessagesScreen() {
         </TouchableOpacity>
       );
     },
-    [user?.role, handleSelectRoom],
+    [user?.role, handleSelectRoom, roomIssues],
   );
 
   const renderItemSeparator = useCallback(
@@ -379,147 +463,159 @@ export default function MessagesScreen() {
   // Show chat interface
   if (showChatInterface && currentRoom) {
     return (
-      <SafeAreaView
-        style={[
-          styles.container,
-          { backgroundColor: ISSUE_BACKGROUND_COLORS[backgroundType] },
-        ]}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0}
       >
-        {/* Header */}
-        <View style={styles.chatHeader}>
-          <TouchableOpacity onPress={handleBackToHistory}>
-            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
-          </TouchableOpacity>
+        <SafeAreaView
+          edges={["top"]}
+          style={[
+            styles.container,
+            { backgroundColor: ISSUE_BACKGROUND_COLORS[backgroundType] },
+          ]}
+        >
+          {/* Header */}
+          <View style={styles.chatHeader}>
+            <TouchableOpacity onPress={handleBackToHistory}>
+              <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+            </TouchableOpacity>
 
-          <View style={styles.headerInfo}>
-            <Text style={styles.headerTitle}>
-              {user?.role === "STUDENT"
-                ? currentRoom.participants.owner.firstName
-                : currentRoom.participants.student.firstName}
-            </Text>
-            {currentIssue ? (
-              <View style={styles.headerIssueInfo}>
-                <Ionicons name="warning" size={14} color={COLORS.primary} />
-                <Text style={styles.headerIssueText} numberOfLines={1}>
-                  Issue: {currentIssue.title}
+            <View style={styles.headerInfo}>
+              <Text style={styles.headerTitle}>
+                {user?.role === "STUDENT"
+                  ? currentRoom.participants.owner.firstName
+                  : currentRoom.participants.student.firstName}
+              </Text>
+              {currentIssue ? (
+                <View style={styles.headerIssueInfo}>
+                  <Ionicons name="warning" size={14} color={COLORS.primary} />
+                  <Text style={styles.headerIssueText} numberOfLines={1}>
+                    Issue: {currentIssue.title}
+                  </Text>
+                  <View
+                    style={[
+                      styles.headerIssueBadge,
+                      {
+                        backgroundColor:
+                          ISSUE_BADGE_COLORS[currentIssue.category]?.bg ||
+                          COLORS.gray,
+                      },
+                    ]}
+                  >
+                    <Text style={styles.headerIssueBadgeText}>
+                      {currentIssue.category.replace("_", " ")}
+                    </Text>
+                  </View>
+                </View>
+              ) : currentRoom.boardingId ? (
+                <Text style={styles.headerSubtitle} numberOfLines={1}>
+                  {currentRoom.boardingId.propertyName}
                 </Text>
+              ) : null}
+            </View>
+
+            {currentIssue && (
+              <View style={styles.headerIssueStatusBadge}>
                 <View
                   style={[
-                    styles.headerIssueBadge,
+                    styles.headerIssueStatus,
                     {
-                      backgroundColor:
-                        ISSUE_BADGE_COLORS[currentIssue.category]?.bg ||
-                        COLORS.gray,
+                      backgroundColor: COLORS.white,
+                      borderColor: getIssueStatusColor(currentIssue.status),
                     },
                   ]}
                 >
-                  <Text style={styles.headerIssueBadgeText}>
-                    {currentIssue.category.replace("_", " ")}
+                  <Text
+                    style={[
+                      styles.headerIssueStatusText,
+                      { color: getIssueStatusColor(currentIssue.status) },
+                    ]}
+                  >
+                    {currentIssue.status.replace("_", " ")}
                   </Text>
                 </View>
               </View>
-            ) : currentRoom.boardingId ? (
-              <Text style={styles.headerSubtitle} numberOfLines={1}>
-                {currentRoom.boardingId.propertyName}
-              </Text>
-            ) : null}
+            )}
           </View>
 
-          {currentIssue && (
-            <View
-              style={[
-                styles.headerIssueStatus,
-                {
-                  backgroundColor:
-                    getIssueStatusColor(currentIssue.status) + "20",
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.headerIssueStatusText,
-                  { color: getIssueStatusColor(currentIssue.status) },
-                ]}
-              >
-                {currentIssue.status.replace("_", " ")}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* Messages List */}
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          renderItem={renderMessage}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.messagesList}
-          ListEmptyComponent={
-            <View style={styles.emptyMessages}>
-              <Ionicons
-                name="chatbox-ellipses-outline"
-                size={48}
-                color={COLORS.grayBorder}
-              />
-              <Text style={styles.emptyMessagesText}>No messages yet</Text>
-              <Text style={styles.emptyMessagesSubtext}>
-                Start the conversation!
-              </Text>
-            </View>
-          }
-          ListFooterComponent={
-            isLoading ? (
-              <ActivityIndicator color={COLORS.primary} style={styles.loader} />
-            ) : null
-          }
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        />
-
-        {/* Typing Indicator */}
-        {renderTypingIndicator()}
-
-        {/* Input */}
-        <ChatInput
-          value={messageText}
-          onChangeText={handleTyping}
-          onSend={handleSend}
-          disabled={currentIssue?.status === "RESOLVED"}
-          loading={isSending}
-          placeholder={
-            currentIssue?.status === "RESOLVED"
-              ? "This issue is resolved (view-only)"
-              : "Type a message..."
-          }
-        />
-
-        {/* Create Room Modal */}
-        <CreateChatRoomModal
-          visible={showCreateModal}
-          userType={user?.role === "STUDENT" ? "student" : "owner"}
-          onSubmit={handleCreateRoom}
-          onClose={() => {
-            setShowCreateModal(false);
-            // Only reset chat interface if no room is selected
-            // and we're not in the middle of creating a room
-            if (!currentRoom && !showChatInterface) {
-              setMessageText("");
+          {/* Messages List */}
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            renderItem={renderMessage}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.messagesList}
+            ListEmptyComponent={
+              <View style={styles.emptyMessages}>
+                <Ionicons
+                  name="chatbox-ellipses-outline"
+                  size={48}
+                  color={COLORS.grayBorder}
+                />
+                <Text style={styles.emptyMessagesText}>No messages yet</Text>
+                <Text style={styles.emptyMessagesSubtext}>
+                  Start the conversation!
+                </Text>
+              </View>
             }
-          }}
-        />
-
-        {/* Issue Upgrade Modal */}
-        <IssueUpgradeModal
-          visible={!!pendingIssueAnalysis}
-          analysis={pendingIssueAnalysis}
-          onUpgrade={async (title, description) => {
-            if (pendingIssueAnalysis) {
-              await upgradeToIssue(pendingIssueAnalysis, title, description);
+            ListFooterComponent={
+              isLoading ? (
+                <ActivityIndicator
+                  color={COLORS.primary}
+                  style={styles.loader}
+                />
+              ) : null
             }
-          }}
-          onDismiss={dismissIssueAnalysis}
-        />
-      </SafeAreaView>
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          />
+
+          {/* Typing Indicator */}
+          {renderTypingIndicator()}
+
+          {/* Input */}
+          <ChatInput
+            value={messageText}
+            onChangeText={handleTyping}
+            onSend={handleSend}
+            disabled={currentIssue?.status === "RESOLVED"}
+            loading={isSending}
+            placeholder={
+              currentIssue?.status === "RESOLVED"
+                ? "This issue is resolved (view-only)"
+                : "Type a message..."
+            }
+          />
+
+          {/* Create Room Modal */}
+          <CreateChatRoomModal
+            visible={showCreateModal}
+            userType={user?.role === "STUDENT" ? "student" : "owner"}
+            onSubmit={handleCreateRoom}
+            onClose={() => {
+              setShowCreateModal(false);
+              // Only reset chat interface if no room is selected
+              // and we're not in the middle of creating a room
+              if (!currentRoom && !showChatInterface) {
+                setMessageText("");
+              }
+            }}
+          />
+
+          {/* Issue Upgrade Modal */}
+          <IssueUpgradeModal
+            visible={!!pendingIssueAnalysis}
+            analysis={pendingIssueAnalysis}
+            onUpgrade={async (title, description) => {
+              if (pendingIssueAnalysis) {
+                await upgradeToIssue(pendingIssueAnalysis, title, description);
+              }
+            }}
+            onDismiss={dismissIssueAnalysis}
+          />
+        </SafeAreaView>
+      </KeyboardAvoidingView>
     );
   }
 
@@ -768,6 +864,38 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.gray,
   },
+  issueInfo: {
+    gap: 4,
+    marginTop: 2,
+  },
+  issueRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  issueTitle: {
+    fontSize: 13,
+    color: COLORS.text,
+    fontWeight: "600",
+    flex: 1,
+  },
+  issueBadges: {
+    flexDirection: "row",
+    gap: 6,
+    marginTop: 2,
+  },
+  issueBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  issueBadgeText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: COLORS.white,
+    textTransform: "capitalize",
+  },
   separator: {
     height: 8,
   },
@@ -868,6 +996,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
+    borderWidth: 1,
+  },
+  headerIssueStatusBadge: {
+    marginTop: 8,
   },
   headerIssueStatusText: {
     fontSize: 11,
