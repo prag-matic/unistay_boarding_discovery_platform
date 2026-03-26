@@ -21,7 +21,12 @@ import { ChatInput } from "@/components/chat/ChatInput";
 import { IssueBanner } from "@/components/chat/IssueBanner";
 import { CreateChatRoomModal } from "@/components/chat/CreateChatRoomModal";
 import { ISSUE_BACKGROUND_COLORS } from "@/types/chat.types";
-import type { ChatRoom, ChatMessage, Issue } from "@/types/chat.types";
+import type {
+  ChatRoom,
+  ChatMessage,
+  Issue,
+  ChatUser,
+} from "@/types/chat.types";
 import { IssueUpgradeModal } from "@/components/chat/IssueUpgradeModal";
 
 export default function MessagesScreen() {
@@ -161,14 +166,18 @@ export default function MessagesScreen() {
       const boardingId = undefined;
       const room = await createRoom(otherUserId, boardingId);
 
-      await joinRoom(room.id);
+      // Set the room immediately to show the chat interface
       setCurrentRoom(room);
-      await loadMessages(room.id);
       setShowCreateModal(false);
+      setShowChatInterface(true);
+
+      // Join room and load messages in background
+      await joinRoom(room.id);
+      await loadMessages(room.id);
 
       // Send pending message if exists
       if (messageText.trim()) {
-        setTimeout(() => handleSend(), 500);
+        setTimeout(() => handleSend(), 300);
       }
     } catch (error: unknown) {
       Alert.alert(
@@ -284,35 +293,62 @@ export default function MessagesScreen() {
 
   const renderMessage = useCallback(
     ({ item }: { item: ChatMessage }) => {
-      const isOwn = item.senderId === user?.id;
+      try {
+        // Handle both string ID and populated object from API
+        let senderId: string;
+        if (typeof item.senderId === "string") {
+          senderId = item.senderId;
+        } else if (item.senderId && typeof item.senderId === "object") {
+          // senderId is populated - could be an object with _id or id
+          const senderObj = item.senderId as Record<string, unknown>;
+          senderId = (senderObj._id as string) || (senderObj.id as string);
+        } else {
+          senderId = "";
+        }
 
-      // Get sender info - check if message has sender object, otherwise get from room
-      let sender;
-      if (item.sender) {
-        // Message includes sender object (from API)
-        sender = item.sender;
-      } else if (isOwn) {
-        // Current user's message
-        sender = user;
-      } else {
-        // Other participant - determine which role they have
-        const otherRole =
-          currentRoom?.participants.student.id === item.senderId
-            ? "student"
-            : "owner";
-        sender = currentRoom?.participants[otherRole];
+        const isOwn = senderId === user?.id;
+
+        // Get sender info - check if message has sender object, otherwise get from room
+        let sender: ChatUser | undefined;
+        if (item.sender) {
+          // Message includes sender object (from API)
+          sender = item.sender;
+        } else if (
+          typeof item.senderId === "object" &&
+          item.senderId !== null &&
+          "firstName" in item.senderId
+        ) {
+          // senderId is populated with user object from API
+          sender = item.senderId as ChatUser;
+        } else if (isOwn) {
+          // Current user's message
+          sender = user;
+        } else {
+          // Other participant - determine which role they have
+          const otherRole =
+            currentRoom?.participants.student.id === senderId
+              ? "student"
+              : "owner";
+          sender = currentRoom?.participants[otherRole];
+        }
+
+        return (
+          <ChatBubble
+            message={item}
+            isOwn={isOwn}
+            showSender={!isOwn}
+            senderName={
+              sender ? `${sender.firstName} ${sender.lastName}` : undefined
+            }
+          />
+        );
+      } catch (error) {
+        console.error(
+          "[MessagesScreen] Error rendering message:",
+          error instanceof Error ? error.message : error,
+        );
+        return null;
       }
-
-      return (
-        <ChatBubble
-          message={item}
-          isOwn={isOwn}
-          showSender={!isOwn}
-          senderName={
-            sender ? `${sender.firstName} ${sender.lastName}` : undefined
-          }
-        />
-      );
     },
     [user, currentRoom],
   );
@@ -336,75 +372,81 @@ export default function MessagesScreen() {
   // Show chat interface
   if (showChatInterface && currentRoom) {
     return (
-      <SafeAreaView
-        style={[
-          styles.container,
-          { backgroundColor: ISSUE_BACKGROUND_COLORS[backgroundType] },
-        ]}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
-        {/* Header */}
-        <View style={styles.chatHeader}>
-          <TouchableOpacity onPress={handleBackToHistory}>
-            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
-          </TouchableOpacity>
-
-          <View style={styles.headerInfo}>
-            <Text style={styles.headerTitle}>
-              {user?.role === "STUDENT"
-                ? currentRoom.participants.owner.firstName
-                : currentRoom.participants.student.firstName}
-            </Text>
-            {currentRoom.boardingId && (
-              <Text style={styles.headerSubtitle} numberOfLines={1}>
-                {currentRoom.boardingId.propertyName}
-              </Text>
-            )}
-          </View>
-        </View>
-
-        {/* Issue Banner */}
-        {currentIssue && (
-          <IssueBanner
-            issue={currentIssue}
-            onPress={() => handleIssuePress(currentIssue)}
-          />
-        )}
-
-        {/* Messages List */}
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          renderItem={renderMessage}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.messagesList}
-          ListEmptyComponent={
-            <View style={styles.emptyMessages}>
-              <Ionicons
-                name="chatbox-ellipses-outline"
-                size={48}
-                color={COLORS.grayBorder}
-              />
-              <Text style={styles.emptyMessagesText}>No messages yet</Text>
-              <Text style={styles.emptyMessagesSubtext}>
-                Start the conversation!
-              </Text>
-            </View>
-          }
-          ListFooterComponent={
-            isLoading ? (
-              <ActivityIndicator color={COLORS.primary} style={styles.loader} />
-            ) : null
-          }
-          showsVerticalScrollIndicator={false}
-        />
-
-        {/* Typing Indicator */}
-        {renderTypingIndicator()}
-
-        {/* Input */}
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        <SafeAreaView
+          style={[
+            styles.container,
+            { backgroundColor: ISSUE_BACKGROUND_COLORS[backgroundType] },
+          ]}
         >
+          {/* Header */}
+          <View style={styles.chatHeader}>
+            <TouchableOpacity onPress={handleBackToHistory}>
+              <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+            </TouchableOpacity>
+
+            <View style={styles.headerInfo}>
+              <Text style={styles.headerTitle}>
+                {user?.role === "STUDENT"
+                  ? currentRoom.participants.owner.firstName
+                  : currentRoom.participants.student.firstName}
+              </Text>
+              {currentRoom.boardingId && (
+                <Text style={styles.headerSubtitle} numberOfLines={1}>
+                  {currentRoom.boardingId.propertyName}
+                </Text>
+              )}
+            </View>
+          </View>
+
+          {/* Issue Banner */}
+          {currentIssue && (
+            <IssueBanner
+              issue={currentIssue}
+              onPress={() => handleIssuePress(currentIssue)}
+            />
+          )}
+
+          {/* Messages List */}
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            renderItem={renderMessage}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.messagesList}
+            ListEmptyComponent={
+              <View style={styles.emptyMessages}>
+                <Ionicons
+                  name="chatbox-ellipses-outline"
+                  size={48}
+                  color={COLORS.grayBorder}
+                />
+                <Text style={styles.emptyMessagesText}>No messages yet</Text>
+                <Text style={styles.emptyMessagesSubtext}>
+                  Start the conversation!
+                </Text>
+              </View>
+            }
+            ListFooterComponent={
+              isLoading ? (
+                <ActivityIndicator
+                  color={COLORS.primary}
+                  style={styles.loader}
+                />
+              ) : null
+            }
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          />
+
+          {/* Typing Indicator */}
+          {renderTypingIndicator()}
+
+          {/* Input */}
           <ChatInput
             value={messageText}
             onChangeText={handleTyping}
@@ -417,34 +459,34 @@ export default function MessagesScreen() {
                 : "Type a message..."
             }
           />
-        </KeyboardAvoidingView>
 
-        {/* Create Room Modal */}
-        <CreateChatRoomModal
-          visible={showCreateModal}
-          userType={user?.role === "STUDENT" ? "student" : "owner"}
-          onSubmit={handleCreateRoom}
-          onClose={() => {
-            setShowCreateModal(false);
-            if (!currentRoom) {
-              setShowChatInterface(false);
-              setMessageText("");
-            }
-          }}
-        />
+          {/* Create Room Modal */}
+          <CreateChatRoomModal
+            visible={showCreateModal}
+            userType={user?.role === "STUDENT" ? "student" : "owner"}
+            onSubmit={handleCreateRoom}
+            onClose={() => {
+              setShowCreateModal(false);
+              if (!currentRoom) {
+                setShowChatInterface(false);
+                setMessageText("");
+              }
+            }}
+          />
 
-        {/* Issue Upgrade Modal */}
-        <IssueUpgradeModal
-          visible={!!pendingIssueAnalysis}
-          analysis={pendingIssueAnalysis}
-          onUpgrade={async (title, description) => {
-            if (pendingIssueAnalysis) {
-              await upgradeToIssue(pendingIssueAnalysis, title, description);
-            }
-          }}
-          onDismiss={dismissIssueAnalysis}
-        />
-      </SafeAreaView>
+          {/* Issue Upgrade Modal */}
+          <IssueUpgradeModal
+            visible={!!pendingIssueAnalysis}
+            analysis={pendingIssueAnalysis}
+            onUpgrade={async (title, description) => {
+              if (pendingIssueAnalysis) {
+                await upgradeToIssue(pendingIssueAnalysis, title, description);
+              }
+            }}
+            onDismiss={dismissIssueAnalysis}
+          />
+        </SafeAreaView>
+      </KeyboardAvoidingView>
     );
   }
 

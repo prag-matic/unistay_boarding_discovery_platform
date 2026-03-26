@@ -1,7 +1,7 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { COLORS } from '@/lib/constants';
-import type { ChatMessage } from '@/types/chat.types';
+import React from "react";
+import { View, Text, StyleSheet } from "react-native";
+import { COLORS } from "@/lib/constants";
+import type { ChatMessage } from "@/types/chat.types";
 
 interface ChatBubbleProps {
   message: ChatMessage;
@@ -16,19 +16,33 @@ export const ChatBubble: React.FC<ChatBubbleProps> = ({
   showSender = false,
   senderName,
 }) => {
+  // Defensive check - ensure message has required fields
+  if (!message || !message.content) {
+    return null;
+  }
+
   return (
-    <View style={[styles.container, isOwn ? styles.ownContainer : styles.otherContainer]}>
+    <View
+      style={[
+        styles.container,
+        isOwn ? styles.ownContainer : styles.otherContainer,
+      ]}
+    >
       {showSender && !isOwn && senderName && (
         <Text style={styles.senderName}>{senderName}</Text>
       )}
 
-      <View style={[styles.bubble, isOwn ? styles.ownBubble : styles.otherBubble]}>
+      <View
+        style={[styles.bubble, isOwn ? styles.ownBubble : styles.otherBubble]}
+      >
         <Text style={[styles.text, isOwn ? styles.ownText : styles.otherText]}>
           {message.content}
         </Text>
 
         <View style={styles.meta}>
-          <Text style={[styles.time, isOwn ? styles.ownTime : styles.otherTime]}>
+          <Text
+            style={[styles.time, isOwn ? styles.ownTime : styles.otherTime]}
+          >
             {formatTime(message.createdAt)}
           </Text>
           {isOwn && message.isRead && (
@@ -47,20 +61,20 @@ function formatTime(isoString: string): string {
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
 
-    if (diffMins < 1) return 'Just now';
+    if (diffMins < 1) return "Just now";
     if (diffMins < 60) return `${diffMins}m ago`;
 
     const diffHours = Math.floor(diffMins / 60);
     if (diffHours < 24) return `${diffHours}h ago`;
 
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   } catch {
-    return '';
+    return "";
   }
 }
 
@@ -68,21 +82,21 @@ const styles = StyleSheet.create({
   container: {
     marginVertical: 2,
     paddingHorizontal: 16,
-    maxWidth: '80%',
+    maxWidth: "80%",
   },
   ownContainer: {
-    alignSelf: 'flex-end',
-    alignItems: 'flex-end',
+    alignSelf: "flex-end",
+    alignItems: "flex-end",
   },
   otherContainer: {
-    alignSelf: 'flex-start',
-    alignItems: 'flex-start',
+    alignSelf: "flex-start",
+    alignItems: "flex-start",
   },
   bubble: {
     borderRadius: 18,
     padding: 12,
     paddingHorizontal: 16,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
@@ -107,9 +121,9 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
   meta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
     gap: 4,
     marginTop: 4,
   },
@@ -117,20 +131,20 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   ownTime: {
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: "rgba(255, 255, 255, 0.8)",
   },
   otherTime: {
     color: COLORS.gray,
   },
   readIndicator: {
     fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontWeight: '600',
+    color: "rgba(255, 255, 255, 0.8)",
+    fontWeight: "600",
   },
   senderName: {
     fontSize: 12,
     color: COLORS.primary,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 4,
     marginLeft: 4,
   },
