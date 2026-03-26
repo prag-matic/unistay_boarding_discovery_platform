@@ -145,3 +145,15 @@ export async function createIssue(payload: CreateIssuePayload) {
   );
   return response.data;
 }
+
+/**
+ * Get issues for a chat room
+ * GET /api/issues?roomId=...
+ */
+export async function getRoomIssues(roomId: string) {
+  const response = await api.get<UniStayApiResponse<{ issues: Issue[] }>>(
+    "/issues",
+    { params: { roomId, limit: 1 } },
+  );
+  return response.data;
+}
