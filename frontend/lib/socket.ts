@@ -1,6 +1,7 @@
 import { io, type Socket } from "socket.io-client";
 import { API_URL } from "./constants";
 import { storage } from "./storage";
+import type { IssueAnalysis } from "@/types/chat.types";
 
 // Convert HTTP URL to WebSocket URL
 const getSocketUrl = (httpUrl: string) => {
@@ -58,15 +59,6 @@ export interface ChatRoom {
   };
   lastMessageAt?: string;
   isActive: boolean;
-}
-
-export interface IssueAnalysis {
-  messageId: string;
-  roomId: string;
-  isIssue: boolean;
-  reason: string;
-  category?: string;
-  suggestedPriority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 }
 
 export type SocketEvent = {

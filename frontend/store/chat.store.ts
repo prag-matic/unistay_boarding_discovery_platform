@@ -1,9 +1,12 @@
 import { create } from "zustand";
-import socketService, {
-  type ChatMessage,
-  type IssueAnalysis,
-} from "@/lib/socket";
-import type { ChatRoom, Issue, ChatBackgroundType } from "@/types/chat.types";
+import socketService from "@/lib/socket";
+import type { ChatMessage } from "@/lib/socket";
+import type {
+  ChatRoom,
+  Issue,
+  ChatBackgroundType,
+  IssueAnalysis,
+} from "@/types/chat.types";
 
 interface ChatState {
   // State
@@ -18,6 +21,7 @@ interface ChatState {
   isLoadingHistory: boolean;
   hasMoreMessages: boolean;
   lastCursor?: string;
+  pendingIssueAnalysis: IssueAnalysis | null;
 
   // Actions - Room management
   setCurrentRoom: (room: ChatRoom | null) => void;
@@ -56,6 +60,15 @@ interface ChatState {
   setLoading: (loading: boolean) => void;
   setLoadingHistory: (loading: boolean) => void;
   clearChat: () => void;
+
+  // Actions - Issue Analysis
+  setPendingIssueAnalysis: (analysis: IssueAnalysis | null) => void;
+  upgradeToIssue: (
+    analysis: IssueAnalysis,
+    title: string,
+    description?: string,
+  ) => Promise<void>;
+  dismissIssueAnalysis: () => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -71,6 +84,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isLoadingHistory: false,
   hasMoreMessages: true,
   lastCursor: undefined,
+  pendingIssueAnalysis: null,
 
   setCurrentRoom: (room) => {
     set({ currentRoom: room });
@@ -96,9 +110,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   addMessage: (message) => {
-    set((state) => ({
-      messages: [...state.messages, message],
-    }));
+    set((state) => {
+      // Prevent duplicate messages by checking if message ID already exists
+      const exists = state.messages.some((msg) => msg.id === message.id);
+      if (exists) {
+        console.log(
+          "[ChatStore] Duplicate message detected, skipping:",
+          message.id,
+        );
+        return state; // Don't add duplicate
+      }
+      return {
+        messages: [...state.messages, message],
+      };
+    });
   },
 
   loadMessages: async (roomId, limit = 50) => {
@@ -211,8 +236,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
 
     socketService.onIssueAnalysis((analysis) => {
-      console.log("Issue analysis received:", analysis);
-      // Handle issue analysis - could create issue or show alert
+      console.log("[ChatStore] Issue analysis received:", analysis);
+      // Only show if this is for the current room and is actually an issue
+      if (analysis.isIssue && analysis.roomId === get().currentRoom?.id) {
+        get().setPendingIssueAnalysis(analysis);
+      }
     });
 
     socketService.onError((error) => {
@@ -243,6 +271,49 @@ export const useChatStore = create<ChatState>((set, get) => ({
       typingUserId: undefined,
       lastCursor: undefined,
       hasMoreMessages: true,
+      pendingIssueAnalysis: null,
     });
+  },
+
+  setPendingIssueAnalysis: (analysis) => {
+    set({ pendingIssueAnalysis: analysis });
+  },
+
+  dismissIssueAnalysis: () => {
+    set({ pendingIssueAnalysis: null });
+  },
+
+  upgradeToIssue: async (analysis, title, description) => {
+    try {
+      const { createIssue } = await import("@/lib/chat");
+      const response = await createIssue({
+        roomId: analysis.roomId,
+        messageId: analysis.messageId,
+        title,
+        description: description || analysis.reason,
+        category: analysis.category || "other",
+        priority: analysis.suggestedPriority || "MEDIUM",
+      });
+
+      const newIssue = response.data;
+
+      // Add issue to store
+      get().addIssue(newIssue);
+
+      // Update background based on issue category
+      const backgroundType = `issue_${newIssue.category}` as ChatBackgroundType;
+      get().setBackgroundType(backgroundType);
+
+      // Clear pending analysis
+      get().dismissIssueAnalysis();
+
+      console.log("[ChatStore] Issue created successfully:", newIssue.id);
+    } catch (error) {
+      console.error(
+        "[ChatStore] Failed to create issue:",
+        error instanceof Error ? error.message : error,
+      );
+      throw error;
+    }
   },
 }));
