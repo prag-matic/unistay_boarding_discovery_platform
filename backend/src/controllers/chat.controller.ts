@@ -82,11 +82,18 @@ export async function getChatRooms(
 		const chatRooms = await chatRoomsQuery.lean();
 
 		const hasMore = chatRooms.length > limit;
-		const result = hasMore ? chatRooms.slice(0, limit) : chatRooms;
+		const rawResult = hasMore ? chatRooms.slice(0, limit) : chatRooms;
+
+		const result = rawResult.map((room) => ({
+			...room,
+			id: room._id.toString(),
+		}));
 
 		const nextCursor =
-			hasMore && result.length > 0
-				? (result[result.length - 1] as { _id: Types.ObjectId })._id.toString()
+			hasMore && rawResult.length > 0
+				? (
+						rawResult[rawResult.length - 1] as { _id: Types.ObjectId }
+					)._id.toString()
 				: undefined;
 
 		sendSuccess(res, {
@@ -142,7 +149,7 @@ export async function getChatRoom(
 			throw new ForbiddenError("You are not a participant in this chat room");
 		}
 
-		sendSuccess(res, chatRoom);
+		sendSuccess(res, { ...chatRoom, id: chatRoom._id.toString() });
 	} catch (error) {
 		next(error);
 	}
@@ -196,7 +203,28 @@ export async function createChatRoom(
 		}).lean();
 
 		if (existingRoom) {
-			sendSuccess(res, existingRoom, "Chat room retrieved successfully");
+			const populatedExisting = await ChatRoom.findById(existingRoom._id)
+				.populate(
+					"participants.student",
+					"firstName lastName profileImageUrl email",
+				)
+				.populate(
+					"participants.owner",
+					"firstName lastName profileImageUrl email",
+				)
+				.lean();
+
+			if (!populatedExisting) {
+				throw new NotFoundError(
+					"Chat room found but failed to retrieve details",
+				);
+			}
+
+			sendSuccess(
+				res,
+				{ ...populatedExisting, id: populatedExisting._id.toString() },
+				"Chat room retrieved successfully",
+			);
 			return;
 		}
 
@@ -225,7 +253,15 @@ export async function createChatRoom(
 			)
 			.lean();
 
-		sendSuccess(res, populatedRoom, "Chat room created successfully");
+		if (!populatedRoom) {
+			throw new NotFoundError("Failed to retrieve created room");
+		}
+
+		sendSuccess(
+			res,
+			{ ...populatedRoom, id: populatedRoom._id.toString() },
+			"Chat room created successfully",
+		);
 	} catch (error) {
 		next(error);
 	}
@@ -287,11 +323,18 @@ export async function getChatHistory(
 		const messages = await messagesQuery.lean();
 
 		const hasMore = messages.length > limit;
-		const result = hasMore ? messages.slice(0, limit) : messages;
+		const rawResult = hasMore ? messages.slice(0, limit) : messages;
+
+		const result = rawResult.map((msg) => ({
+			...msg,
+			id: msg._id.toString(),
+		}));
 
 		const nextCursor =
-			hasMore && result.length > 0
-				? (result[result.length - 1] as { _id: Types.ObjectId })._id.toString()
+			hasMore && rawResult.length > 0
+				? (
+						rawResult[rawResult.length - 1] as { _id: Types.ObjectId }
+					)._id.toString()
 				: undefined;
 
 		sendSuccess(res, {
