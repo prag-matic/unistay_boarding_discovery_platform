@@ -20,7 +20,10 @@ import { ChatBubble } from "@/components/chat/ChatBubble";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { IssueBanner } from "@/components/chat/IssueBanner";
 import { CreateChatRoomModal } from "@/components/chat/CreateChatRoomModal";
-import { ISSUE_BACKGROUND_COLORS } from "@/types/chat.types";
+import {
+  ISSUE_BACKGROUND_COLORS,
+  ISSUE_BADGE_COLORS,
+} from "@/types/chat.types";
 import type {
   ChatRoom,
   ChatMessage,
@@ -376,122 +379,147 @@ export default function MessagesScreen() {
   // Show chat interface
   if (showChatInterface && currentRoom) {
     return (
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+      <SafeAreaView
+        style={[
+          styles.container,
+          { backgroundColor: ISSUE_BACKGROUND_COLORS[backgroundType] },
+        ]}
       >
-        <SafeAreaView
-          style={[
-            styles.container,
-            { backgroundColor: ISSUE_BACKGROUND_COLORS[backgroundType] },
-          ]}
-        >
-          {/* Header */}
-          <View style={styles.chatHeader}>
-            <TouchableOpacity onPress={handleBackToHistory}>
-              <Ionicons name="arrow-back" size={24} color={COLORS.text} />
-            </TouchableOpacity>
+        {/* Header */}
+        <View style={styles.chatHeader}>
+          <TouchableOpacity onPress={handleBackToHistory}>
+            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+          </TouchableOpacity>
 
-            <View style={styles.headerInfo}>
-              <Text style={styles.headerTitle}>
-                {user?.role === "STUDENT"
-                  ? currentRoom.participants.owner.firstName
-                  : currentRoom.participants.student.firstName}
-              </Text>
-              {currentRoom.boardingId && (
-                <Text style={styles.headerSubtitle} numberOfLines={1}>
-                  {currentRoom.boardingId.propertyName}
+          <View style={styles.headerInfo}>
+            <Text style={styles.headerTitle}>
+              {user?.role === "STUDENT"
+                ? currentRoom.participants.owner.firstName
+                : currentRoom.participants.student.firstName}
+            </Text>
+            {currentIssue ? (
+              <View style={styles.headerIssueInfo}>
+                <Ionicons name="warning" size={14} color={COLORS.primary} />
+                <Text style={styles.headerIssueText} numberOfLines={1}>
+                  Issue: {currentIssue.title}
                 </Text>
-              )}
-            </View>
+                <View
+                  style={[
+                    styles.headerIssueBadge,
+                    {
+                      backgroundColor:
+                        ISSUE_BADGE_COLORS[currentIssue.category]?.bg ||
+                        COLORS.gray,
+                    },
+                  ]}
+                >
+                  <Text style={styles.headerIssueBadgeText}>
+                    {currentIssue.category.replace("_", " ")}
+                  </Text>
+                </View>
+              </View>
+            ) : currentRoom.boardingId ? (
+              <Text style={styles.headerSubtitle} numberOfLines={1}>
+                {currentRoom.boardingId.propertyName}
+              </Text>
+            ) : null}
           </View>
 
-          {/* Issue Banner */}
           {currentIssue && (
-            <IssueBanner
-              issue={currentIssue}
-              onPress={() => handleIssuePress(currentIssue)}
-            />
+            <View
+              style={[
+                styles.headerIssueStatus,
+                {
+                  backgroundColor:
+                    getIssueStatusColor(currentIssue.status) + "20",
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.headerIssueStatusText,
+                  { color: getIssueStatusColor(currentIssue.status) },
+                ]}
+              >
+                {currentIssue.status.replace("_", " ")}
+              </Text>
+            </View>
           )}
+        </View>
 
-          {/* Messages List */}
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            renderItem={renderMessage}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.messagesList}
-            ListEmptyComponent={
-              <View style={styles.emptyMessages}>
-                <Ionicons
-                  name="chatbox-ellipses-outline"
-                  size={48}
-                  color={COLORS.grayBorder}
-                />
-                <Text style={styles.emptyMessagesText}>No messages yet</Text>
-                <Text style={styles.emptyMessagesSubtext}>
-                  Start the conversation!
-                </Text>
-              </View>
+        {/* Messages List */}
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          renderItem={renderMessage}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.messagesList}
+          ListEmptyComponent={
+            <View style={styles.emptyMessages}>
+              <Ionicons
+                name="chatbox-ellipses-outline"
+                size={48}
+                color={COLORS.grayBorder}
+              />
+              <Text style={styles.emptyMessagesText}>No messages yet</Text>
+              <Text style={styles.emptyMessagesSubtext}>
+                Start the conversation!
+              </Text>
+            </View>
+          }
+          ListFooterComponent={
+            isLoading ? (
+              <ActivityIndicator color={COLORS.primary} style={styles.loader} />
+            ) : null
+          }
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        />
+
+        {/* Typing Indicator */}
+        {renderTypingIndicator()}
+
+        {/* Input */}
+        <ChatInput
+          value={messageText}
+          onChangeText={handleTyping}
+          onSend={handleSend}
+          disabled={currentIssue?.status === "RESOLVED"}
+          loading={isSending}
+          placeholder={
+            currentIssue?.status === "RESOLVED"
+              ? "This issue is resolved (view-only)"
+              : "Type a message..."
+          }
+        />
+
+        {/* Create Room Modal */}
+        <CreateChatRoomModal
+          visible={showCreateModal}
+          userType={user?.role === "STUDENT" ? "student" : "owner"}
+          onSubmit={handleCreateRoom}
+          onClose={() => {
+            setShowCreateModal(false);
+            // Only reset chat interface if no room is selected
+            // and we're not in the middle of creating a room
+            if (!currentRoom && !showChatInterface) {
+              setMessageText("");
             }
-            ListFooterComponent={
-              isLoading ? (
-                <ActivityIndicator
-                  color={COLORS.primary}
-                  style={styles.loader}
-                />
-              ) : null
+          }}
+        />
+
+        {/* Issue Upgrade Modal */}
+        <IssueUpgradeModal
+          visible={!!pendingIssueAnalysis}
+          analysis={pendingIssueAnalysis}
+          onUpgrade={async (title, description) => {
+            if (pendingIssueAnalysis) {
+              await upgradeToIssue(pendingIssueAnalysis, title, description);
             }
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          />
-
-          {/* Typing Indicator */}
-          {renderTypingIndicator()}
-
-          {/* Input */}
-          <ChatInput
-            value={messageText}
-            onChangeText={handleTyping}
-            onSend={handleSend}
-            disabled={currentIssue?.status === "RESOLVED"}
-            loading={isSending}
-            placeholder={
-              currentIssue?.status === "RESOLVED"
-                ? "This issue is resolved (view-only)"
-                : "Type a message..."
-            }
-          />
-
-          {/* Create Room Modal */}
-          <CreateChatRoomModal
-            visible={showCreateModal}
-            userType={user?.role === "STUDENT" ? "student" : "owner"}
-            onSubmit={handleCreateRoom}
-            onClose={() => {
-              setShowCreateModal(false);
-              // Only reset chat interface if no room is selected
-              // and we're not in the middle of creating a room
-              if (!currentRoom && !showChatInterface) {
-                setMessageText("");
-              }
-            }}
-          />
-
-          {/* Issue Upgrade Modal */}
-          <IssueUpgradeModal
-            visible={!!pendingIssueAnalysis}
-            analysis={pendingIssueAnalysis}
-            onUpgrade={async (title, description) => {
-              if (pendingIssueAnalysis) {
-                await upgradeToIssue(pendingIssueAnalysis, title, description);
-              }
-            }}
-            onDismiss={dismissIssueAnalysis}
-          />
-        </SafeAreaView>
-      </KeyboardAvoidingView>
+          }}
+          onDismiss={dismissIssueAnalysis}
+        />
+      </SafeAreaView>
     );
   }
 
@@ -587,6 +615,21 @@ export default function MessagesScreen() {
       />
     </SafeAreaView>
   );
+}
+
+function getIssueStatusColor(status: string): string {
+  switch (status) {
+    case "OPEN":
+      return "#F44336";
+    case "IN_PROGRESS":
+      return "#FF9800";
+    case "RESOLVED":
+      return "#4CAF50";
+    case "CLOSED":
+      return "#2196F3";
+    default:
+      return COLORS.gray;
+  }
 }
 
 function formatTimeAgo(isoString: string): string {
@@ -797,6 +840,38 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textSecondary,
     marginTop: 2,
+  },
+  headerIssueInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 2,
+  },
+  headerIssueText: {
+    fontSize: 12,
+    color: COLORS.primary,
+    fontWeight: "600",
+    flex: 1,
+  },
+  headerIssueBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  headerIssueBadgeText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: COLORS.white,
+    textTransform: "capitalize",
+  },
+  headerIssueStatus: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  headerIssueStatusText: {
+    fontSize: 11,
+    fontWeight: "700",
   },
   messagesList: {
     flexGrow: 1,

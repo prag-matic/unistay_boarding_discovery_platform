@@ -127,14 +127,36 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   loadMessages: async (roomId, limit = 50) => {
-    set({ isLoading: true, messages: [] });
+    set({ isLoading: true, messages: [], currentIssue: null });
     try {
-      const { getChatHistory } = await import("@/lib/chat");
-      const response = await getChatHistory(roomId, limit);
-      const { messages, nextCursor } = response.data;
+      const { getChatHistory, getRoomIssues } = await import("@/lib/chat");
 
+      // Load messages and issues in parallel
+      const [messagesResponse, issuesResponse] = await Promise.all([
+        getChatHistory(roomId, limit),
+        getRoomIssues(roomId),
+      ]);
+
+      const { messages, nextCursor } = messagesResponse.data;
+      const { issues } = issuesResponse.data;
+
+      // Get the most recent active issue (if any)
+      const activeIssue =
+        issues.find(
+          (issue) => issue.status === "OPEN" || issue.status === "IN_PROGRESS",
+        ) || null;
+
+      // Set background type based on issue category
+      let backgroundType: ChatBackgroundType = "default";
+      if (activeIssue?.category) {
+        backgroundType = `issue_${activeIssue.category}` as ChatBackgroundType;
+      }
+
+      // Backend already returns messages in chronological order (oldest first)
       set({
-        messages: messages.reverse(), // Reverse to show newest last
+        messages: messages,
+        currentIssue: activeIssue,
+        backgroundType,
         lastCursor: nextCursor,
         hasMoreMessages: !!nextCursor,
       });
@@ -155,8 +177,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const response = await getChatHistory(roomId, limit, cursor);
       const { messages, nextCursor } = response.data;
 
+      // Backend returns messages in chronological order, prepend to existing messages
       set((state) => ({
-        messages: [...messages.reverse(), ...state.messages],
+        messages: [...messages, ...state.messages],
         lastCursor: nextCursor,
         hasMoreMessages: !!nextCursor,
       }));

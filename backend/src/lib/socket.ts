@@ -6,6 +6,7 @@ import type { JwtPayload } from "@/lib/jwt.js";
 import { verifyAccessToken } from "@/lib/jwt.js";
 import { ChatMessage } from "@/models/ChatMessage.js";
 import { ChatRoom } from "@/models/ChatRoom.js";
+import { Issue } from "@/models/Issue.js";
 import {
 	type SocketMarkAsReadInput,
 	type SocketSendMessageInput,
@@ -331,45 +332,55 @@ export function setupSocketIO(httpServer: HTTPServer): SocketIOType {
 				io.to(roomId).emit("message", messageData);
 
 				// Analyze the message for potential issues (only for text messages)
+				// Skip if room already has an active issue
 				if (messageType === "text" && config.openrouter.apiKey) {
-					// Get recent message context for better analysis
-					const recentMessages = await ChatMessage.find({
+					// Check if room already has an active issue
+					const existingIssue = await Issue.findOne({
 						roomId: new Types.ObjectId(roomId),
-						createdAt: { $lte: message.createdAt },
-					})
-						.sort({ createdAt: -1 })
-						.limit(10)
-						.populate("senderId", "role")
-						.lean();
+						status: { $in: ["OPEN", "IN_PROGRESS"] },
+					}).lean();
 
-					const messageContext = recentMessages.map((msg) => ({
-						content: msg.content,
-						senderRole: (msg.senderId as unknown as { role: string }).role,
-						createdAt: msg.createdAt,
-					}));
-
-					// Analyze the message asynchronously (don't block the response)
-					chatAnalysisService
-						.analyzeMessage(message.content, messageContext)
-						.then((analysis) => {
-							if (analysis.isIssue) {
-								// Emit the analysis to all participants in the room
-								io.to(roomId).emit("issueAnalysis", {
-									messageId: message._id.toString(),
-									roomId,
-									isIssue: analysis.isIssue,
-									reason: analysis.reason,
-									category: analysis.category,
-									suggestedPriority: analysis.suggestedPriority,
-								});
-							}
+					// Skip AI analysis if there's already an active issue
+					if (!existingIssue) {
+						// Get recent message context for better analysis
+						const recentMessages = await ChatMessage.find({
+							roomId: new Types.ObjectId(roomId),
+							createdAt: { $lte: message.createdAt },
 						})
-						.catch((err) => {
-							console.error(
-								"[Socket.io] Error analyzing message for issues:",
-								err,
-							);
-						});
+							.sort({ createdAt: -1 })
+							.limit(10)
+							.populate("senderId", "role")
+							.lean();
+
+						const messageContext = recentMessages.map((msg) => ({
+							content: msg.content,
+							senderRole: (msg.senderId as unknown as { role: string }).role,
+							createdAt: msg.createdAt,
+						}));
+
+						// Analyze the message asynchronously (don't block the response)
+						chatAnalysisService
+							.analyzeMessage(message.content, messageContext)
+							.then((analysis) => {
+								if (analysis.isIssue) {
+									// Emit the analysis to all participants in the room
+									io.to(roomId).emit("issueAnalysis", {
+										messageId: message._id.toString(),
+										roomId,
+										isIssue: analysis.isIssue,
+										reason: analysis.reason,
+										category: analysis.category,
+										suggestedPriority: analysis.suggestedPriority,
+									});
+								}
+							})
+							.catch((err) => {
+								console.error(
+									"[Socket.io] Error analyzing message for issues:",
+									err,
+								);
+							});
+					}
 				}
 
 				callback({ success: true });
