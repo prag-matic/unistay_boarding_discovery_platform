@@ -22,6 +22,7 @@ import { IssueBanner } from "@/components/chat/IssueBanner";
 import { CreateChatRoomModal } from "@/components/chat/CreateChatRoomModal";
 import { ISSUE_BACKGROUND_COLORS } from "@/types/chat.types";
 import type { ChatRoom, ChatMessage, Issue } from "@/types/chat.types";
+import { IssueUpgradeModal } from "@/components/chat/IssueUpgradeModal";
 
 export default function MessagesScreen() {
   const { user } = useAuthStore();
@@ -41,6 +42,10 @@ export default function MessagesScreen() {
     clearChat,
     connectSocket,
     disconnectSocket,
+    pendingIssueAnalysis,
+    setPendingIssueAnalysis,
+    dismissIssueAnalysis,
+    upgradeToIssue,
   } = useChatStore();
 
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
@@ -280,9 +285,23 @@ export default function MessagesScreen() {
   const renderMessage = useCallback(
     ({ item }: { item: ChatMessage }) => {
       const isOwn = item.senderId === user?.id;
-      const sender = isOwn
-        ? user
-        : currentRoom?.participants[isOwn ? "owner" : "student"];
+
+      // Get sender info - check if message has sender object, otherwise get from room
+      let sender;
+      if (item.sender) {
+        // Message includes sender object (from API)
+        sender = item.sender;
+      } else if (isOwn) {
+        // Current user's message
+        sender = user;
+      } else {
+        // Other participant - determine which role they have
+        const otherRole =
+          currentRoom?.participants.student.id === item.senderId
+            ? "student"
+            : "owner";
+        sender = currentRoom?.participants[otherRole];
+      }
 
       return (
         <ChatBubble
@@ -413,6 +432,18 @@ export default function MessagesScreen() {
             }
           }}
         />
+
+        {/* Issue Upgrade Modal */}
+        <IssueUpgradeModal
+          visible={!!pendingIssueAnalysis}
+          analysis={pendingIssueAnalysis}
+          onUpgrade={async (title, description) => {
+            if (pendingIssueAnalysis) {
+              await upgradeToIssue(pendingIssueAnalysis, title, description);
+            }
+          }}
+          onDismiss={dismissIssueAnalysis}
+        />
       </SafeAreaView>
     );
   }
@@ -494,6 +525,18 @@ export default function MessagesScreen() {
             setMessageText("");
           }
         }}
+      />
+
+      {/* Issue Upgrade Modal */}
+      <IssueUpgradeModal
+        visible={!!pendingIssueAnalysis}
+        analysis={pendingIssueAnalysis}
+        onUpgrade={async (title, description) => {
+          if (pendingIssueAnalysis) {
+            await upgradeToIssue(pendingIssueAnalysis, title, description);
+          }
+        }}
+        onDismiss={dismissIssueAnalysis}
       />
     </SafeAreaView>
   );

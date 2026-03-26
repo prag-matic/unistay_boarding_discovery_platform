@@ -1,10 +1,25 @@
 import api from "./api";
 import type { UniStayApiResponse } from "@/types/api.types";
-import type { ChatMessage, ChatRoom, ChatUser } from "@/types/chat.types";
+import type {
+  ChatMessage,
+  ChatRoom,
+  ChatUser,
+  Issue,
+} from "@/types/chat.types";
 
 export interface CreateChatRoomPayload {
   otherUserId: string;
   boardingId?: string;
+}
+
+export interface CreateIssuePayload {
+  roomId: string;
+  messageId: string;
+  title?: string;
+  description?: string;
+  category?: string;
+  priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+  reason?: string;
 }
 
 export interface GetChatRoomsResponse {
@@ -115,6 +130,18 @@ export async function searchUsers(query: string, role?: "STUDENT" | "OWNER") {
   const response = await api.get<UniStayApiResponse<ChatUser[]>>(
     "/chat/users",
     { params },
+  );
+  return response.data;
+}
+
+/**
+ * Create an issue from a chat message
+ * POST /api/issues
+ */
+export async function createIssue(payload: CreateIssuePayload) {
+  const response = await api.post<UniStayApiResponse<Issue>>(
+    "/issues",
+    payload,
   );
   return response.data;
 }
