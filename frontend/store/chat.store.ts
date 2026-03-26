@@ -286,12 +286,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
   upgradeToIssue: async (analysis, title, description) => {
     try {
       const { createIssue } = await import("@/lib/chat");
+
+      // Map category from frontend format to backend format
+      const categoryMap: Record<string, string> = {
+        rules: "rule_violation",
+        maintenance: "maintenance",
+        payment: "payment",
+        safety: "safety",
+        other: "other",
+      };
+
+      const backendCategory = analysis.category
+        ? categoryMap[analysis.category] || "other"
+        : "other";
+
       const response = await createIssue({
         roomId: analysis.roomId,
         messageId: analysis.messageId,
         title,
         description: description || analysis.reason,
-        category: analysis.category || "other",
+        reason: analysis.reason, // Backend requires this field
+        category: backendCategory,
         priority: analysis.suggestedPriority || "MEDIUM",
       });
 

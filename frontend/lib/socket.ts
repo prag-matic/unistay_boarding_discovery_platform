@@ -129,9 +129,16 @@ class SocketService {
       // Message event
       this.socket.on("message", (data) => {
         console.log("[Socket] New message:", data);
-        this.messageListeners.forEach((listener) =>
-          listener(data as ChatMessage),
-        );
+        try {
+          this.messageListeners.forEach((listener) =>
+            listener(data as ChatMessage),
+          );
+        } catch (error) {
+          console.error(
+            "[Socket] Error processing message:",
+            error instanceof Error ? error.message : error,
+          );
+        }
       });
 
       // Typing event
