@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -87,20 +87,22 @@ export default function MessagesScreen() {
     }
   };
 
-  const handleSelectRoom = async (room: ChatRoom) => {
-    try {
-      await joinRoom(room.id);
-      setCurrentRoom(room);
-      await loadMessages(room.id);
-      setShowChatInterface(true);
-    } catch (error: unknown) {
-      console.error(
-        "Failed to join room:",
-        error instanceof Error ? error.message : error,
-      );
-      Alert.alert("Error", "Failed to load chat. Please try again.");
-    }
-  };
+  const handleSelectRoom = useCallback(
+    async (room: ChatRoom) => {
+      try {
+        await joinRoom(room.id);
+        setCurrentRoom(room);
+        await loadMessages(room.id);
+        setShowChatInterface(true);
+      } catch (error: unknown) {
+        console.error(
+          "Failed to join room:",
+          error instanceof Error ? error.message : error,
+        );
+      }
+    },
+    [joinRoom, setCurrentRoom, loadMessages],
+  );
 
   const handleTyping = (text: string) => {
     setMessageText(text);
@@ -198,73 +200,103 @@ export default function MessagesScreen() {
       })
     : chatRooms;
 
-  const renderRoom = ({ item }: { item: ChatRoom }) => {
-    const otherUser =
-      user?.role === "STUDENT"
-        ? item.participants.owner
-        : item.participants.student;
-    const lastMessage = item.lastMessage;
-    const timeAgo = lastMessage?.createdAt
-      ? formatTimeAgo(lastMessage.createdAt)
-      : "";
+  const renderRoom = useCallback(
+    ({ item }: { item: ChatRoom }) => {
+      const otherUser =
+        user?.role === "STUDENT"
+          ? item.participants.owner
+          : item.participants.student;
+      const lastMessage = item.lastMessage;
+      const timeAgo = lastMessage?.createdAt
+        ? formatTimeAgo(lastMessage.createdAt)
+        : "";
 
-    return (
-      <TouchableOpacity
-        style={styles.roomCard}
-        onPress={() => handleSelectRoom(item)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {otherUser.firstName.charAt(0)}
-            {otherUser.lastName.charAt(0)}
-          </Text>
+      return (
+        <TouchableOpacity
+          style={styles.roomCard}
+          onPress={() => handleSelectRoom(item)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>
+              {otherUser.firstName.charAt(0)}
+              {otherUser.lastName.charAt(0)}
+            </Text>
+          </View>
+
+          <View style={styles.info}>
+            <Text style={styles.userName} numberOfLines={1}>
+              {otherUser.firstName} {otherUser.lastName}
+            </Text>
+            {lastMessage && (
+              <View style={styles.lastMessageRow}>
+                <Text style={styles.lastMessage} numberOfLines={1}>
+                  {lastMessage.content}
+                </Text>
+                <Text style={styles.time}>{timeAgo}</Text>
+              </View>
+            )}
+            {item.boardingId && (
+              <View style={styles.boardingTag}>
+                <Ionicons name="home-outline" size={12} color={COLORS.gray} />
+                <Text style={styles.boardingTagText} numberOfLines={1}>
+                  {item.boardingId.propertyName}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
+        </TouchableOpacity>
+      );
+    },
+    [user?.role, handleSelectRoom],
+  );
+
+  const renderItemSeparator = useCallback(
+    () => <View style={styles.separator} />,
+    [],
+  );
+
+  const renderEmptyList = useCallback(
+    () => (
+      <View style={styles.emptyContainer}>
+        <View style={styles.emptyIcon}>
+          <Ionicons
+            name="chatbubbles-outline"
+            size={48}
+            color={COLORS.primary}
+          />
         </View>
+        <Text style={styles.emptyTitle}>No messages yet</Text>
+        <Text style={styles.emptyText}>
+          Start a conversation to see your chat history here
+        </Text>
+      </View>
+    ),
+    [],
+  );
 
-        <View style={styles.info}>
-          <Text style={styles.userName} numberOfLines={1}>
-            {otherUser.firstName} {otherUser.lastName}
-          </Text>
-          {lastMessage && (
-            <View style={styles.lastMessageRow}>
-              <Text style={styles.lastMessage} numberOfLines={1}>
-                {lastMessage.content}
-              </Text>
-              <Text style={styles.time}>{timeAgo}</Text>
-            </View>
-          )}
-          {item.boardingId && (
-            <View style={styles.boardingTag}>
-              <Ionicons name="home-outline" size={12} color={COLORS.gray} />
-              <Text style={styles.boardingTagText} numberOfLines={1}>
-                {item.boardingId.propertyName}
-              </Text>
-            </View>
-          )}
-        </View>
+  const renderMessage = useCallback(
+    ({ item }: { item: ChatMessage }) => {
+      const isOwn = item.senderId === user?.id;
+      const sender = isOwn
+        ? user
+        : currentRoom?.participants[isOwn ? "owner" : "student"];
 
-        <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
-      </TouchableOpacity>
-    );
-  };
-
-  const renderMessage = ({ item }: { item: ChatMessage }) => {
-    const isOwn = item.senderId === user?.id;
-    const sender = isOwn
-      ? user
-      : currentRoom?.participants[isOwn ? "owner" : "student"];
-
-    return (
-      <ChatBubble
-        message={item}
-        isOwn={isOwn}
-        showSender={!isOwn}
-        senderName={
-          sender ? `${sender.firstName} ${sender.lastName}` : undefined
-        }
-      />
-    );
-  };
+      return (
+        <ChatBubble
+          message={item}
+          isOwn={isOwn}
+          showSender={!isOwn}
+          senderName={
+            sender ? `${sender.firstName} ${sender.lastName}` : undefined
+          }
+        />
+      );
+    },
+    [user, currentRoom],
+  );
 
   const renderTypingIndicator = () => {
     if (!isTyping || !typingUserId) return null;
@@ -431,24 +463,10 @@ export default function MessagesScreen() {
         <FlatList
           data={filteredRooms}
           renderItem={renderRoom}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item, index) => `${item.id}-${index}`}
           contentContainerStyle={styles.listContent}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <View style={styles.emptyIcon}>
-                <Ionicons
-                  name="chatbubbles-outline"
-                  size={48}
-                  color={COLORS.primary}
-                />
-              </View>
-              <Text style={styles.emptyTitle}>No messages yet</Text>
-              <Text style={styles.emptyText}>
-                Start a conversation to see your chat history here
-              </Text>
-            </View>
-          }
+          ItemSeparatorComponent={renderItemSeparator}
+          ListEmptyComponent={renderEmptyList}
         />
       )}
 
