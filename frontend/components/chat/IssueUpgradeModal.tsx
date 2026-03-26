@@ -8,6 +8,8 @@ import {
   TextInput,
   ActivityIndicator,
   Platform,
+  KeyboardAvoidingView,
+  ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "@/lib/constants";
@@ -72,108 +74,128 @@ export const IssueUpgradeModal: React.FC<IssueUpgradeModalProps> = ({
       animationType="slide"
       onRequestClose={handleClose}
     >
-      <View style={styles.overlay}>
-        <View style={styles.container}>
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.iconContainer}>
-              <Ionicons name="warning" size={32} color={badgeColors.bg} />
-            </View>
-            <Text style={styles.title}>Potential Issue Detected</Text>
-            <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-              <Ionicons name="close" size={24} color={COLORS.gray} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Analysis Info */}
-          <View style={styles.infoContainer}>
-            <Text style={styles.infoLabel}>AI Analysis:</Text>
-            <Text style={styles.reason}>{analysis.reason}</Text>
-
-            <View style={styles.badges}>
-              {analysis.category && (
-                <View
-                  style={[styles.badge, { backgroundColor: badgeColors.bg }]}
-                >
-                  <Text style={styles.badgeText}>
-                    {analysis.category.replace("_", " ")}
-                  </Text>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={100}
+      >
+        <ScrollView
+          contentContainerStyle={{ flex: 1, justifyContent: "flex-end" }}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.overlay}>
+            <View style={styles.container}>
+              {/* Header */}
+              <View style={styles.header}>
+                <View style={styles.iconContainer}>
+                  <Ionicons name="warning" size={32} color={badgeColors.bg} />
                 </View>
-              )}
-
-              {analysis.suggestedPriority && (
-                <View
-                  style={[styles.badge, { backgroundColor: priorityColors.bg }]}
+                <Text style={styles.title}>Potential Issue Detected</Text>
+                <TouchableOpacity
+                  onPress={handleClose}
+                  style={styles.closeButton}
                 >
-                  <Text style={[styles.badgeText, styles.priorityText]}>
-                    {analysis.suggestedPriority}
-                  </Text>
+                  <Ionicons name="close" size={24} color={COLORS.gray} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Analysis Info */}
+              <View style={styles.infoContainer}>
+                <Text style={styles.infoLabel}>AI Analysis:</Text>
+                <Text style={styles.reason}>{analysis.reason}</Text>
+
+                <View style={styles.badges}>
+                  {analysis.category && (
+                    <View
+                      style={[
+                        styles.badge,
+                        { backgroundColor: badgeColors.bg },
+                      ]}
+                    >
+                      <Text style={styles.badgeText}>
+                        {analysis.category.replace("_", " ")}
+                      </Text>
+                    </View>
+                  )}
+
+                  {analysis.suggestedPriority && (
+                    <View
+                      style={[
+                        styles.badge,
+                        { backgroundColor: priorityColors.bg },
+                      ]}
+                    >
+                      <Text style={[styles.badgeText, styles.priorityText]}>
+                        {analysis.suggestedPriority}
+                      </Text>
+                    </View>
+                  )}
                 </View>
-              )}
+              </View>
+
+              {/* Title Input */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Issue Title *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g., Noise complaint, Maintenance needed"
+                  placeholderTextColor={COLORS.gray}
+                  value={title}
+                  onChangeText={setTitle}
+                  maxLength={200}
+                />
+                <Text style={styles.charCount}>{title.length}/200</Text>
+              </View>
+
+              {/* Description Input */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Description (optional)</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  placeholder="Add more details..."
+                  placeholderTextColor={COLORS.gray}
+                  value={description}
+                  onChangeText={setDescription}
+                  multiline
+                  maxLength={2000}
+                  textAlignVertical="top"
+                />
+                <Text style={styles.charCount}>{description.length}/2000</Text>
+              </View>
+
+              {/* Actions */}
+              <View style={styles.actions}>
+                <TouchableOpacity
+                  style={[styles.button, styles.dismissButton]}
+                  onPress={handleClose}
+                  disabled={isUpgrading}
+                >
+                  <Text style={styles.dismissButtonText}>Not an Issue</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.button,
+                    styles.upgradeButton,
+                    !title.trim() && styles.upgradeButtonDisabled,
+                  ]}
+                  onPress={handleUpgrade}
+                  disabled={isUpgrading || !title.trim()}
+                >
+                  {isUpgrading ? (
+                    <ActivityIndicator color={COLORS.white} />
+                  ) : (
+                    <>
+                      <Ionicons name="flag" size={18} color={COLORS.white} />
+                      <Text style={styles.upgradeButtonText}>Create Issue</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-
-          {/* Title Input */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Issue Title *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g., Noise complaint, Maintenance needed"
-              placeholderTextColor={COLORS.gray}
-              value={title}
-              onChangeText={setTitle}
-              maxLength={200}
-            />
-            <Text style={styles.charCount}>{title.length}/200</Text>
-          </View>
-
-          {/* Description Input */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Description (optional)</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Add more details..."
-              placeholderTextColor={COLORS.gray}
-              value={description}
-              onChangeText={setDescription}
-              multiline
-              maxLength={2000}
-              textAlignVertical="top"
-            />
-            <Text style={styles.charCount}>{description.length}/2000</Text>
-          </View>
-
-          {/* Actions */}
-          <View style={styles.actions}>
-            <TouchableOpacity
-              style={[styles.button, styles.dismissButton]}
-              onPress={handleClose}
-              disabled={isUpgrading}
-            >
-              <Text style={styles.dismissButtonText}>Not an Issue</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.button,
-                styles.upgradeButton,
-                !title.trim() && styles.upgradeButtonDisabled,
-              ]}
-              onPress={handleUpgrade}
-              disabled={isUpgrading || !title.trim()}
-            >
-              {isUpgrading ? (
-                <ActivityIndicator color={COLORS.white} />
-              ) : (
-                <>
-                  <Ionicons name="flag" size={18} color={COLORS.white} />
-                  <Text style={styles.upgradeButtonText}>Create Issue</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };

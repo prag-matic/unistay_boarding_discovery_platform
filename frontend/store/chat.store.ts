@@ -179,14 +179,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   addIssue: (issue) => {
-    set((state) => ({
-      issues: [...state.issues, issue],
-      currentIssue: issue,
-      backgroundType:
-        get().backgroundType === "default"
-          ? (`issue_${issue.category}` as ChatBackgroundType)
-          : get().backgroundType,
-    }));
+    set((state) => {
+      // Update background based on issue category if currently default
+      let newBackgroundType = state.backgroundType;
+      if (state.backgroundType === "default" && issue.category) {
+        newBackgroundType = `issue_${issue.category}` as ChatBackgroundType;
+      }
+
+      return {
+        issues: [...state.issues, issue],
+        currentIssue: issue,
+        backgroundType: newBackgroundType,
+      };
+    });
   },
 
   updateIssue: (issueId, updates) => {
@@ -312,12 +317,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       const newIssue = response.data;
 
+      if (!newIssue) {
+        throw new Error(
+          "Failed to create issue: No issue returned from server",
+        );
+      }
+
       // Add issue to store
       get().addIssue(newIssue);
-
-      // Update background based on issue category
-      const backgroundType = `issue_${newIssue.category}` as ChatBackgroundType;
-      get().setBackgroundType(backgroundType);
 
       // Clear pending analysis
       get().dismissIssueAnalysis();

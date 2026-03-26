@@ -66,7 +66,7 @@ export default function MessagesScreen() {
 
   useEffect(() => {
     loadChatRooms();
-    connectSocket();
+    // Don't connect socket on mount - connect only when user starts chatting
     return () => {
       disconnectSocket();
     };
@@ -100,6 +100,8 @@ export default function MessagesScreen() {
   const handleSelectRoom = useCallback(
     async (room: ChatRoom) => {
       try {
+        // Connect socket when selecting a room
+        await connectSocket();
         await joinRoom(room.id);
         setCurrentRoom(room);
         await loadMessages(room.id);
@@ -111,7 +113,7 @@ export default function MessagesScreen() {
         );
       }
     },
-    [joinRoom, setCurrentRoom, loadMessages],
+    [joinRoom, setCurrentRoom, loadMessages, connectSocket],
   );
 
   const handleTyping = (text: string) => {
@@ -168,12 +170,14 @@ export default function MessagesScreen() {
 
       // Set the room immediately to show the chat interface
       setCurrentRoom(room);
-      setShowCreateModal(false);
-      setShowChatInterface(true);
 
       // Join room and load messages in background
       await joinRoom(room.id);
       await loadMessages(room.id);
+
+      // Close modal and show chat interface
+      setShowCreateModal(false);
+      setShowChatInterface(true);
 
       // Send pending message if exists
       if (messageText.trim()) {
@@ -467,8 +471,9 @@ export default function MessagesScreen() {
             onSubmit={handleCreateRoom}
             onClose={() => {
               setShowCreateModal(false);
-              if (!currentRoom) {
-                setShowChatInterface(false);
+              // Only reset chat interface if no room is selected
+              // and we're not in the middle of creating a room
+              if (!currentRoom && !showChatInterface) {
                 setMessageText("");
               }
             }}

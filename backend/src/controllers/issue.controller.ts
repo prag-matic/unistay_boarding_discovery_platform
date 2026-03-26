@@ -135,7 +135,17 @@ export async function createIssue(
 			.populate("roomId", "participants")
 			.lean();
 
-		sendSuccess(res, populatedIssue, "Issue created successfully");
+		if (!populatedIssue) {
+			throw new NotFoundError("Failed to retrieve created issue");
+		}
+
+		// Add id field for frontend compatibility
+		const issueWithId = {
+			...populatedIssue,
+			id: populatedIssue._id.toString(),
+		};
+
+		sendSuccess(res, issueWithId, "Issue created successfully");
 	} catch (error) {
 		next(error);
 	}
