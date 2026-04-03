@@ -2,27 +2,22 @@ FROM node:lts-alpine
 
 WORKDIR /app
 
-# Install dependencies for Prisma (required for Alpine)
+# Install dependencies for Alpine
 RUN apk add --no-cache openssl
 
 # Copy package files
 COPY package*.json ./
 
 # Install dependencies
-RUN npm install
+RUN npm install -g pnpm
+RUN pnpm install
 
-# Copy Prisma schema
-COPY prisma ./prisma/
-
-# Generate Prisma client
-RUN npm run prisma:generate
-
-# Copy source code (excluding seed.ts from production build)
+# Copy source code
 COPY tsconfig.json ./
 COPY src ./src
 
 # Build the application
-RUN npm run build
+RUN pnpm run build
 
 # Default command (overridden in docker-compose for dev)
-CMD ["npm", "start"]
+CMD ["pnpm", "start"]
