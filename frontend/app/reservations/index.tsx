@@ -211,6 +211,17 @@ function ReservationCard({
         </TouchableOpacity>
       )}
 
+      {/* Write Review button (COMPLETED) */}
+      {item.status === 'COMPLETED' && (
+        <TouchableOpacity
+          style={styles.reviewBtn}
+          onPress={() => router.push(`/boardings/${item.boarding.slug}/reviews` as never)}
+        >
+          <Ionicons name="star-outline" size={15} color={COLORS.primary} />
+          <Text style={styles.reviewBtnText}>Write a Review</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Rental periods (only for ACTIVE) */}
       {item.status === 'ACTIVE' && (
         <>
@@ -378,6 +389,16 @@ const styles = StyleSheet.create({
     borderTopColor: COLORS.grayLight,
   },
   cancelBtnText: { fontSize: 13, color: COLORS.red, fontWeight: '600' },
+  reviewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.grayLight,
+  },
+  reviewBtnText: { fontSize: 13, color: COLORS.primary, fontWeight: '600' },
 
   expandBtn: {
     flexDirection: 'row',
