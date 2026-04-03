@@ -25,7 +25,10 @@ const refreshTokenSchema = new Schema<IRefreshToken>(
 			type: Date,
 			required: true,
 		},
-		revokedAt: Date,
+		revokedAt: {
+			type: Date,
+			default: null,
+		},
 		replacedByTokenId: {
 			type: Schema.Types.ObjectId,
 			ref: "RefreshToken",
@@ -36,7 +39,6 @@ const refreshTokenSchema = new Schema<IRefreshToken>(
 	},
 );
 
-refreshTokenSchema.index({ tokenHash: 1 });
 refreshTokenSchema.index({ userId: 1 });
 
 export const RefreshToken = mongoose.model<IRefreshToken>(
