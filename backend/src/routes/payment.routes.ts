@@ -13,7 +13,9 @@ import {
 	getMyPayments,
 	logPayment,
 	rejectPayment,
+	uploadProofImage,
 } from "../controllers/payment.controller.js";
+import { uploadPaymentProofMiddleware } from "@/middleware/upload.js";
 
 const router: Router = createRouter();
 
@@ -25,6 +27,14 @@ router.post(
 	requireRole("STUDENT"),
 	validate(logPaymentSchema),
 	logPayment,
+);
+
+router.put(
+	"/proof-image",
+	authenticate,
+	requireRole("STUDENT"),
+	uploadPaymentProofMiddleware,
+	uploadProofImage,
 );
 
 router.get("/my-payments", authenticate, requireRole("STUDENT"), getMyPayments);
