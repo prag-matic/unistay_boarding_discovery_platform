@@ -6,6 +6,7 @@ import type {
   Review,
   ReviewComment,
   ReviewMedia,
+  ReviewPersonInfo,
   ReviewStats,
   ReviewsListResponse,
   ReviewsQueryParams,
@@ -18,11 +19,22 @@ import type {
 // ── Normalization helpers ────────────────────────────────────────────────────
 
 function normalizeComment(raw: RawReviewComment): ReviewComment {
+  // Mongoose populates the relation in-place under the FK field name:
+  // raw.commentorId becomes the populated User object (not a string).
+  // Accept both the Mongoose shape and a Prisma-like { commentor } shape.
+  const commentor: ReviewPersonInfo =
+    raw.commentor ?? (raw.commentorId as unknown as ReviewPersonInfo);
+  const authorId =
+    typeof raw.commentorId === 'string'
+      ? raw.commentorId
+      : ((raw.commentorId as unknown as ReviewPersonInfo)?.id ?? '');
   return {
     id: raw.id,
     reviewId: raw.reviewId,
-    authorId: raw.commentorId,
-    authorName: `${raw.commentor.firstName} ${raw.commentor.lastName}`,
+    authorId,
+    authorName: commentor
+      ? `${commentor.firstName} ${commentor.lastName}`
+      : 'Unknown',
     comment: raw.comment,
     editedAt: raw.editedAt,
     createdAt: raw.commentedAt,
@@ -31,6 +43,20 @@ function normalizeComment(raw: RawReviewComment): ReviewComment {
 }
 
 function normalizeReview(raw: RawReview): Review {
+  // Mongoose populates the relation in-place under the FK field name:
+  // raw.studentId becomes the populated User object (not a string).
+  // Accept both the Mongoose shape and a Prisma-like { student } shape.
+  const student: ReviewPersonInfo =
+    raw.student ?? (raw.studentId as unknown as ReviewPersonInfo);
+  const authorId =
+    typeof raw.studentId === 'string'
+      ? raw.studentId
+      : ((raw.studentId as unknown as ReviewPersonInfo)?.id ?? '');
+  // boardingId may also be populated (Mongoose replaces FK with the document)
+  const boardingId =
+    typeof raw.boardingId === 'string'
+      ? raw.boardingId
+      : ((raw.boardingId as unknown as { id: string })?.id ?? (raw.boardingId as unknown as string));
   const media: ReviewMedia[] = [
     ...(raw.images ?? []).map((url, i) => ({ id: `img_${i}`, url, type: 'image' as const })),
     ...(raw.video ? [{ id: 'video_0', url: raw.video, type: 'video' as const }] : []),
@@ -38,9 +64,11 @@ function normalizeReview(raw: RawReview): Review {
   const comments = (raw.comments ?? []).map(normalizeComment);
   return {
     id: raw.id,
-    boardingId: raw.boardingId,
-    authorId: raw.studentId,
-    reviewerName: `${raw.student.firstName} ${raw.student.lastName}`,
+    boardingId,
+    authorId,
+    reviewerName: student
+      ? `${student.firstName} ${student.lastName}`
+      : 'Unknown',
     rating: raw.rating,
     comment: raw.comment,
     editedAt: raw.editedAt,
@@ -122,21 +150,27 @@ export async function getMyBoardingReviews(params: ReviewsQueryParams = {}) {
 }
 
 export async function createReview(formData: FormData) {
-  const response = await api.post<UniStayApiResponse<{ id: string; boardingId: string; studentId: string }>>(
+  const response = await api.post<UniStayApiResponse<RawReview>>(
     '/reviews',
     formData,
     { headers: { 'Content-Type': 'multipart/form-data' } },
   );
-  return response.data;
+  return {
+    ...response.data,
+    data: normalizeReview(response.data.data),
+  };
 }
 
 export async function updateReview(reviewId: string, formData: FormData) {
-  const response = await api.put<UniStayApiResponse<{ id: string; editedAt: string }>>(
+  const response = await api.put<UniStayApiResponse<RawReview>>(
     `/reviews/${reviewId}`,
     formData,
     { headers: { 'Content-Type': 'multipart/form-data' } },
   );
-  return response.data;
+  return {
+    ...response.data,
+    data: normalizeReview(response.data.data),
+  };
 }
 
 export async function deleteReview(reviewId: string) {
