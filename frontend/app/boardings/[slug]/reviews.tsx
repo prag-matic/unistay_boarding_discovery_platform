@@ -372,9 +372,8 @@ function WriteReviewModal({ visible, boardingId, editTarget, onClose, onSuccess 
         } as unknown as Blob);
       }
       const result = isEdit && editTarget ? await updateReview(editTarget.id, formData) : await createReview(formData);
-      const reviewRes = await getReviewById(result.data.id);
       Toast.show({ type: 'success', text1: isEdit ? 'Review updated' : 'Review submitted' });
-      onSuccess(reviewRes.data);
+      onSuccess(result.data);
     } catch {
       Toast.show({ type: 'error', text1: 'Submission failed', text2: 'Please try again.' });
     } finally {
