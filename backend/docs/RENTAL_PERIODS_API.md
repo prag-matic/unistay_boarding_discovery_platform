@@ -80,7 +80,7 @@ GET /api/reservation/:resId/rental-periods
 ### Response Notes
 
 - Rental periods are ordered by `dueDate` ascending
-- `payments[].amount` is Prisma `Decimal`, usually serialized as a string
+- `payments[].amount` is stored as a numeric value and serialized as a JSON number
 - `paymentMethod` enum values: `CASH`, `BANK_TRANSFER`, `ONLINE`
 - `payment.status` enum values: `PENDING`, `CONFIRMED`, `REJECTED`
 
