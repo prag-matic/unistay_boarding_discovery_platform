@@ -75,7 +75,7 @@ export class ReviewService {
 		const populatedReview = await Review.findById(review._id)
 			.populate("boardingId", "id title boardingType address city")
 			.populate("studentId", "id firstName lastName email")
-			.lean();
+			.lean({ virtuals: true });
 
 		return populatedReview;
 	}
@@ -153,6 +153,114 @@ export class ReviewService {
 			Review.countDocuments({
 				boardingId: new mongoose.Types.ObjectId(boardingId),
 			}),
+		]);
+
+		return {
+			data: reviews,
+			pagination: {
+				page,
+				limit,
+				total,
+				totalPages: Math.ceil(total / limit),
+			},
+		};
+	}
+
+	/**
+	 * Get all reviews written by a specific student
+	 */
+	async getMyReviews(
+		studentId: string,
+		options?: {
+			page?: number;
+			limit?: number;
+			sortBy?: "rating" | "commentedAt";
+			sortOrder?: "asc" | "desc";
+		},
+	) {
+		const {
+			page = 1,
+			limit = 10,
+			sortBy = "commentedAt",
+			sortOrder = "desc",
+		} = options ?? {};
+
+		const skip = (page - 1) * limit;
+
+		const [reviews, total] = await Promise.all([
+			Review.find({ studentId: new mongoose.Types.ObjectId(studentId) })
+				.populate({
+					path: "boardingId",
+					select: "id title boardingType address city",
+				})
+				.sort({ [sortBy]: sortOrder })
+				.skip(skip)
+				.limit(limit)
+				.lean({ virtuals: true }),
+
+			Review.countDocuments({
+				studentId: new mongoose.Types.ObjectId(studentId),
+			}),
+		]);
+
+		return {
+			data: reviews,
+			pagination: {
+				page,
+				limit,
+				total,
+				totalPages: Math.ceil(total / limit),
+			},
+		};
+	}
+
+	/**
+	 * Get all reviews for boardings owned by a specific user
+	 */
+	async getMyBoardingReviews(
+		ownerId: string,
+		options?: {
+			page?: number;
+			limit?: number;
+			sortBy?: "rating" | "commentedAt";
+			sortOrder?: "asc" | "desc";
+		},
+	) {
+		const {
+			page = 1,
+			limit = 10,
+			sortBy = "commentedAt",
+			sortOrder = "desc",
+		} = options ?? {};
+
+		const skip = (page - 1) * limit;
+
+		// Find all boardings owned by this user
+		const { Boarding } = await import("@/models/index.js");
+		const boardingIds = await Boarding.find({
+			ownerId: new mongoose.Types.ObjectId(ownerId),
+		})
+			.select("_id")
+			.lean();
+
+		const ids = boardingIds.map((b) => b._id);
+
+		const [reviews, total] = await Promise.all([
+			Review.find({ boardingId: { $in: ids } })
+				.populate({
+					path: "boardingId",
+					select: "id title boardingType address city",
+				})
+				.populate({
+					path: "studentId",
+					select: "id firstName lastName email",
+				})
+				.sort({ [sortBy]: sortOrder })
+				.skip(skip)
+				.limit(limit)
+				.lean({ virtuals: true }),
+
+			Review.countDocuments({ boardingId: { $in: ids } }),
 		]);
 
 		return {
