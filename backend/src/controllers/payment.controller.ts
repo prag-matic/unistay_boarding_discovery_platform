@@ -14,6 +14,7 @@ import {
 	RentalPeriod,
 	Reservation,
 } from "@/models/index.js";
+import { uploadPaymentProofImage } from "@/lib/cloudinary.js";
 import type {
 	LogPaymentInput,
 	RejectPaymentInput,
@@ -264,13 +265,13 @@ export async function uploadProofImage(req: Request, res: Response, next: NextFu
   	try {
 		if (!req.user) throw new UnauthorizedError();
 		if (!req.file) throw new BadRequestError('No image file provided');
-    
+
 		const proofImageUrl = await uploadPaymentProofImage(req.file.buffer, req.file.mimetype);
 
-    	sendSuccess(res, { proofImageUrl }, 'Proof image uploaded successfully');
-  	
+		sendSuccess(res, { proofImageUrl }, 'Proof image uploaded successfully');
+
 	} catch (err) {
-    	next(err);
+		next(err);
   	}
 }
 

@@ -8,6 +8,7 @@ import {
 	NotFoundError,
 } from "@/errors/AppError.js";
 import { sendSuccess } from "@/lib/response.js";
+import { withMongoTransaction } from "@/lib/mongodb.js";
 import { Boarding, RentalPeriod, Reservation } from "@/models/index.js";
 
 import type {
@@ -422,14 +423,11 @@ export async function cancelReservation(
 			);
 		}
 
-		const session = await mongoose.startSession();
-		session.startTransaction();
-
-		try {
+		await withMongoTransaction(async (session) => {
 			const updated = await Reservation.findByIdAndUpdate(
 				id,
 				{ status: ReservationStatus.CANCELLED },
-				{ new: true, session },
+				{ new: true, ...(session ? { session } : {}) },
 			)
 				.populate("studentId", "firstName lastName email")
 				.populate("boardingId", "title slug city district")
@@ -441,19 +439,12 @@ export async function cancelReservation(
 					{
 						$inc: { currentOccupants: -1 },
 					},
-					{ session },
+					(session ? { session } : {}),
 				);
 			}
 
-			await session.commitTransaction();
-
 			sendSuccess(res, { reservation: updated }, "Reservation cancelled");
-		} catch (error) {
-			await session.abortTransaction();
-			throw error;
-		} finally {
-			session.endSession();
-		}
+		});
 	} catch (err) {
 		next(err);
 	}
@@ -490,14 +481,11 @@ export async function completeReservation(
 			throw new BadRequestError("Only ACTIVE reservations can be completed");
 		}
 
-		const session = await mongoose.startSession();
-		session.startTransaction();
-
-		try {
+		await withMongoTransaction(async (session) => {
 			const updated = await Reservation.findByIdAndUpdate(
 				id,
 				{ status: ReservationStatus.COMPLETED },
-				{ new: true, session },
+				{ new: true, ...(session ? { session } : {}) },
 			)
 				.populate("studentId", "firstName lastName email")
 				.populate("boardingId", "title slug city district")
@@ -508,18 +496,11 @@ export async function completeReservation(
 				{
 					$inc: { currentOccupants: -1 },
 				},
-				{ session },
+				(session ? { session } : {}),
 			);
 
-			await session.commitTransaction();
-
 			sendSuccess(res, { reservation: updated }, "Reservation completed");
-		} catch (error) {
-			await session.abortTransaction();
-			throw error;
-		} finally {
-			session.endSession();
-		}
+		});
 	} catch (err) {
 		next(err);
 	}
