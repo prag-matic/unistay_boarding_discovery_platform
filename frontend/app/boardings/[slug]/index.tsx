@@ -15,10 +15,12 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/store/auth.store';
-import { getBoardingBySlug, getBoardingReviews } from '@/lib/boarding';
+import { getBoardingBySlug } from '@/lib/boarding';
+import { getBoardingReviewsById, getReviewStats } from '@/lib/review';
 import { useSaveBoarding } from '@/hooks/useSaveBoarding';
 import { COLORS } from '@/lib/constants';
-import type { Boarding, BoardingReview, AmenityName } from '@/types/boarding.types';
+import type { Boarding, AmenityName } from '@/types/boarding.types';
+import type { Review, ReviewStats } from '@/types/review.types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const MAX_DESCRIPTION_PREVIEW_LENGTH = 200;
@@ -74,7 +76,8 @@ export default function BoardingDetailsScreen() {
   const { user } = useAuthStore();
 
   const [boarding, setBoarding] = useState<Boarding | null>(null);
-  const [reviews, setReviews] = useState<BoardingReview[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewStats, setReviewStats] = useState<ReviewStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeImage, setActiveImage] = useState(0);
   const [descExpanded, setDescExpanded] = useState(false);
@@ -87,10 +90,19 @@ export default function BoardingDetailsScreen() {
   useEffect(() => {
     if (!slug) return;
     setIsLoading(true);
-    Promise.all([
-      getBoardingBySlug(slug).then((r) => setBoarding(r.data.boarding)),
-      getBoardingReviews(slug).then((r) => setReviews(r.data.reviews)).catch(() => setReviews([])),
-    ])
+    getBoardingBySlug(slug)
+      .then((r) => {
+        setBoarding(r.data.boarding);
+        const id = r.data.boarding.id;
+        return Promise.all([
+          getBoardingReviewsById(id, { limit: 3 }),
+          getReviewStats(id),
+        ]);
+      })
+      .then(([reviewsRes, statsRes]) => {
+        setReviews(reviewsRes.data.reviews);
+        setReviewStats(statsRes.data);
+      })
       .catch(() => {})
       .finally(() => setIsLoading(false));
   }, [slug]);
@@ -369,31 +381,78 @@ export default function BoardingDetailsScreen() {
               <Text style={styles.seeAllLink}>See all</Text>
             </TouchableOpacity>
           </View>
+          {reviewStats && reviewStats.totalReviews > 0 && (
+            <TouchableOpacity
+              style={styles.statsCard}
+              activeOpacity={0.85}
+              onPress={() => router.push(`/boardings/${slug}/reviews` as never)}
+            >
+              <View style={styles.statsLeft}>
+                <Text style={styles.statsAvg}>{reviewStats.averageRating.toFixed(1)}</Text>
+                <StarRow rating={reviewStats.averageRating} />
+                <Text style={styles.statsTotal}>{reviewStats.totalReviews} review{reviewStats.totalReviews !== 1 ? 's' : ''}</Text>
+              </View>
+              <View style={styles.statsRight}>
+                {([5, 4, 3, 2, 1] as const).map((star) => {
+                  const count = reviewStats.ratingDistribution[star] ?? 0;
+                  const pct = reviewStats.totalReviews > 0 ? (count / reviewStats.totalReviews) * 100 : 0;
+                  return (
+                    <View key={star} style={styles.barRow}>
+                      <Text style={styles.barLabel}>{star}</Text>
+                      <Ionicons name="star" size={10} color="#F59E0B" />
+                      <View style={styles.barTrack}>
+                        <View style={[styles.barFill, { width: `${pct}%` as any }]} />
+                      </View>
+                      <Text style={styles.barCount}>{count}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </TouchableOpacity>
+          )}
           {reviews.length === 0 ? (
-            <Text style={styles.noReviewsText}>No reviews yet.</Text>
+            <View style={styles.noReviewsContainer}>
+              <Text style={styles.noReviewsText}>No reviews yet.</Text>
+              {!isOwnListing && (
+                <TouchableOpacity
+                  style={styles.addReviewBtn}
+                  onPress={() => router.push(`/boardings/${slug}/reviews` as never)}
+                >
+                  <Ionicons name="star-outline" size={15} color={COLORS.primary} />
+                  <Text style={styles.addReviewBtnText}>Add Review</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           ) : (
-            reviews.slice(0, 2).map((review) => (
-              <View key={review.id} style={styles.reviewCard}>
-                <View style={styles.reviewHeader}>
-                  <View style={styles.reviewAvatar}>
-                    <Text style={styles.reviewAvatarText}>
-                      {review.reviewerName.charAt(0).toUpperCase()}
+            (() => {
+              const topReview = reviews
+                .filter((r) => r.comment)
+                .sort((a, b) => b.rating - a.rating)[0] ?? reviews[0];
+              return (
+                <View key={topReview.id} style={styles.reviewCard}>
+                  <View style={styles.reviewHeader}>
+                    <View style={styles.reviewAvatar}>
+                      <Text style={styles.reviewAvatarText}>
+                        {topReview.reviewerName.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.reviewerName}>{topReview.reviewerName}</Text>
+                      <StarRow rating={topReview.rating} />
+                    </View>
+                    <Text style={styles.reviewDate}>
+                      {new Date(topReview.createdAt).toLocaleDateString('en-US', {
+                        month: 'short',
+                        year: 'numeric',
+                      })}
                     </Text>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.reviewerName}>{review.reviewerName}</Text>
-                    <StarRow rating={review.rating} />
-                  </View>
-                  <Text style={styles.reviewDate}>
-                    {new Date(review.createdAt).toLocaleDateString('en-US', {
-                      month: 'short',
-                      year: 'numeric',
-                    })}
-                  </Text>
+                  {topReview.comment ? (
+                    <Text style={styles.reviewComment}>{topReview.comment}</Text>
+                  ) : null}
                 </View>
-                <Text style={styles.reviewComment}>{review.comment}</Text>
-              </View>
-            ))
+              );
+            })()
           )}
         </View>
       </ScrollView>
@@ -708,6 +767,18 @@ const styles = StyleSheet.create({
   },
   seeAllLink: { fontSize: 13, color: COLORS.primary, fontWeight: '600' },
   noReviewsText: { fontSize: 14, color: COLORS.textSecondary, fontStyle: 'italic' },
+  noReviewsContainer: { gap: 10 },
+  addReviewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    backgroundColor: '#EBF0FF',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  addReviewBtnText: { fontSize: 13, fontWeight: '700', color: COLORS.primary },
   reviewCard: {
     backgroundColor: COLORS.white,
     borderRadius: 12,
@@ -729,6 +800,27 @@ const styles = StyleSheet.create({
   reviewerName: { fontSize: 13, fontWeight: '700', color: COLORS.text, marginBottom: 3 },
   reviewDate: { fontSize: 11, color: COLORS.gray },
   reviewComment: { fontSize: 13, color: COLORS.textSecondary, lineHeight: 20 },
+
+  // Review stats card
+  statsCard: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.white,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: COLORS.grayBorder,
+    gap: 16,
+  },
+  statsLeft: { alignItems: 'center', justifyContent: 'center', gap: 4, minWidth: 56 },
+  statsAvg: { fontSize: 32, fontWeight: '800', color: COLORS.text, lineHeight: 36 },
+  statsTotal: { fontSize: 11, color: COLORS.textSecondary, marginTop: 2 },
+  statsRight: { flex: 1, gap: 4, justifyContent: 'center' },
+  barRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  barLabel: { fontSize: 11, color: COLORS.textSecondary, width: 8, textAlign: 'right' },
+  barTrack: { flex: 1, height: 6, backgroundColor: '#F3F4F6', borderRadius: 3, overflow: 'hidden' },
+  barFill: { height: 6, backgroundColor: '#F59E0B', borderRadius: 3 },
+  barCount: { fontSize: 11, color: COLORS.textSecondary, width: 18, textAlign: 'right' },
 
   // Floating Action Buttons
   fabContainer: {
