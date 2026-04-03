@@ -7,6 +7,8 @@ import {
 	createReviewComment,
 	deleteReview,
 	deleteReviewComment,
+	getMyBoardingReviews,
+	getMyReviews,
 	getReview,
 	getReviewStats,
 	getReviewsByBoarding,
@@ -42,6 +44,18 @@ router.post(
 	createReview,
 );
 
+// Get reviews written by the authenticated student (must be before /:id)
+router.get("/my", authenticate, getMyReviews);
+
+// Get reviews for boardings owned by the authenticated user (must be before /:id)
+router.get("/my-boardings", authenticate, getMyBoardingReviews);
+
+// Get reviews by boarding (must be before /:id)
+router.get("/boarding/:boardingId", getReviewsByBoarding);
+
+// Get review statistics for boarding (must be before /:id)
+router.get("/boarding/:boardingId/stats", getReviewStats);
+
 // Get review by ID
 router.get("/:id", getReview);
 
@@ -68,10 +82,7 @@ router.post(
 );
 
 // Get reviews by boarding (separate route for boarding-specific queries)
-router.get("/boarding/:boardingId", getReviewsByBoarding);
-
-// Get review statistics for boarding
-router.get("/boarding/:boardingId/stats", getReviewStats);
+// Note: already registered before /:id above
 
 // Create comment on review (validation done in controller with commentBodySchema)
 router.post("/:id/comments", authenticate, createReviewComment);
