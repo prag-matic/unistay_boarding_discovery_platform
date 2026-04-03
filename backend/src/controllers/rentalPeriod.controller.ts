@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import { ForbiddenError, NotFoundError } from "@/errors/AppError.js";
 import { sendSuccess } from "@/lib/response.js";
 import { RentalPeriod, Reservation } from "@/models/index.js";
+import { transformRentalPeriodDoc } from "@/utils/index.js";
 
 // GET /api/reservations/:resId/rental-periods  (participant)
 export async function getRentalPeriods(
@@ -47,7 +48,11 @@ export async function getRentalPeriods(
 			.sort({ dueDate: 1 })
 			.lean({ virtuals: true });
 
-		sendSuccess(res, { rentalPeriods });
+		sendSuccess(res, {
+			rentalPeriods: (rentalPeriods as Record<string, unknown>[]).map(
+				transformRentalPeriodDoc,
+			),
+		});
 	} catch (err) {
 		next(err);
 	}

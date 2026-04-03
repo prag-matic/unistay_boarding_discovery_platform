@@ -32,19 +32,10 @@ const router: Router = createRouter();
 router.use(boardingLimiter);
 
 // Public routes
-router.get(
-	"/", 
-	validateQuery(searchBoardingsQuerySchema), 
-	searchBoardings
-);
+router.get("/", validateQuery(searchBoardingsQuerySchema), searchBoardings);
 
 // Owner-only routes
-router.get(
-	"/my-listings", 
-	authenticate, 
-	requireRole("OWNER"), 
-	getMyListings
-);
+router.get("/my-listings", authenticate, requireRole("OWNER"), getMyListings);
 
 router.post(
 	"/",
@@ -63,11 +54,7 @@ router.put(
 	updateBoarding,
 );
 
-router.patch(
-	"/:id/submit",
-	authenticate,
-	requireRole("OWNER"),
-	submitBoarding);
+router.patch("/:id/submit", authenticate, requireRole("OWNER"), submitBoarding);
 
 router.patch(
 	"/:id/deactivate",
@@ -99,9 +86,6 @@ router.delete(
 );
 
 // Public slug route (after all specific paths)
-router.get(
-	"/:slug", 
-	getBoardingBySlug
-);
+router.get("/:slug", getBoardingBySlug);
 
 export default router;

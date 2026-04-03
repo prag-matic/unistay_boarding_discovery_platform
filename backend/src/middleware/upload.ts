@@ -83,17 +83,16 @@ export const uploadProfileImageMiddleware: RequestHandler = multer({
 }).single("profileImage");
 
 export const uploadBoardingImageMiddleware = multer({
-  storage,
-  fileFilter: boardingFileFilter,
-  limits: { fileSize: MAX_FILE_SIZE },
-}).array('images', MAX_BOARDING_IMAGES);
+	storage,
+	fileFilter: boardingFileFilter,
+	limits: { fileSize: MAX_FILE_SIZE },
+}).array("images", MAX_BOARDING_IMAGES);
 
 export const uploadPaymentProofMiddleware = multer({
-  storage,
-  fileFilter: imageFilter,
-  limits: { fileSize: MAX_FILE_SIZE },
-}).single('proofImage');
-
+	storage,
+	fileFilter: imageFilter,
+	limits: { fileSize: MAX_FILE_SIZE },
+}).single("proofImage");
 
 // Custom middleware to validate files
 export const validateReviewFiles = (
