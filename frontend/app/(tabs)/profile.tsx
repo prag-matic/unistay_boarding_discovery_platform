@@ -1,7 +1,14 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+} from 'react-native';
 import { router } from 'expo-router';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons, Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '@/store/auth.store';
 import { Avatar } from '@/components/ui/Avatar';
@@ -36,10 +43,10 @@ export default function ProfileScreen() {
 
   const mainMenuItems: MenuItem[] = [
     {
-      id: 'profile-settings',
-      label: 'Profile Settings',
-      sublabel: 'Edit profile and change password',
-      icon: <Ionicons name="person-circle-outline" size={20} color={COLORS.primary} />,
+      id: 'edit',
+      label: 'Edit Profile',
+      sublabel: 'Personal info, avatar',
+      icon: <Feather name="edit-2" size={20} color={COLORS.primary} />,
       onPress: () => router.push('/profile/edit'),
     },
     ...(user?.role === 'STUDENT'
@@ -106,6 +113,13 @@ export default function ProfileScreen() {
       icon: <Ionicons name="heart-outline" size={20} color="#EF4444" />,
       onPress: () => router.push('/saved'),
     },
+    {
+      id: 'marketplace',
+      label: 'My Marketplace Items',
+      sublabel: 'Items for sale',
+      icon: <Ionicons name="grid-outline" size={20} color={COLORS.primary} />,
+      onPress: () => {},
+    },
   ];
 
   const secondaryItems: MenuItem[] = [
@@ -133,13 +147,16 @@ export default function ProfileScreen() {
         <Text style={[styles.menuLabel, item.danger && styles.dangerText]}>{item.label}</Text>
         {item.sublabel ? <Text style={styles.menuSublabel}>{item.sublabel}</Text> : null}
       </View>
-      {!item.danger && <Ionicons name="chevron-forward" size={18} color={COLORS.grayBorder} />}
+      {!item.danger && (
+        <Ionicons name="chevron-forward" size={18} color={COLORS.grayBorder} />
+      )}
     </TouchableOpacity>
   );
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name="arrow-back" size={24} color={COLORS.text} />
@@ -148,26 +165,41 @@ export default function ProfileScreen() {
           <View style={styles.placeholder} />
         </View>
 
+        {/* Avatar */}
         <View style={styles.avatarSection}>
-          <Avatar
-            uri={user?.profileImageUrl ?? undefined}
-            firstName={user?.firstName}
-            lastName={user?.lastName}
-            size={100}
-          />
+          <View style={styles.avatarWrapper}>
+            <Avatar
+              uri={user?.avatar}
+              firstName={user?.firstName}
+              lastName={user?.lastName}
+              size={100}
+            />
+            <TouchableOpacity style={styles.cameraBtn} onPress={() => router.push('/profile/edit')}>
+              <Ionicons name="camera" size={14} color={COLORS.white} />
+            </TouchableOpacity>
+          </View>
           <Text style={styles.userName}>
-            {user?.firstName ?? 'User'} {user?.lastName ?? ''}
+            {user?.firstName ?? 'Alex'} {user?.lastName ?? 'Thompson'}
           </Text>
           <View style={styles.badgeRow}>
-            <Badge label={user?.role === 'OWNER' ? 'Property Owner' : 'Student'} variant="primary" pill />
-            {user?.username ? <Text style={styles.username}>@{user.username}</Text> : null}
+            <Badge
+              label={user?.role === 'OWNER' ? 'Property Owner' : 'Student'}
+              variant="primary"
+              pill
+            />
+            <Text style={styles.username}>@{user?.username ?? 'alex_t'}</Text>
           </View>
-          {user?.phone ? <Text style={styles.metaText}>{user.phone}</Text> : null}
-          {user?.university ? <Text style={styles.metaText}>{user.university}</Text> : null}
         </View>
 
-        <View style={styles.menuCard}>{mainMenuItems.map(renderMenuItem)}</View>
-        <View style={[styles.menuCard, styles.menuCardSecondary]}>{secondaryItems.map(renderMenuItem)}</View>
+        {/* Main Menu */}
+        <View style={styles.menuCard}>
+          {mainMenuItems.map(renderMenuItem)}
+        </View>
+
+        {/* Secondary Menu */}
+        <View style={[styles.menuCard, styles.menuCardSecondary]}>
+          {secondaryItems.map(renderMenuItem)}
+        </View>
 
         <Text style={styles.version}>UniStay v{APP_VERSION}</Text>
       </ScrollView>
@@ -189,11 +221,24 @@ const styles = StyleSheet.create({
   backBtn: { width: 40, alignItems: 'flex-start' },
   headerTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '700', color: COLORS.text },
   placeholder: { width: 40 },
-  avatarSection: { alignItems: 'center', paddingVertical: 24, gap: 6 },
-  userName: { fontSize: 20, fontWeight: '700', color: COLORS.text, marginTop: 8 },
+  avatarSection: { alignItems: 'center', paddingVertical: 28 },
+  avatarWrapper: { position: 'relative', marginBottom: 16 },
+  cameraBtn: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.white,
+  },
+  userName: { fontSize: 20, fontWeight: '700', color: COLORS.text, marginBottom: 8 },
   badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   username: { fontSize: 14, color: COLORS.textSecondary },
-  metaText: { fontSize: 14, color: COLORS.textSecondary },
   menuCard: {
     backgroundColor: COLORS.white,
     marginHorizontal: 16,
