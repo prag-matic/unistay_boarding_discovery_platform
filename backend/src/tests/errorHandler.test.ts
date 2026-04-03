@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { errorHandler } from '@/middleware/errorHandler.js';
 import { AppError, ValidationError, UnauthorizedError } from '@/errors/AppError.js';
+import mongoose from 'mongoose';
 import { ZodError, z } from 'zod';
-import { Prisma } from '@prisma/client';
 import type { Request, Response } from 'express';
 
 function mockRes() {
@@ -43,32 +43,33 @@ describe('errorHandler', () => {
     expect(getBody(res).error).toBe('TokenExpiredError');
   });
 
-  it('handles Prisma P2002 with 409', () => {
-    const err = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
-      code: 'P2002', clientVersion: '5.0.0', meta: { target: ['email'] },
-    });
+  it('handles Mongoose validation errors with 422', () => {
+    const err = new mongoose.Error.ValidationError();
+    err.addError('email', new mongoose.Error.ValidatorError({ path: 'email', message: 'Invalid email', value: 'bad' }));
+    const res = mockRes();
+    errorHandler(err, req, res, vi.fn());
+    expect(res.status).toHaveBeenCalledWith(422);
+    expect(getBody(res).error).toBe('ValidationError');
+  });
+
+  it('handles CastError with 400', () => {
+    const err = new mongoose.Error.CastError('ObjectId', 'bad-id', 'boardingId');
+    const res = mockRes();
+    errorHandler(err, req, res, vi.fn());
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(getBody(res).error).toBe('BadRequestError');
+  });
+
+  it('handles duplicate key errors with 409', () => {
+    const err = Object.assign(new Error('duplicate key'), { code: 11000, keyValue: { email: 'a@b.com' } });
     const res = mockRes();
     errorHandler(err, req, res, vi.fn());
     expect(res.status).toHaveBeenCalledWith(409);
     expect(getBody(res).error).toBe('ConflictError');
   });
 
-  it('handles Prisma P2025 with 404', () => {
-    const err = new Prisma.PrismaClientKnownRequestError('Not found', { code: 'P2025', clientVersion: '5.0.0' });
-    const res = mockRes();
-    errorHandler(err, req, res, vi.fn());
-    expect(res.status).toHaveBeenCalledWith(404);
-  });
-
-  it('handles Prisma P2003 with 400', () => {
-    const err = new Prisma.PrismaClientKnownRequestError('FK failed', { code: 'P2003', clientVersion: '5.0.0' });
-    const res = mockRes();
-    errorHandler(err, req, res, vi.fn());
-    expect(res.status).toHaveBeenCalledWith(400);
-  });
-
-  it('handles unknown Prisma error with 500', () => {
-    const err = new Prisma.PrismaClientKnownRequestError('other', { code: 'P9999', clientVersion: '5.0.0' });
+  it('handles generic mongoose errors with 500', () => {
+    const err = new mongoose.Error('db failed');
     const res = mockRes();
     errorHandler(err, req, res, vi.fn());
     expect(res.status).toHaveBeenCalledWith(500);
