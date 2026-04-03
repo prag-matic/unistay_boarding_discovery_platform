@@ -27,13 +27,19 @@ function normalizeComment(raw: RawReviewComment): ReviewComment {
   const authorId =
     typeof raw.commentorId === 'string'
       ? raw.commentorId
-      : ((raw.commentorId as unknown as ReviewPersonInfo)?.id ?? '');
+      : ((raw.commentorId as unknown as ReviewPersonInfo)?.id ??
+         (raw.commentorId as unknown as { _id: string })?._id ??
+         '');
+  const id =
+    raw.id ??
+    (raw as unknown as { _id?: string })._id ??
+    '';
   return {
-    id: raw.id,
+    id,
     reviewId: raw.reviewId,
     authorId,
     authorName: commentor
-      ? `${commentor.firstName} ${commentor.lastName}`
+      ? `${commentor.firstName ?? ''} ${commentor.lastName ?? ''}`.trim() || 'Unknown'
       : 'Unknown',
     comment: raw.comment,
     editedAt: raw.editedAt,
@@ -51,23 +57,32 @@ function normalizeReview(raw: RawReview): Review {
   const authorId =
     typeof raw.studentId === 'string'
       ? raw.studentId
-      : ((raw.studentId as unknown as ReviewPersonInfo)?.id ?? '');
+      : ((raw.studentId as unknown as ReviewPersonInfo)?.id ??
+         (raw.studentId as unknown as { _id: string })?._id ??
+         '');
   // boardingId may also be populated (Mongoose replaces FK with the document)
   const boardingId =
     typeof raw.boardingId === 'string'
       ? raw.boardingId
-      : ((raw.boardingId as unknown as { id: string })?.id ?? (raw.boardingId as unknown as string));
+      : ((raw.boardingId as unknown as { id?: string; _id?: string })?.id ??
+         (raw.boardingId as unknown as { id?: string; _id?: string })?._id ??
+         String(raw.boardingId));
+  // id virtual may be absent if lean() was called without { virtuals: true }
+  const id =
+    raw.id ??
+    (raw as unknown as { _id?: string })._id ??
+    '';
   const media: ReviewMedia[] = [
     ...(raw.images ?? []).map((url, i) => ({ id: `img_${i}`, url, type: 'image' as const })),
     ...(raw.video ? [{ id: 'video_0', url: raw.video, type: 'video' as const }] : []),
   ];
   const comments = (raw.comments ?? []).map(normalizeComment);
   return {
-    id: raw.id,
+    id,
     boardingId,
     authorId,
     reviewerName: student
-      ? `${student.firstName} ${student.lastName}`
+      ? `${student.firstName ?? ''} ${student.lastName ?? ''}`.trim() || 'Unknown'
       : 'Unknown',
     rating: raw.rating,
     comment: raw.comment,
