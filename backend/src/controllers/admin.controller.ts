@@ -45,6 +45,7 @@ export async function listUsers(
 				totalPages: Math.ceil(total / size),
 			},
 		});
+		
 	} catch (error) {
 		next(error);
 	}

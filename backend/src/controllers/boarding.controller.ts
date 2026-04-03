@@ -1,5 +1,4 @@
 import type { NextFunction, Request, Response } from "express";
-import mongoose from "mongoose";
 import {
 	BoardingNotFoundError,
 	ForbiddenError,
@@ -7,6 +6,7 @@ import {
 	ValidationError,
 } from "@/errors/AppError.js";
 import { deleteBoardingImage, uploadBoardingImage } from "@/lib/cloudinary.js";
+import { withMongoTransaction } from "@/lib/mongodb.js";
 import { sendSuccess } from "@/lib/response.js";
 import { MAX_BOARDING_IMAGES } from "@/middleware/upload.js";
 import {
@@ -318,18 +318,15 @@ export async function updateBoarding(
 			slug = await generateUniqueSlug(title, id);
 		}
 
-		const session = await mongoose.startSession();
-		session.startTransaction();
-
-		try {
+		await withMongoTransaction(async (session) => {
 			// Delete existing rules if rules array is provided
 			if (rules !== undefined) {
-				await BoardingRule.deleteMany({ boardingId: id }).session(session);
+				await BoardingRule.deleteMany({ boardingId: id }, session ? { session } : {});
 			}
 
 			// Delete existing amenities if amenities array is provided
 			if (amenities !== undefined) {
-				await BoardingAmenity.deleteMany({ boardingId: id }).session(session);
+				await BoardingAmenity.deleteMany({ boardingId: id }, session ? { session } : {});
 			}
 
 			// Update boarding
@@ -340,7 +337,7 @@ export async function updateBoarding(
 					...(title && { title }),
 					slug,
 				},
-				{ new: true, session },
+				{ new: true, ...(session ? { session } : {}) },
 			)
 				.populate("ownerId", "firstName lastName phone")
 				.populate({
@@ -361,7 +358,7 @@ export async function updateBoarding(
 			if (rules && rules.length > 0) {
 				await BoardingRule.insertMany(
 					rules.map((rule) => ({ boardingId: id, rule })),
-					{ session },
+					session ? { session } : {},
 				);
 			}
 
@@ -369,11 +366,9 @@ export async function updateBoarding(
 			if (amenities && amenities.length > 0) {
 				await BoardingAmenity.insertMany(
 					amenities.map((name) => ({ boardingId: id, name })),
-					{ session },
+					session ? { session } : {},
 				);
 			}
-
-			await session.commitTransaction();
 
 			// Re-fetch to get updated populated data
 			const updatedBoarding = await Boarding.findById(id)
@@ -397,12 +392,7 @@ export async function updateBoarding(
 				{ boarding: updatedBoarding },
 				"Boarding updated successfully",
 			);
-		} catch (error) {
-			await session.abortTransaction();
-			throw error;
-		} finally {
-			session.endSession();
-		}
+		});
 	} catch (err) {
 		next(err);
 	}
