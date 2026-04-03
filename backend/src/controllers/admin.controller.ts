@@ -10,6 +10,7 @@ import { Boarding, User } from "@/models/index.js";
 import type { RejectBoardingInput } from "@/schemas/boarding.validators.js";
 import type { AdminListUsersQuery } from "@/schemas/user.validators.js";
 import { BoardingStatus } from "@/types/enums.js";
+import { addId, transformBoardingDoc } from "@/utils/index.js";
 
 // GET /api/v1/admin/users
 export async function listUsers(
@@ -37,7 +38,7 @@ export async function listUsers(
 		]);
 
 		sendSuccess(res, {
-			users,
+			users: (users as Record<string, unknown>[]).map(addId),
 			pagination: {
 				total,
 				page,
@@ -45,7 +46,6 @@ export async function listUsers(
 				totalPages: Math.ceil(total / size),
 			},
 		});
-		
 	} catch (error) {
 		next(error);
 	}
@@ -68,7 +68,7 @@ export async function getUserById(
 
 		if (!user) throw new UserNotFoundError();
 
-		sendSuccess(res, user);
+		sendSuccess(res, addId(user as Record<string, unknown>));
 	} catch (error) {
 		next(error);
 	}
@@ -97,7 +97,7 @@ export async function activateUser(
 
 		sendSuccess(
 			res,
-			{ id: user._id, isActive: user.isActive },
+			{ id: user._id.toString(), isActive: user.isActive },
 			"User activated successfully",
 		);
 	} catch (err) {
@@ -128,7 +128,7 @@ export async function deactivateUser(
 
 		sendSuccess(
 			res,
-			{ id: user._id, isActive: user.isActive },
+			{ id: user._id.toString(), isActive: user.isActive },
 			"User deactivated successfully",
 		);
 	} catch (err) {
@@ -163,7 +163,11 @@ export async function listPendingBoardings(
 			.sort({ updatedAt: 1 })
 			.lean();
 
-		sendSuccess(res, { boardings });
+		sendSuccess(res, {
+			boardings: (boardings as Record<string, unknown>[]).map(
+				transformBoardingDoc,
+			),
+		});
 	} catch (err) {
 		next(err);
 	}
@@ -196,7 +200,11 @@ export async function approveBoarding(
 			.select("id status title updatedAt")
 			.lean();
 
-		sendSuccess(res, { boarding }, "Boarding approved successfully");
+		sendSuccess(
+			res,
+			{ boarding: addId(boarding as Record<string, unknown>) },
+			"Boarding approved successfully",
+		);
 	} catch (err) {
 		next(err);
 	}
@@ -233,7 +241,11 @@ export async function rejectBoarding(
 			.select("id status title rejectionReason updatedAt")
 			.lean();
 
-		sendSuccess(res, { boarding }, "Boarding rejected successfully");
+		sendSuccess(
+			res,
+			{ boarding: addId(boarding as Record<string, unknown>) },
+			"Boarding rejected successfully",
+		);
 	} catch (err) {
 		next(err);
 	}
