@@ -84,9 +84,6 @@ router.put(
 	updateReviewComment,
 );
 
-// Delete comment
-router.delete("/comments/:id", deleteReviewComment);
-
 // Delete comment - only the user who created it
 router.delete("/comments/:id", authenticate, deleteReviewComment);
 
