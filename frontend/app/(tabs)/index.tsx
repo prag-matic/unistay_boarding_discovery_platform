@@ -519,12 +519,12 @@ function StudentHome({ firstName }: { firstName: string }) {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.stuManageCard}
-            onPress={() => router.push('/(tabs)/search' as never)}
+            onPress={() => router.push('/my-reviews' as never)}
           >
             <View style={[styles.quickActionIcon, { backgroundColor: '#FDF4FF' }]}>
-              <Ionicons name="search-outline" size={22} color="#9333EA" />
+              <Ionicons name="star-outline" size={22} color="#9333EA" />
             </View>
-            <Text style={styles.quickActionLabel}>Find Boarding</Text>
+            <Text style={styles.quickActionLabel}>My Reviews</Text>
           </TouchableOpacity>
         </View>
       </View>
