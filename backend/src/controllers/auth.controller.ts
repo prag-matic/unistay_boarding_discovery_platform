@@ -13,6 +13,7 @@ import {
 import { sendPasswordResetEmail, sendVerificationEmail } from "@/lib/email.js";
 import { generateSecureToken, sha256 } from "@/lib/hash.js";
 import { parseDurationMs, signAccessToken } from "@/lib/jwt.js";
+import { withMongoTransaction } from "@/lib/mongodb.js";
 import { sendSuccess } from "@/lib/response.js";
 import {
 	EmailVerificationToken,
@@ -172,7 +173,7 @@ export async function refreshToken(
 		const tokenHash = sha256(refreshToken);
 		const stored = await RefreshToken.findOne({ tokenHash });
 
-		if (!stored || stored.revokedAt !== null) {
+		if (!stored || stored.revokedAt != null) {
 			throw new UnauthorizedError("Refresh Token is Invalid or Revoked");
 		}
 
@@ -188,10 +189,7 @@ export async function refreshToken(
 			Date.now() + parseDurationMs(config.jwt.refreshExpiry),
 		);
 
-		const session = await User.startSession();
-		session.startTransaction();
-
-		try {
+		await withMongoTransaction(async (session) => {
 			// Store new refresh token in the DB
 			const newRt = await RefreshToken.create(
 				[
@@ -201,7 +199,7 @@ export async function refreshToken(
 						expiresAt: newExpiresAt,
 					},
 				],
-				{ session },
+				session ? { session } : {},
 			);
 
 			// Revoke the old refresh token
@@ -211,27 +209,20 @@ export async function refreshToken(
 					revokedAt: new Date(),
 					replacedByTokenId: newRt[0]._id,
 				},
-				{ session },
+				session ? { session } : {},
 			);
+		});
 
-			await session.commitTransaction();
+		const newAccessToken = signAccessToken({
+			userId: user._id.toString(),
+			role: user.role,
+			email: user.email,
+		});
 
-			const newAccessToken = signAccessToken({
-				userId: user._id.toString(),
-				role: user.role,
-				email: user.email,
-			});
-
-			sendSuccess(res, {
-				accessToken: newAccessToken,
-				refreshToken: rawRefreshToken,
-			});
-		} catch (error) {
-			await session.abortTransaction();
-			throw error;
-		} finally {
-			session.endSession();
-		}
+		sendSuccess(res, {
+			accessToken: newAccessToken,
+			refreshToken: rawRefreshToken,
+		});
 	} catch (error) {
 		next(error);
 	}
@@ -247,10 +238,7 @@ export async function logout(
 		const { refreshToken } = req.body as LogoutInput;
 		const tokenHash = sha256(refreshToken);
 
-		await RefreshToken.updateMany(
-			{ tokenHash, revokedAt: null },
-			{ revokedAt: new Date() },
-		);
+		await RefreshToken.updateMany({ tokenHash }, { revokedAt: new Date() });
 
 		sendSuccess(res, null, "Logged Out Successfully");
 	} catch (error) {
@@ -278,25 +266,16 @@ export async function verifyEmail(
 			throw new TokenExpiredError("Verification token has expired");
 		}
 
-		const session = await User.startSession();
-		session.startTransaction();
-
-		try {
+		await withMongoTransaction(async (session) => {
 			await User.findByIdAndUpdate(
 				record.userId,
 				{ isVerified: true },
-				{ session },
+				session ? { session } : {},
 			);
 			await EmailVerificationToken.findByIdAndDelete(record._id);
-			await session.commitTransaction();
+		});
 
-			sendSuccess(res, null, "Email Verified Successfully");
-		} catch (error) {
-			await session.abortTransaction();
-			throw error;
-		} finally {
-			session.endSession();
-		}
+		sendSuccess(res, null, "Email Verified Successfully");
 	} catch (error) {
 		next(error);
 	}
@@ -421,35 +400,25 @@ export async function resetPassword(
 
 		const passwordHash = await bcrypt.hash(password, config.saltRounds);
 
-		const session = await User.startSession();
-		session.startTransaction();
-
-		try {
+		await withMongoTransaction(async (session) => {
 			await User.findByIdAndUpdate(
 				record.userId,
 				{ passwordHash },
-				{ session },
+				session ? { session } : {},
 			);
 			await PasswordResetToken.findByIdAndUpdate(
 				record._id,
 				{ used: true },
-				{ session },
+				session ? { session } : {},
 			);
 			await RefreshToken.updateMany(
-				{ userId: record.userId, revokedAt: null },
+				{ userId: record.userId },
 				{ revokedAt: new Date() },
-				{ session },
+				session ? { session } : {},
 			);
+		});
 
-			await session.commitTransaction();
-
-			sendSuccess(res, null, "Password Reset Successfully");
-		} catch (error) {
-			await session.abortTransaction();
-			throw error;
-		} finally {
-			session.endSession();
-		}
+		sendSuccess(res, null, "Password Reset Successfully");
 	} catch (error) {
 		next(error);
 	}
