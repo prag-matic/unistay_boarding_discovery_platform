@@ -15,7 +15,10 @@ import { useBoardingStore } from '@/store/boarding.store';
 import { COLORS } from '@/lib/constants';
 
 const DISTRICTS = [
-  'Colombo',
+  'Colombo', 'Gampaha', 'Kalutara', 'Kandy', 'Matale', 'Nuwara Eliya',
+  'Galle', 'Matara', 'Hambantota', 'Jaffna', 'Batticaloa', 'Ampara',
+  'Trincomalee', 'Kurunegala', 'Puttalam', 'Anuradhapura', 'Polonnaruwa',
+  'Badulla', 'Monaragala', 'Ratnapura', 'Kegalle',
 ];
 
 const SRI_LANKA_LAT_MIN = 5.9;

@@ -29,7 +29,18 @@ const GENDER_OPTIONS: { label: string; value: GenderPreference }[] = [
 ];
 
 const UNIVERSITIES = [
-  'Sri Lanka Institute of Information Technology',
+  'University of Colombo',
+  'University of Moratuwa',
+  'University of Kelaniya',
+  'University of Peradeniya',
+  'University of Sri Jayewardenepura',
+  'University of Ruhuna',
+  'Eastern University',
+  'South Eastern University',
+  'Rajarata University',
+  'Sabaragamuwa University',
+  'Wayamba University',
+  'Uva Wellassa University',
 ];
 
 function ProgressBar({ step, total }: { step: number; total: number }) {

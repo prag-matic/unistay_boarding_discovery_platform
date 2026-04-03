@@ -24,12 +24,11 @@ import { Header } from '@/components/layout/Header';
 import { COLORS } from '@/lib/constants';
 import { getErrorMessage } from '@/utils/helpers';
 import { useImagePicker } from '@/hooks/useImagePicker';
-import { uploadProfileImage } from '@/lib/user';
 
 type EditForm = z.infer<typeof editProfileSchema>;
 
 export default function EditProfileScreen() {
-  const { user, updateProfile, refreshProfile, isLoading } = useAuthStore();
+  const { user, updateProfile, isLoading } = useAuthStore();
   const { pickImage, imageUri } = useImagePicker();
 
   const {
@@ -49,11 +48,7 @@ export default function EditProfileScreen() {
 
   const onSubmit = async (data: EditForm) => {
     try {
-      await updateProfile(data);
-      if (imageUri) {
-        await uploadProfileImage(imageUri);
-        await refreshProfile();
-      }
+      await updateProfile({ ...data, avatar: imageUri ?? user?.avatar });
       Alert.alert('Success', 'Profile updated!', [{ text: 'OK', onPress: () => router.back() }]);
     } catch (err) {
       Alert.alert('Error', getErrorMessage(err));
@@ -62,7 +57,7 @@ export default function EditProfileScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header title="Profile Settings" />
+      <Header title="Edit Profile" />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -71,7 +66,7 @@ export default function EditProfileScreen() {
           {/* Avatar */}
           <View style={styles.avatarSection}>
             <Avatar
-              uri={imageUri ?? user?.profileImageUrl ?? undefined}
+              uri={imageUri ?? user?.avatar}
               firstName={user?.firstName}
               lastName={user?.lastName}
               size={90}
@@ -169,7 +164,10 @@ export default function EditProfileScreen() {
             style={styles.saveBtn}
           />
 
-          <TouchableOpacity style={styles.changePasswordBtn} onPress={() => router.push('/profile/change-password')}>
+          <TouchableOpacity
+            style={styles.changePasswordBtn}
+            onPress={() => router.push('/profile/change-password')}
+          >
             <Ionicons name="lock-closed-outline" size={16} color={COLORS.primary} />
             <Text style={styles.changePasswordText}>Change Password</Text>
           </TouchableOpacity>

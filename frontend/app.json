@@ -19,31 +19,16 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#4A7BF7"
       },
-      "package": "com.unistay.app",
-      "permissions": [
-        "android.permission.RECORD_AUDIO"
-      ]
+      "package": "com.unistay.app"
     },
     "web": {
       "bundler": "metro",
       "output": "static",
       "favicon": "./assets/favicon.png"
     },
-    "plugins": [
-      "expo-router",
-      "expo-secure-store",
-      "expo-image-picker"
-    ],
+    "plugins": ["expo-router", "expo-secure-store", "expo-image-picker"],
     "experiments": {
       "typedRoutes": true
-    },
-    "extra": {
-      "router": {
-        "origin": false
-      },
-      "eas": {
-        "projectId": "6a4c5a82-2712-4ec7-b830-955785eaffc7"
-      }
     }
   }
 }
