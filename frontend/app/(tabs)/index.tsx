@@ -519,12 +519,12 @@ function StudentHome({ firstName }: { firstName: string }) {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.stuManageCard}
-            onPress={() => router.push('/(tabs)/search' as never)}
+            onPress={() => router.push('/my-reviews' as never)}
           >
             <View style={[styles.quickActionIcon, { backgroundColor: '#FDF4FF' }]}>
-              <Ionicons name="search-outline" size={22} color="#9333EA" />
+              <Ionicons name="star-outline" size={22} color="#9333EA" />
             </View>
-            <Text style={styles.quickActionLabel}>Find Boarding</Text>
+            <Text style={styles.quickActionLabel}>My Reviews</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -740,6 +740,15 @@ function OwnerHome({ firstName }: { firstName: string }) {
             <Ionicons name="card-outline" size={22} color="#9333EA" />
           </View>
           <Text style={styles.quickActionLabel}>Payments</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.ownerManageCard}
+          onPress={() => router.push('/my-listings/reviews' as never)}
+        >
+          <View style={[styles.quickActionIcon, { backgroundColor: '#FFF7ED' }]}>
+            <Ionicons name="star-outline" size={22} color={COLORS.orange} />
+          </View>
+          <Text style={styles.quickActionLabel}>Reviews</Text>
         </TouchableOpacity>
       </View>
 

@@ -40,7 +40,10 @@ export default function ChangePasswordScreen() {
 
   const onSubmit = async (data: ChangeForm) => {
     try {
-      await api.put('/users/me/password', data);
+      await api.put('/users/me/password', {
+        currentPassword: data.currentPassword,
+        newPassword: data.newPassword,
+      });
       Alert.alert('Success', 'Password updated!', [
         { text: 'OK', onPress: () => router.back() },
       ]);
