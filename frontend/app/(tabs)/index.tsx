@@ -645,6 +645,7 @@ function OwnerHome({ firstName }: { firstName: string }) {
     getBoardingPayments()
       .then((r) => setOwnerPayments(r.data.payments))
       .catch(() => setOwnerPayments([]));
+
   }, []));
 
   const pendingPayments = ownerPayments.filter((p) => p.status === 'PENDING');
