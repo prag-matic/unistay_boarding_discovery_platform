@@ -29,7 +29,6 @@ const emailVerificationTokenSchema = new Schema<IEmailVerificationToken>(
 	},
 );
 
-emailVerificationTokenSchema.index({ token: 1 });
 emailVerificationTokenSchema.index({ userId: 1 });
 
 export const EmailVerificationToken = mongoose.model<IEmailVerificationToken>(
