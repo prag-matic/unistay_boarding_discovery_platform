@@ -197,6 +197,64 @@ export async function getReviewStats(
 	}
 }
 
+// GET /api/reviews/my
+export async function getMyReviews(
+	req: Request,
+	res: Response,
+	next: NextFunction,
+): Promise<void> {
+	try {
+		const studentId = getUserId(req);
+		if (!studentId) throw new BadRequestError("User ID is required");
+
+		const result = await reviewService.getMyReviews(studentId, {
+			page: parseInt(getQueryParamSafe(req, "page") || "1", 10),
+			limit: parseInt(getQueryParamSafe(req, "limit") || "10", 10),
+			sortBy:
+				(getQueryParamSafe(req, "sortBy") as "rating" | "commentedAt") ||
+				"commentedAt",
+			sortOrder:
+				(getQueryParamSafe(req, "sortOrder") as "asc" | "desc") || "desc",
+		});
+
+		sendSuccess(res, {
+			reviews: result.data,
+			pagination: result.pagination,
+		});
+	} catch (error) {
+		next(error);
+	}
+}
+
+// GET /api/reviews/my-boardings
+export async function getMyBoardingReviews(
+	req: Request,
+	res: Response,
+	next: NextFunction,
+): Promise<void> {
+	try {
+		const ownerId = getUserId(req);
+		if (!ownerId) throw new BadRequestError("User ID is required");
+
+		const result = await reviewService.getMyBoardingReviews(ownerId, {
+			page: parseInt(getQueryParamSafe(req, "page") || "1", 10),
+			limit: parseInt(getQueryParamSafe(req, "limit") || "10", 10),
+			sortBy:
+				(getQueryParamSafe(req, "sortBy") as "rating" | "commentedAt") ||
+				"commentedAt",
+			sortOrder:
+				(getQueryParamSafe(req, "sortOrder") as "asc" | "desc") || "desc",
+		});
+
+		sendSuccess(res, {
+			reviews: result.data,
+			pagination: result.pagination,
+		});
+	} catch (error) {
+		next(error);
+	}
+}
+
 // PUT /api/reviews/:id
 export async function updateReview(
 	req: Request,
