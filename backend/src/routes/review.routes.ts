@@ -79,6 +79,7 @@ router.post("/:id/comments", authenticate, createReviewComment);
 // Update comment
 router.put(
 	"/comments/:id",
+	authenticate,
 	requireRole("STUDENT"),
 	validate(updateReviewCommentSchema, "body"),
 	updateReviewComment,
