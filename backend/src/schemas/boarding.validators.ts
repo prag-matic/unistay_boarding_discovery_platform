@@ -108,10 +108,6 @@ export const boardingIdParamSchema = z.object({
 	id: z.string().min(1, "Boarding id is required"),
 });
 
-export const boardingIdParamSchema = z.object({
-  id: z.string().min(1, 'Boarding id is required'),
-});
-
 export const rejectBoardingSchema = z.object({
 	reason: z.string().min(1, "Rejection reason is required"),
 });

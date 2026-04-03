@@ -2,7 +2,7 @@
  * Services directory
  *
  * Services contain business logic and data operations.
- * They interact with the database via Prisma and external services.
+ * They interact with the database via Mongoose models and external services.
  *
  * Structure:
  * - index.ts (exports all services)
