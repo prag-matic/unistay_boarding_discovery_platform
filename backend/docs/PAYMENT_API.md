@@ -219,7 +219,7 @@ Backend can reject even when schema passes:
 ### Response Notes
 
 - Ordered by `createdAt` descending (newest first)
-- `amount` is Prisma `Decimal`, usually serialized as string
+- `amount` is stored as a numeric value and serialized as a JSON number
 - Each payment includes nested `student`, `rentalPeriod`, and `reservation` details
 
 ---
