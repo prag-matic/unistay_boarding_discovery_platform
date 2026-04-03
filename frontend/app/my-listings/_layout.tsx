@@ -8,6 +8,7 @@ export default function MyListingsLayout() {
       <Stack.Screen name="payments" />
       <Stack.Screen name="payment-detail" />
       <Stack.Screen name="payment-history" />
+      <Stack.Screen name="reviews" />
     </Stack>
   );
 }
