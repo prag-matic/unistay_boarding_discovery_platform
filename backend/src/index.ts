@@ -7,6 +7,7 @@ import { setupSocketIO } from "./lib/socket.js";
 
 const PORT = config.port;
 
+
 connectDB()
 	.then(() => {
 		const httpServer = createServer(app);

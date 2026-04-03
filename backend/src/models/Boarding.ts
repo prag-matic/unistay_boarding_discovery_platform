@@ -127,7 +127,6 @@ boardingSchema.virtual("rules", {
 	foreignField: "boardingId",
 });
 
-boardingSchema.index({ slug: 1 });
 boardingSchema.index({ ownerId: 1 });
 boardingSchema.index({ city: 1 });
 boardingSchema.index({ district: 1 });
