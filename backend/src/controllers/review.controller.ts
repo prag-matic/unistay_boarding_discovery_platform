@@ -17,13 +17,13 @@ import {
 
 // Schema for comment request body (only comment field, reviewId comes from URL)
 const commentBodySchema = z.object({
-  comment: z.string().min(1, "Comment is required").max(500),
+	comment: z.string().min(1, "Comment is required").max(500),
 });
 
 // Helper functions to safely get values from Express request
 const getParam = (req: Request, name: string): string => {
-  const value = req.params[name];
-  return Array.isArray(value) ? value[0] : value;
+	const value = req.params[name];
+	return Array.isArray(value) ? value[0] : value;
 };
 
 const getHeader = (req: Request, name: string): string | undefined => {
@@ -32,10 +32,10 @@ const getHeader = (req: Request, name: string): string | undefined => {
 };
 
 const getQueryParamSafe = (req: Request, name: string): string | undefined => {
-  const value = req.query[name] as string | string[] | undefined;
-  if (typeof value === "string") return value;
-  if (Array.isArray(value)) return value[0];
-  return undefined;
+	const value = req.query[name] as string | string[] | undefined;
+	if (typeof value === "string") return value;
+	if (Array.isArray(value)) return value[0];
+	return undefined;
 };
 
 const getUserId = (req: Request): string | undefined => {
@@ -162,15 +162,15 @@ export async function getReviewsByBoarding(
   try {
     const boardingId = getParam(req, "boardingId");
 
-    const result = await reviewService.getReviewsByBoarding(boardingId, {
-      page: parseInt(getQueryParamSafe(req, "page") || "1"),
-      limit: parseInt(getQueryParamSafe(req, "limit") || "10"),
-      sortBy:
-        (getQueryParamSafe(req, "sortBy") as "rating" | "commentedAt") ||
-        "commentedAt",
-      sortOrder:
-        (getQueryParamSafe(req, "sortOrder") as "asc" | "desc") || "desc",
-    });
+		const result = await reviewService.getReviewsByBoarding(boardingId, {
+			page: parseInt(getQueryParamSafe(req, "page") || "1", 10),
+			limit: parseInt(getQueryParamSafe(req, "limit") || "10", 10),
+			sortBy:
+				(getQueryParamSafe(req, "sortBy") as "rating" | "commentedAt") ||
+				"commentedAt",
+			sortOrder:
+				(getQueryParamSafe(req, "sortOrder") as "asc" | "desc") || "desc",
+		});
 
     sendSuccess(res, {
       reviews: result.data,
@@ -246,7 +246,7 @@ export async function deleteReview(
 
     if (!studentId) throw new BadRequestError("User ID is required");
 
-    const result = await reviewService.deleteReview(id, studentId);
+		const result = await reviewService.deleteReview(id, studentId);
 
     sendSuccess(res, null, result.message);
   } catch (error) {
@@ -271,7 +271,7 @@ export async function addReviewReaction(
 
     if (!userId) throw new BadRequestError("User ID is required");
 
-    const result = await reviewService.addReviewReaction(id, userId, type);
+		const result = await reviewService.addReviewReaction(id, userId, type);
 
     sendSuccess(
       res,
@@ -300,11 +300,11 @@ export async function createReviewComment(
 
     if (!commentorId) throw new BadRequestError("User ID is required");
 
-    const reviewComment = await reviewService.createReviewComment(
-      reviewId,
-      commentorId,
-      { comment },
-    );
+		const reviewComment = await reviewService.createReviewComment(
+			reviewId,
+			commentorId,
+			{ comment },
+		);
 
     sendSuccess(res, reviewComment, "Comment added successfully", 201);
   } catch (error) {
@@ -329,11 +329,11 @@ export async function updateReviewComment(
 
     if (!commentorId) throw new BadRequestError("User ID is required");
 
-    const reviewComment = await reviewService.updateReviewComment(
-      id,
-      commentorId,
-      { comment },
-    );
+		const reviewComment = await reviewService.updateReviewComment(
+			id,
+			commentorId,
+			{ comment },
+		);
 
     sendSuccess(res, reviewComment, "Comment updated successfully");
   } catch (error) {
@@ -357,7 +357,7 @@ export async function deleteReviewComment(
 
     if (!commentorId) throw new BadRequestError("User ID is required");
 
-    const result = await reviewService.deleteReviewComment(id, commentorId);
+		const result = await reviewService.deleteReviewComment(id, commentorId);
 
     sendSuccess(res, null, result.message);
   } catch (error) {
