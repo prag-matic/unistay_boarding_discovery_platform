@@ -4,17 +4,6 @@ import { storage } from '@/lib/storage';
 import type { User } from '@/types/user.types';
 import type { RegisterData, LoginResponse, RefreshResponse } from '@/types/auth.types';
 import type { UniStayApiResponse } from '@/types/api.types';
-import { getCurrentUserProfile, updateCurrentUserProfile } from '@/lib/user';
-import type { UpdateProfileRequest } from '@/types/user.types';
-
-const mergeUserData = (preferred: User, fallback: User | null): User => ({
-  ...fallback,
-  ...preferred,
-  profileImageUrl:
-    preferred.profileImageUrl ?? fallback?.profileImageUrl ?? null,
-  phone: preferred.phone ?? fallback?.phone,
-  university: preferred.university ?? fallback?.university,
-}) as User;
 
 interface AuthState {
   user: User | null;
@@ -29,8 +18,7 @@ interface AuthState {
   setUser: (user: User) => void;
   setToken: (token: string) => void;
   setSelectedRole: (role: 'student' | 'owner') => void;
-  updateProfile: (data: UpdateProfileRequest) => Promise<void>;
-  refreshProfile: () => Promise<void>;
+  updateProfile: (data: Partial<User>) => Promise<void>;
   checkAuth: () => Promise<boolean>;
   hydrate: () => Promise<void>;
 }
@@ -54,13 +42,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         email,
         password,
       });
-      const { accessToken, refreshToken, user: loginUser } = response.data.data;
+      const { accessToken, refreshToken, user } = response.data.data;
       await storage.setToken(accessToken);
       await storage.setRefreshToken(refreshToken);
-      const meUser = await getCurrentUserProfile();
-      const mergedUser = mergeUserData(meUser, loginUser);
-      await storage.setUser(mergedUser);
-      set({ token: accessToken, refreshToken, user: mergedUser, isAuthenticated: true });
+      await storage.setUser(user);
+      set({ token: accessToken, refreshToken, user, isAuthenticated: true });
     } finally {
       set({ isLoading: false });
     }
@@ -98,22 +84,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   updateProfile: async (data) => {
     set({ isLoading: true });
     try {
-      const currentUser = get().user;
-      const updatedUser = await updateCurrentUserProfile(data);
-      const mergedUser = mergeUserData(updatedUser, currentUser);
-      await storage.setUser(mergedUser);
-      set({ user: mergedUser });
+      const response = await api.put<UniStayApiResponse<{ user: User }>>('/users/me', data);
+      const updatedUser = response.data.data.user;
+      await storage.setUser(updatedUser);
+      set({ user: updatedUser });
     } finally {
       set({ isLoading: false });
     }
-  },
-
-  refreshProfile: async () => {
-    const currentUser = get().user;
-    const user = await getCurrentUserProfile();
-    const mergedUser = mergeUserData(user, currentUser);
-    await storage.setUser(mergedUser);
-    set({ user: mergedUser });
   },
 
   checkAuth: async () => {
@@ -126,16 +103,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { accessToken, refreshToken: newRefreshToken } = response.data.data;
       await storage.setToken(accessToken);
       await storage.setRefreshToken(newRefreshToken);
-      const user = await getCurrentUserProfile();
-      const storedUser = await storage.getUser<User>();
-      const mergedUser = mergeUserData(user, storedUser);
-      await storage.setUser(mergedUser);
-      set({
-        token: accessToken,
-        refreshToken: newRefreshToken,
-        user: mergedUser,
-        isAuthenticated: true,
-      });
+      const user = await storage.getUser<User>();
+      if (!user) return false;
+      set({ token: accessToken, refreshToken: newRefreshToken, user, isAuthenticated: true });
       return true;
     } catch {
       await get().logout();
@@ -148,14 +118,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const refreshToken = await storage.getRefreshToken();
     const user = await storage.getUser<User>();
     if (token && refreshToken && user) {
-      try {
-        const freshUser = await getCurrentUserProfile();
-        const mergedUser = mergeUserData(freshUser, user);
-        await storage.setUser(mergedUser);
-        set({ token, refreshToken, user: mergedUser, isAuthenticated: true });
-      } catch {
-        set({ token, refreshToken, user, isAuthenticated: true });
-      }
+      set({ token, refreshToken, user, isAuthenticated: true });
     }
   },
 }));
