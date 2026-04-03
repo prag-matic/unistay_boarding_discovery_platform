@@ -1,85 +1,119 @@
-import { Router } from "express";
+import type { Router } from "express";
+import { Router as createRouter } from "express";
+import { authenticate, requireRole } from "../middleware/auth.js";
+
 import {
-  createReview,
-  getReview,
-  updateReview,
-  deleteReview,
-  addReviewReaction,
-  getReviewsByBoarding,
-  getReviewStats,
-  createReviewComment,
-  updateReviewComment,
-  deleteReviewComment,
-  addReviewCommentReaction,
+  	createReview,
+  	getReview,
+  	updateReview,
+  	deleteReview,
+  	addReviewReaction,
+  	getReviewsByBoarding,
+  	getReviewStats,
+  	createReviewComment,
+  	updateReviewComment,
+  	deleteReviewComment,
+  	addReviewCommentReaction,
 } from "../controllers/review.controller.js";
+
 import {
-  uploadReviewMedia,
-  validateReviewFiles,
+  	uploadReviewMedia,
+  	validateReviewFiles,
 } from "../middleware/upload.js";
+
 import { validate } from "../middleware/validate.js";
+
 import {
-  updateReviewCommentSchema,
-  reactionSchema,
+  	updateReviewCommentSchema,
+  	reactionSchema,
 } from "../schemas/index.js";
 
-const router = Router();
+
+const router: Router = createRouter();
 
 /**
  * Review Routes
  *
- * All routes require user authentication (user ID passed via x-user-id header)
- * In production, use the auth middleware instead
+ * All routes require user authentication
  */
 
-// Create review (with file upload)
+// Create review (with file upload) - requires STUDENT role
 router.post(
-  "/",
-  uploadReviewMedia,
-  validateReviewFiles,
-  createReview,
+  	"/",
+	authenticate,
+	requireRole("STUDENT"),
+  	uploadReviewMedia,
+  	validateReviewFiles,
+  	createReview,
 );
 
 // Get review by ID
 router.get("/:id", getReview);
 
-// Update review (with file upload)
+// Update review (with file upload) - only the student who created it
 router.put(
-  "/:id",
-  uploadReviewMedia,
-  validateReviewFiles,
-  updateReview,
+  	"/:id",
+	authenticate,
+  	requireRole("STUDENT"),
+  	uploadReviewMedia,
+  	validateReviewFiles,
+  	updateReview,
 );
 
 // Delete review
-router.delete("/:id", deleteReview);
+router.delete(
+	"/:id", 
+	authenticate,
+	deleteReview
+);
 
-// Add reaction to review
+// Add reaction to review - requires authentication
 router.post(
-  "/:id/reactions",
-  validate(reactionSchema, "body"),
-  addReviewReaction,
+  	"/:id/reactions",
+	authenticate,
+	requireRole("STUDENT"),
+  	validate(reactionSchema, "body"),
+  	addReviewReaction,
 );
 
 // Get reviews by boarding (separate route for boarding-specific queries)
-router.get("/boarding/:boardingId", getReviewsByBoarding);
+router.get(
+	"/boarding/:boardingId", 
+	getReviewsByBoarding
+);
 
 // Get review statistics for boarding
-router.get("/boarding/:boardingId/stats", getReviewStats);
+router.get(
+	"/boarding/:boardingId/stats", 
+	getReviewStats
+);
 
 // Create comment on review (validation done in controller with commentBodySchema)
-router.post("/:id/comments", createReviewComment);
+router.post(
+	"/:id/comments", 
+	authenticate,
+	createReviewComment
+);
 
 // Update comment
 router.put(
-  "/comments/:id",
-  validate(updateReviewCommentSchema, "body"),
-  updateReviewComment,
+  	"/comments/:id",
+	requireRole("STUDENT"),
+  	validate(updateReviewCommentSchema, "body"),
+  	updateReviewComment,
 );
 
 // Delete comment
 router.delete("/comments/:id", deleteReviewComment);
 
-// Add reaction to comment
+// Delete comment - only the user who created it
+router.delete(
+	"/comments/:id",
+	authenticate,
+	deleteReviewComment,
+);
+
+// Add reaction to comment - requires authentication
 router.post(
   "/comments/:id/reactions",
   validate(reactionSchema, "body"),
