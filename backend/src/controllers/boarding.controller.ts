@@ -21,6 +21,7 @@ import type {
 	UpdateBoardingInput,
 } from "@/schemas/boarding.validators.js";
 import { BoardingStatus } from "@/types/enums.js";
+import { transformBoardingDoc } from "@/utils/index.js";
 import { generateUniqueSlug } from "@/utils/slug.js";
 
 // GET /api/boardings  (public)
@@ -120,7 +121,9 @@ export async function searchBoardings(
 		]);
 
 		sendSuccess(res, {
-			boarding,
+			boarding: (boarding as Record<string, unknown>[]).map(
+				transformBoardingDoc,
+			),
 			pagination: { total, page, size, totalPages: Math.ceil(total / size) },
 		});
 	} catch (error) {
@@ -161,7 +164,9 @@ export async function getBoardingBySlug(
 			throw new BoardingNotFoundError();
 		}
 
-		sendSuccess(res, { boarding });
+		sendSuccess(res, {
+			boarding: transformBoardingDoc(boarding as Record<string, unknown>),
+		});
 	} catch (error) {
 		next(error);
 	}
@@ -196,7 +201,11 @@ export async function getMyListings(
 			.sort({ createdAt: -1 })
 			.lean({ virtuals: true });
 
-		sendSuccess(res, { boardings });
+		sendSuccess(res, {
+			boardings: (boardings as Record<string, unknown>[]).map(
+				transformBoardingDoc,
+			),
+		});
 	} catch (err) {
 		next(err);
 	}
@@ -262,7 +271,11 @@ export async function createBoarding(
 
 		sendSuccess(
 			res,
-			{ boarding: completeBoarding },
+			{
+				boarding: transformBoardingDoc(
+					completeBoarding as Record<string, unknown>,
+				),
+			},
 			"Boarding Created Successfully",
 			201,
 		);
@@ -292,8 +305,9 @@ export async function updateBoarding(
 		if (existing.ownerId.toString() !== ownerId)
 			throw new ForbiddenError("You do not own this listing");
 
-        const shouldSetPendingApprovalAfterEdit = existing.status === BoardingStatus.ACTIVE;
-		
+		const shouldSetPendingApprovalAfterEdit =
+			existing.status === BoardingStatus.ACTIVE;
+
 		if (
 			existing.status === BoardingStatus.ACTIVE ||
 			existing.status === BoardingStatus.PENDING_APPROVAL
@@ -321,12 +335,18 @@ export async function updateBoarding(
 		await withMongoTransaction(async (session) => {
 			// Delete existing rules if rules array is provided
 			if (rules !== undefined) {
-				await BoardingRule.deleteMany({ boardingId: id }, session ? { session } : {});
+				await BoardingRule.deleteMany(
+					{ boardingId: id },
+					session ? { session } : {},
+				);
 			}
 
 			// Delete existing amenities if amenities array is provided
 			if (amenities !== undefined) {
-				await BoardingAmenity.deleteMany({ boardingId: id }, session ? { session } : {});
+				await BoardingAmenity.deleteMany(
+					{ boardingId: id },
+					session ? { session } : {},
+				);
 			}
 
 			// Update boarding
@@ -389,7 +409,11 @@ export async function updateBoarding(
 
 			sendSuccess(
 				res,
-				{ boarding: updatedBoarding },
+				{
+					boarding: transformBoardingDoc(
+						updatedBoarding as Record<string, unknown>,
+					),
+				},
 				"Boarding updated successfully",
 			);
 		});
@@ -430,14 +454,16 @@ export async function submitBoarding(
 			);
 		}
 
-        if (
-            existing.status !== BoardingStatus.DRAFT &&
-            existing.status !== BoardingStatus.REJECTED &&
-            existing.status !== BoardingStatus.INACTIVE
-        ) {
-            throw new InvalidStateTransitionError('Only DRAFT, REJECTED, or INACTIVE listings can be submitted for approval')
-        }
-		
+		if (
+			existing.status !== BoardingStatus.DRAFT &&
+			existing.status !== BoardingStatus.REJECTED &&
+			existing.status !== BoardingStatus.INACTIVE
+		) {
+			throw new InvalidStateTransitionError(
+				"Only DRAFT, REJECTED, or INACTIVE listings can be submitted for approval",
+			);
+		}
+
 		if (
 			(existing as typeof existing & { images?: unknown[] }).images?.length ===
 			0
@@ -470,7 +496,11 @@ export async function submitBoarding(
 			})
 			.lean({ virtuals: true });
 
-		sendSuccess(res, { boarding }, "Boarding Submitted for Approval");
+		sendSuccess(
+			res,
+			{ boarding: transformBoardingDoc(boarding as Record<string, unknown>) },
+			"Boarding Submitted for Approval",
+		);
 	} catch (error) {
 		next(error);
 	}
@@ -522,7 +552,11 @@ export async function deactivateBoarding(
 			})
 			.lean({ virtuals: true });
 
-		sendSuccess(res, { boarding }, "Boarding deactivated successfully");
+		sendSuccess(
+			res,
+			{ boarding: transformBoardingDoc(boarding as Record<string, unknown>) },
+			"Boarding deactivated successfully",
+		);
 	} catch (err) {
 		next(err);
 	}
@@ -574,7 +608,11 @@ export async function activateBoarding(
 			})
 			.lean({ virtuals: true });
 
-		sendSuccess(res, { boarding }, "Boarding activated successfully");
+		sendSuccess(
+			res,
+			{ boarding: transformBoardingDoc(boarding as Record<string, unknown>) },
+			"Boarding activated successfully",
+		);
 	} catch (err) {
 		next(err);
 	}

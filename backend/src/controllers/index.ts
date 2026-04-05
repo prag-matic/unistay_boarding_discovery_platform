@@ -14,15 +14,15 @@
  */
 
 export {
-	createReview,
-	getReview,
-	updateReview,
-	deleteReview,
-	addReviewReaction,
-	getReviewsByBoarding,
-	getReviewStats,
-	createReviewComment,
-	updateReviewComment,
-	deleteReviewComment,
 	addReviewCommentReaction,
+	addReviewReaction,
+	createReview,
+	createReviewComment,
+	deleteReview,
+	deleteReviewComment,
+	getReview,
+	getReviewStats,
+	getReviewsByBoarding,
+	updateReview,
+	updateReviewComment,
 } from "./review.controller.js";

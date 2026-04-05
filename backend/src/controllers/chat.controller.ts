@@ -15,6 +15,7 @@ import type {
 	GetChatHistoryInput,
 	GetChatRoomsInput,
 } from "@/schemas/chat.validators.js";
+import { addId } from "@/utils/index.js";
 
 // Helper function to check if user is a student or owner
 function validateUserRole(role: string): void {
@@ -66,7 +67,7 @@ export async function getChatRooms(
 				"firstName lastName profileImageUrl email",
 			)
 			.populate("lastMessage", "content messageType createdAt")
-			.populate("boardingId", "propertyName address city")
+			.populate("boardingId", "title address city")
 			.sort({ lastMessageAt: -1 })
 			.limit(limit + 1);
 
@@ -84,10 +85,25 @@ export async function getChatRooms(
 		const hasMore = chatRooms.length > limit;
 		const rawResult = hasMore ? chatRooms.slice(0, limit) : chatRooms;
 
-		const result = rawResult.map((room) => ({
-			...room,
-			id: room._id.toString(),
-		}));
+		const result = rawResult.map((room) => {
+			const participants = room.participants as Record<string, unknown>;
+			const boardingRaw = room.boardingId as
+				| Record<string, unknown>
+				| undefined;
+			return {
+				...room,
+				id: room._id.toString(),
+				participants: {
+					student: participants?.student
+						? addId(participants.student as Record<string, unknown>)
+						: participants?.student,
+					owner: participants?.owner
+						? addId(participants.owner as Record<string, unknown>)
+						: participants?.owner,
+				},
+				...(boardingRaw?._id ? { boardingId: addId(boardingRaw) } : {}),
+			};
+		});
 
 		const nextCursor =
 			hasMore && rawResult.length > 0
@@ -132,7 +148,7 @@ export async function getChatRoom(
 				"firstName lastName profileImageUrl email",
 			)
 			.populate("lastMessage", "content messageType createdAt")
-			.populate("boardingId", "propertyName address city")
+			.populate("boardingId", "title address city")
 			.lean();
 
 		if (!chatRoom) {
@@ -149,7 +165,23 @@ export async function getChatRoom(
 			throw new ForbiddenError("You are not a participant in this chat room");
 		}
 
-		sendSuccess(res, { ...chatRoom, id: chatRoom._id.toString() });
+		const participants = chatRoom.participants as Record<string, unknown>;
+		const boardingRaw = chatRoom.boardingId as
+			| Record<string, unknown>
+			| undefined;
+		sendSuccess(res, {
+			...chatRoom,
+			id: chatRoom._id.toString(),
+			participants: {
+				student: participants?.student
+					? addId(participants.student as Record<string, unknown>)
+					: participants?.student,
+				owner: participants?.owner
+					? addId(participants.owner as Record<string, unknown>)
+					: participants?.owner,
+			},
+			...(boardingRaw?._id ? { boardingId: addId(boardingRaw) } : {}),
+		});
 	} catch (error) {
 		next(error);
 	}
@@ -220,9 +252,24 @@ export async function createChatRoom(
 				);
 			}
 
+			const existingParticipants = populatedExisting.participants as Record<
+				string,
+				unknown
+			>;
 			sendSuccess(
 				res,
-				{ ...populatedExisting, id: populatedExisting._id.toString() },
+				{
+					...populatedExisting,
+					id: populatedExisting._id.toString(),
+					participants: {
+						student: existingParticipants?.student
+							? addId(existingParticipants.student as Record<string, unknown>)
+							: existingParticipants?.student,
+						owner: existingParticipants?.owner
+							? addId(existingParticipants.owner as Record<string, unknown>)
+							: existingParticipants?.owner,
+					},
+				},
 				"Chat room retrieved successfully",
 			);
 			return;
@@ -257,9 +304,24 @@ export async function createChatRoom(
 			throw new NotFoundError("Failed to retrieve created room");
 		}
 
+		const newParticipants = populatedRoom.participants as Record<
+			string,
+			unknown
+		>;
 		sendSuccess(
 			res,
-			{ ...populatedRoom, id: populatedRoom._id.toString() },
+			{
+				...populatedRoom,
+				id: populatedRoom._id.toString(),
+				participants: {
+					student: newParticipants?.student
+						? addId(newParticipants.student as Record<string, unknown>)
+						: newParticipants?.student,
+					owner: newParticipants?.owner
+						? addId(newParticipants.owner as Record<string, unknown>)
+						: newParticipants?.owner,
+				},
+			},
 			"Chat room created successfully",
 		);
 	} catch (error) {
@@ -325,10 +387,20 @@ export async function getChatHistory(
 		const hasMore = messages.length > limit;
 		const rawResult = hasMore ? messages.slice(0, limit) : messages;
 
-		const result = rawResult.map((msg) => ({
-			...msg,
-			id: msg._id.toString(),
-		}));
+		const result = rawResult.map((msg) => {
+			const senderRef = msg.senderId as unknown as
+				| Record<string, unknown>
+				| undefined;
+			const isSenderPopulated = senderRef?._id != null;
+			return {
+				...msg,
+				id: msg._id.toString(),
+				senderId: isSenderPopulated
+					? (senderRef._id as { toString(): string }).toString()
+					: msg.senderId,
+				...(isSenderPopulated ? { sender: addId(senderRef) } : {}),
+			};
+		});
 
 		const nextCursor =
 			hasMore && rawResult.length > 0
@@ -401,7 +473,11 @@ export async function markMessageAsRead(
 			throw new NotFoundError("Message not found or already marked as read");
 		}
 
-		sendSuccess(res, message, "Message marked as read");
+		sendSuccess(
+			res,
+			addId(message as Record<string, unknown>),
+			"Message marked as read",
+		);
 	} catch (error) {
 		next(error);
 	}

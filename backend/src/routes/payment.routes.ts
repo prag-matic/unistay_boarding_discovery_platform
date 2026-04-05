@@ -1,6 +1,8 @@
 import type { Router } from "express";
 import { Router as createRouter } from "express";
+import { authenticate, requireRole } from "@/middleware/auth.js";
 import { paymentLimiter } from "@/middleware/rateLimit.js";
+import { validate } from "@/middleware/validate.js";
 import {
 	logPaymentSchema,
 	rejectPaymentSchema,
@@ -11,9 +13,9 @@ import {
 	getMyPayments,
 	logPayment,
 	rejectPayment,
+	uploadProofImage,
 } from "../controllers/payment.controller.js";
-import { authenticate, requireRole } from "@/middleware/auth.js";
-import { validate } from "@/middleware/validate.js";
+import { uploadPaymentProofMiddleware } from "@/middleware/upload.js";
 
 const router: Router = createRouter();
 
@@ -27,12 +29,15 @@ router.post(
 	logPayment,
 );
 
-router.get(
-	"/my-payments", 
-	authenticate, 
-	requireRole("STUDENT"), 
-	getMyPayments
+router.put(
+	"/proof-image",
+	authenticate,
+	requireRole("STUDENT"),
+	uploadPaymentProofMiddleware,
+	uploadProofImage,
 );
+
+router.get("/my-payments", authenticate, requireRole("STUDENT"), getMyPayments);
 
 router.get(
 	"/my-boardings",
