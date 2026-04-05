@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Marker, Callout, UrlTile } from 'react-native-maps';
 import { searchBoardings } from '@/lib/boarding';
 import { COLORS } from '@/lib/constants';
+import { MapAttribution } from '@/components/ui/MapAttribution';
 import type { Boarding } from '@/types/boarding.types';
 
 // Sri Lanka centre as the default region
@@ -80,6 +81,8 @@ export default function MapViewScreen() {
           </Marker>
         ))}
       </MapView>
+
+      <MapAttribution />
 
       {/* Top overlay: Back + Search + Buttons */}
       <View style={styles.topOverlay}>

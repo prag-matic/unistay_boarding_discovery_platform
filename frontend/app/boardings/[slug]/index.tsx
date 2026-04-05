@@ -21,6 +21,7 @@ import { getBoardingBySlug } from '@/lib/boarding';
 import { getBoardingReviewsById, getReviewStats } from '@/lib/review';
 import { useSaveBoarding } from '@/hooks/useSaveBoarding';
 import { COLORS } from '@/lib/constants';
+import { MapAttribution } from '@/components/ui/MapAttribution';
 import type { Boarding, AmenityName } from '@/types/boarding.types';
 import type { Review, ReviewStats } from '@/types/review.types';
 
@@ -374,6 +375,7 @@ export default function BoardingDetailsScreen() {
                 <Ionicons name="expand-outline" size={16} color={COLORS.white} />
                 <Text style={styles.mapExpandBtnText}>View on Map</Text>
               </TouchableOpacity>
+              <MapAttribution style={styles.mapAttributionOverride} />
               <View style={styles.mapAddressOverlay}>
                 <Ionicons name="location-outline" size={14} color={COLORS.primary} />
                 <Text style={styles.mapAddressText} numberOfLines={1}>
@@ -817,6 +819,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   mapAddressText: { fontSize: 12, color: COLORS.text, fontWeight: '500', flex: 1 },
+  // Attribution sits above the address overlay (address bar is ~34px tall)
+  mapAttributionOverride: { bottom: 38, left: 4 },
 
   // Owner card
   ownerCard: {

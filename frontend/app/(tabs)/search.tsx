@@ -20,6 +20,7 @@ import { useBoardingStore } from '@/store/boarding.store';
 import { useSaveBoarding } from '@/hooks/useSaveBoarding';
 import { searchBoardings } from '@/lib/boarding';
 import { COLORS } from '@/lib/constants';
+import { MapAttribution } from '@/components/ui/MapAttribution';
 import type { Boarding, SortOption } from '@/types/boarding.types';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -425,6 +426,7 @@ export default function ExploreScreen() {
               );
             })}
           </MapView>
+          <MapAttribution />
           {/* Boarding preview bottom sheet */}
           {mapSelected && (
             <MapBottomSheet
