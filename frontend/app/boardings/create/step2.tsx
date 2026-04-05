@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
-  Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +15,7 @@ import MapView, { Marker, UrlTile, MapPressEvent } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useBoardingStore } from '@/store/boarding.store';
 import { COLORS } from '@/lib/constants';
+import { MapAttribution } from '@/components/ui/MapAttribution';
 
 const DISTRICTS = [
   'Colombo', 'Gampaha', 'Kalutara', 'Kandy', 'Matale', 'Nuwara Eliya',
@@ -188,46 +188,49 @@ export default function CreateStep2Screen() {
         <Text style={styles.label}>Map Location *</Text>
         <Text style={styles.mapHint}>Tap on the map to pin the exact location of your boarding</Text>
         <View style={styles.mapContainer}>
-          <MapView
-            ref={mapRef}
-            style={styles.map}
-            mapType="none"
-            initialRegion={
-              markerCoordinate
-                ? { ...markerCoordinate, latitudeDelta: 0.02, longitudeDelta: 0.02 }
-                : SRI_LANKA_INITIAL_REGION
-            }
-            onPress={handleMapPress}
-          >
-            <UrlTile
-              urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-              maximumZ={19}
-              flipY={false}
-            />
-            {markerCoordinate && (
-              <Marker
-                coordinate={markerCoordinate}
-                draggable
-                onDragEnd={(e) => {
-                  const { latitude, longitude } = e.nativeEvent.coordinate;
-                  setLat(latitude.toFixed(6));
-                  setLng(longitude.toFixed(6));
-                }}
-              >
-                <View style={styles.locationPin}>
-                  <Ionicons name="location" size={32} color={COLORS.primary} />
+          <View style={styles.mapViewWrapper}>
+            <MapView
+              ref={mapRef}
+              style={styles.map}
+              mapType="none"
+              initialRegion={
+                markerCoordinate
+                  ? { ...markerCoordinate, latitudeDelta: 0.02, longitudeDelta: 0.02 }
+                  : SRI_LANKA_INITIAL_REGION
+              }
+              onPress={handleMapPress}
+            >
+              <UrlTile
+                urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+                maximumZ={19}
+                flipY={false}
+              />
+              {markerCoordinate && (
+                <Marker
+                  coordinate={markerCoordinate}
+                  draggable
+                  onDragEnd={(e) => {
+                    const { latitude, longitude } = e.nativeEvent.coordinate;
+                    setLat(latitude.toFixed(6));
+                    setLng(longitude.toFixed(6));
+                  }}
+                >
+                  <View style={styles.locationPin}>
+                    <Ionicons name="location" size={32} color={COLORS.primary} />
+                  </View>
+                </Marker>
+              )}
+            </MapView>
+            {!markerCoordinate && (
+              <View style={styles.mapOverlayHint} pointerEvents="none">
+                <View style={styles.mapOverlayBadge}>
+                  <Ionicons name="finger-print-outline" size={16} color={COLORS.text} />
+                  <Text style={styles.mapOverlayText}>Tap to pin location</Text>
                 </View>
-              </Marker>
-            )}
-          </MapView>
-          {!markerCoordinate && (
-            <View style={styles.mapOverlayHint} pointerEvents="none">
-              <View style={styles.mapOverlayBadge}>
-                <Ionicons name="finger-print-outline" size={16} color={COLORS.text} />
-                <Text style={styles.mapOverlayText}>Tap to pin location</Text>
               </View>
-            </View>
-          )}
+            )}
+            <MapAttribution />
+          </View>
           <TouchableOpacity
             style={[styles.locationBtn, isLocating && styles.locationBtnDisabled]}
             onPress={handleUseLocation}
@@ -346,19 +349,22 @@ const styles = StyleSheet.create({
   dropdownItemText: { fontSize: 14, color: COLORS.text },
   dropdownItemActive: { color: COLORS.primary, fontWeight: '600' },
   mapContainer: { gap: 8 },
-  map: {
+  mapViewWrapper: {
     height: 220,
     borderRadius: 12,
-    overflow: Platform.OS === 'ios' ? 'hidden' : 'visible',
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: COLORS.grayBorder,
+  },
+  map: {
+    ...StyleSheet.absoluteFillObject,
   },
   mapOverlayHint: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    bottom: 40,
+    bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
