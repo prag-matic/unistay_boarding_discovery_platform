@@ -60,10 +60,15 @@ const TOP_AMENITIES = Object.keys(AMENITY_ICONS);
 const DEFAULT_LATITUDE = 7.8731;
 const DEFAULT_LONGITUDE = 80.7718;
 const MAP_REGION = {
-  latitude: DEFAULT_LATITUDE,
-  longitude: DEFAULT_LONGITUDE,
-  latitudeDelta: 4.0,
-  longitudeDelta: 4.0,
+  latitude: 6.915137412076758,
+  longitude: 79.9731566669944,
+  latitudeDelta: 0.1,
+  longitudeDelta: 0.1,
+};
+
+const MAP_CAMERA_BOUNDARY = {
+  northEast: { latitude: 7.035961932644662, longitude: 80.19100325001236 },
+  southWest: { latitude: 6.8302835564392455, longitude: 79.89361663337401 },
 };
 
 // ─── Boarding List Card (full-width, horizontal) ──────────────────────────────
@@ -399,6 +404,9 @@ export default function ExploreScreen() {
             style={styles.map}
             provider={PROVIDER_GOOGLE}
             initialRegion={MAP_REGION}
+            cameraBoundary={MAP_CAMERA_BOUNDARY}
+            minZoomLevel={14}
+            maxZoomLevel={18}
             showsUserLocation
             showsMyLocationButton
           >
