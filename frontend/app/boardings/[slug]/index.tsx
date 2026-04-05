@@ -14,13 +14,12 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Marker, UrlTile } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useAuthStore } from '@/store/auth.store';
 import { getBoardingBySlug } from '@/lib/boarding';
 import { getBoardingReviewsById, getReviewStats } from '@/lib/review';
 import { useSaveBoarding } from '@/hooks/useSaveBoarding';
-import { COLORS, TILE_URL } from '@/lib/constants';
-import { MapAttribution } from '@/components/ui/MapAttribution';
+import { COLORS } from '@/lib/constants';
 import type { Boarding, AmenityName } from '@/types/boarding.types';
 import type { Review, ReviewStats } from '@/types/review.types';
 
@@ -345,7 +344,7 @@ export default function BoardingDetailsScreen() {
             <View style={styles.mapWrapper}>
               <MapView
                 style={styles.embeddedMap}
-                mapType="none"
+                provider={PROVIDER_GOOGLE}
                 initialRegion={{
                   latitude: boarding.latitude,
                   longitude: boarding.longitude,
@@ -357,11 +356,6 @@ export default function BoardingDetailsScreen() {
                 rotateEnabled={false}
                 pitchEnabled={false}
               >
-                <UrlTile
-                  urlTemplate={`${TILE_URL}/{z}/{x}/{y}.png`}
-                  maximumZ={19}
-                  flipY={false}
-                />
                 <Marker coordinate={{ latitude: boarding.latitude, longitude: boarding.longitude }}>
                   <View style={styles.mapPin}>
                     <Ionicons name="location" size={30} color={COLORS.primary} />
@@ -376,7 +370,6 @@ export default function BoardingDetailsScreen() {
                 <Ionicons name="expand-outline" size={16} color={COLORS.white} />
                 <Text style={styles.mapExpandBtnText}>View on Map</Text>
               </TouchableOpacity>
-              <MapAttribution style={styles.mapAttributionOverride} />
               <View style={styles.mapAddressOverlay}>
                 <Ionicons name="location-outline" size={14} color={COLORS.primary} />
                 <Text style={styles.mapAddressText} numberOfLines={1}>
