@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  FlatList,
   Image,
   ActivityIndicator,
   Dimensions,
@@ -572,20 +571,20 @@ function StudentHome({ firstName }: { firstName: string }) {
         <View style={styles.sectionLoader}>
           <ActivityIndicator size="small" color={COLORS.primary} />
         </View>
+      ) : recommended.length === 0 ? (
+        <View style={styles.horizontalEmpty}>
+          <Text style={styles.horizontalEmptyText}>No boardings available right now</Text>
+        </View>
       ) : (
-        <FlatList
-          data={recommended}
+        <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          keyExtractor={(item) => item.id}
           contentContainerStyle={styles.horizontalList}
-          renderItem={({ item }) => <BoardingCard item={item} />}
-          ListEmptyComponent={
-            <View style={styles.horizontalEmpty}>
-              <Text style={styles.horizontalEmptyText}>No boardings available right now</Text>
-            </View>
-          }
-        />
+        >
+          {recommended.map((item) => (
+            <BoardingCard key={item.id} item={item} />
+          ))}
+        </ScrollView>
       )}
 
       {/* Bottom CTA */}
@@ -787,24 +786,24 @@ function OwnerHome({ firstName }: { firstName: string }) {
         <View style={styles.sectionLoader}>
           <ActivityIndicator size="small" color={COLORS.primary} />
         </View>
+      ) : activeListings.length === 0 ? (
+        <TouchableOpacity
+          style={styles.emptyListingCard}
+          onPress={() => router.push('/boardings/create/step1' as never)}
+        >
+          <Ionicons name="add-circle-outline" size={32} color={COLORS.primary} />
+          <Text style={styles.emptyListingText}>Create your first listing</Text>
+        </TouchableOpacity>
       ) : (
-        <FlatList
-          data={activeListings}
+        <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          keyExtractor={(item) => item.id}
           contentContainerStyle={styles.horizontalList}
-          renderItem={({ item }) => <BoardingCard item={item} showOccupancy />}
-          ListEmptyComponent={
-            <TouchableOpacity
-              style={styles.emptyListingCard}
-              onPress={() => router.push('/boardings/create/step1' as never)}
-            >
-              <Ionicons name="add-circle-outline" size={32} color={COLORS.primary} />
-              <Text style={styles.emptyListingText}>Create your first listing</Text>
-            </TouchableOpacity>
-          }
-        />
+        >
+          {activeListings.map((item) => (
+            <BoardingCard key={item.id} item={item} showOccupancy />
+          ))}
+        </ScrollView>
       )}
 
       {/* Pending Listings */}
