@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Marker, UrlTile, MapPressEvent } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useBoardingStore } from '@/store/boarding.store';
-import { COLORS } from '@/lib/constants';
+import { COLORS, TILE_URL } from '@/lib/constants';
 import { MapAttribution } from '@/components/ui/MapAttribution';
 
 const DISTRICTS = [
@@ -201,7 +201,7 @@ export default function CreateStep2Screen() {
               onPress={handleMapPress}
             >
               <UrlTile
-                urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+                urlTemplate={`${TILE_URL}/{z}/{x}/{y}.png`}
                 maximumZ={19}
                 flipY={false}
               />
