@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,13 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
+  Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import MapView, { Marker, UrlTile, MapPressEvent } from 'react-native-maps';
+import * as Location from 'expo-location';
 import { useBoardingStore } from '@/store/boarding.store';
 import { COLORS } from '@/lib/constants';
 
@@ -25,6 +28,13 @@ const SRI_LANKA_LAT_MIN = 5.9;
 const SRI_LANKA_LAT_MAX = 9.9;
 const SRI_LANKA_LNG_MIN = 79.5;
 const SRI_LANKA_LNG_MAX = 81.9;
+
+const SRI_LANKA_INITIAL_REGION = {
+  latitude: 7.8731,
+  longitude: 80.7718,
+  latitudeDelta: 4.0,
+  longitudeDelta: 4.0,
+};
 
 function ProgressBar({ step, total }: { step: number; total: number }) {
   return (
@@ -46,12 +56,46 @@ export default function CreateStep2Screen() {
   const [showDistricts, setShowDistricts] = useState(false);
   const [lat, setLat] = useState(String(createDraft.latitude ?? ''));
   const [lng, setLng] = useState(String(createDraft.longitude ?? ''));
+  const [isLocating, setIsLocating] = useState(false);
+  const mapRef = useRef<MapView>(null);
 
-  const handleUseLocation = () => {
-    // Mock current location
-    setLat('6.9271');
-    setLng('79.8612');
-    Alert.alert('Location Set', 'Using mock location: Colombo, Sri Lanka');
+  const markerCoordinate =
+    lat && lng && !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lng))
+      ? { latitude: parseFloat(lat), longitude: parseFloat(lng) }
+      : null;
+
+  const handleMapPress = (e: MapPressEvent) => {
+    const { latitude, longitude } = e.nativeEvent.coordinate;
+    setLat(latitude.toFixed(6));
+    setLng(longitude.toFixed(6));
+  };
+
+  const handleUseLocation = async () => {
+    setIsLocating(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Denied',
+          'Location permission is required to use this feature. Please enable it in your device settings.',
+        );
+        return;
+      }
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      const { latitude, longitude } = location.coords;
+      setLat(latitude.toFixed(6));
+      setLng(longitude.toFixed(6));
+      mapRef.current?.animateToRegion(
+        { latitude, longitude, latitudeDelta: 0.02, longitudeDelta: 0.02 },
+        600,
+      );
+    } catch {
+      Alert.alert('Error', 'Could not retrieve your current location. Please try again.');
+    } finally {
+      setIsLocating(false);
+    }
   };
 
   const validate = () => {
@@ -139,17 +183,59 @@ export default function CreateStep2Screen() {
           </View>
         )}
 
-        {/* Map placeholder */}
-        <Text style={styles.label}>Map Location</Text>
+        {/* Map Location Picker */}
+        <Text style={styles.label}>Map Location *</Text>
+        <Text style={styles.mapHint}>Tap on the map to pin the exact location of your boarding</Text>
         <View style={styles.mapContainer}>
-          <View style={styles.mapPlaceholder}>
-            <Ionicons name="map-outline" size={40} color={COLORS.gray} />
-            <Text style={styles.mapPlaceholderText}>Interactive map coming soon</Text>
-            <Text style={styles.mapPlaceholderSub}>Drag the marker to set exact location</Text>
-          </View>
-          <TouchableOpacity style={styles.locationBtn} onPress={handleUseLocation}>
-            <Ionicons name="locate-outline" size={16} color={COLORS.primary} />
-            <Text style={styles.locationBtnText}>Use My Current Location</Text>
+          <MapView
+            ref={mapRef}
+            style={styles.map}
+            mapType="none"
+            initialRegion={
+              markerCoordinate
+                ? { ...markerCoordinate, latitudeDelta: 0.02, longitudeDelta: 0.02 }
+                : SRI_LANKA_INITIAL_REGION
+            }
+            onPress={handleMapPress}
+          >
+            <UrlTile
+              urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+              maximumZ={19}
+              flipY={false}
+            />
+            {markerCoordinate && (
+              <Marker
+                coordinate={markerCoordinate}
+                draggable
+                onDragEnd={(e) => {
+                  const { latitude, longitude } = e.nativeEvent.coordinate;
+                  setLat(latitude.toFixed(6));
+                  setLng(longitude.toFixed(6));
+                }}
+              >
+                <View style={styles.locationPin}>
+                  <Ionicons name="location" size={32} color={COLORS.primary} />
+                </View>
+              </Marker>
+            )}
+          </MapView>
+          {!markerCoordinate && (
+            <View style={styles.mapOverlayHint} pointerEvents="none">
+              <View style={styles.mapOverlayBadge}>
+                <Ionicons name="finger-print-outline" size={16} color={COLORS.text} />
+                <Text style={styles.mapOverlayText}>Tap to pin location</Text>
+              </View>
+            </View>
+          )}
+          <TouchableOpacity
+            style={[styles.locationBtn, isLocating && styles.locationBtnDisabled]}
+            onPress={handleUseLocation}
+            disabled={isLocating}
+          >
+            <Ionicons name="locate-outline" size={16} color={isLocating ? COLORS.gray : COLORS.primary} />
+            <Text style={[styles.locationBtnText, isLocating && styles.locationBtnTextDisabled]}>
+              {isLocating ? 'Getting Location…' : 'Use My Current Location'}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -259,18 +345,39 @@ const styles = StyleSheet.create({
   dropdownItemText: { fontSize: 14, color: COLORS.text },
   dropdownItemActive: { color: COLORS.primary, fontWeight: '600' },
   mapContainer: { gap: 8 },
-  mapPlaceholder: {
-    backgroundColor: COLORS.grayLight,
+  map: {
+    height: 220,
     borderRadius: 12,
-    height: 160,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
+    overflow: Platform.OS === 'ios' ? 'hidden' : 'visible',
     borderWidth: 1,
     borderColor: COLORS.grayBorder,
   },
-  mapPlaceholderText: { fontSize: 14, color: COLORS.textSecondary, fontWeight: '500' },
-  mapPlaceholderSub: { fontSize: 12, color: COLORS.gray },
+  mapOverlayHint: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mapOverlayBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  mapOverlayText: { fontSize: 13, fontWeight: '600', color: COLORS.text },
+  mapHint: { fontSize: 12, color: COLORS.textSecondary, marginBottom: 4 },
+  locationPin: { alignItems: 'center' },
   locationBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -279,7 +386,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 12,
   },
+  locationBtnDisabled: { backgroundColor: COLORS.grayLight },
   locationBtnText: { fontSize: 14, color: COLORS.primary, fontWeight: '600' },
+  locationBtnTextDisabled: { color: COLORS.gray },
   coordsRow: { flexDirection: 'row', gap: 10 },
   coordInput: { backgroundColor: COLORS.grayLight },
   footer: {
