@@ -5,8 +5,8 @@ export interface DetailedPayment {
   reservationId: string;
   rentalPeriodId: string;
   studentId: string;
-  /** Prisma Decimal serialised as string, e.g. "14000.00" */
-  amount: string;
+  /** MongoDB Number serialised as a JSON number */
+  amount: number;
   paymentMethod: PaymentMethod;
   status: PaymentStatus;
   paidAt: string | null;

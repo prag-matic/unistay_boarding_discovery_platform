@@ -7,7 +7,7 @@ export interface User {
   email: string;
   role: UserRole;
   username?: string;
-  avatar?: string;
+  profileImageUrl?: string;
   phone?: string;
   university?: string;
   nicNumber?: string;
@@ -23,5 +23,5 @@ export interface UpdateProfileRequest {
   phone?: string;
   university?: string;
   nicNumber?: string;
-  avatar?: string;
+  profileImageUrl?: string;
 }

@@ -3,7 +3,6 @@ import logger from './logger';
 import type { UniStayApiResponse } from '@/types/api.types';
 import type {
   Boarding,
-  BoardingReview,
   BoardingType,
   GenderPreference,
   AmenityName,
@@ -154,14 +153,5 @@ export async function deleteBoardingImage(id: string, imageId: string) {
   const response = await api.delete<UniStayApiResponse<null>>(
     `/boardings/${id}/images/${imageId}`,
   );
-  return response.data;
-}
-
-export async function getBoardingReviews(slug: string) {
-  logger.boarding.debug('getBoardingReviews', { slug });
-  const response = await api.get<UniStayApiResponse<{ reviews: BoardingReview[] }>>(
-    `/boardings/${slug}/reviews`,
- );
- 
   return response.data;
 }
