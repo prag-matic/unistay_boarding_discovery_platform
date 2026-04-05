@@ -5,7 +5,11 @@ import {
 	ReviewCommentReaction,
 	ReviewReaction,
 } from "@/models/index.js";
-import { openinary } from "../lib/openinary.js";
+import {
+	deleteCloudinaryAsset,
+	uploadReviewImage,
+	uploadReviewVideo,
+} from "@/lib/cloudinary.js";
 import type {
 	CreateReviewCommentInput,
 	CreateReviewInput,
@@ -18,6 +22,15 @@ import type {
  * Handles all review-related business logic
  */
 
+/**
+ * Extracts the Cloudinary public_id from a Cloudinary secure URL.
+ * e.g. https://res.cloudinary.com/cloud/image/upload/v123/folder/file.jpg → folder/file
+ */
+function extractCloudinaryPublicId(url: string): string {
+	const match = url.match(/\/upload\/(?:v\d+\/)?(.+)\.[^.]+$/);
+	return match?.[1] ?? "";
+}
+
 export class ReviewService {
 	/**
 	 * Create a new review
@@ -29,26 +42,24 @@ export class ReviewService {
 		images?: Express.Multer.File[],
 		video?: Express.Multer.File,
 	) {
-		// Upload images to Openinary (convert to WebP)
+		// Upload images to Cloudinary
 		const imagePaths: string[] = [];
 		if (images && images.length > 0) {
 			for (const image of images) {
-				const result = await openinary.uploadImageWebp(
+				const result = await uploadReviewImage(
 					image.buffer,
-					`reviews/${boardingId}/images`,
+					image.mimetype,
+					boardingId,
 				);
-				imagePaths.push(result.path);
+				imagePaths.push(result.url);
 			}
 		}
 
-		// Upload video to Openinary (convert to WebM)
+		// Upload video to Cloudinary
 		let videoPath: string | null = null;
 		if (video) {
-			const result = await openinary.uploadVideoWebm(
-				video.buffer,
-				`reviews/${boardingId}/videos`,
-			);
-			videoPath = result.path;
+			const result = await uploadReviewVideo(video.buffer, boardingId);
+			videoPath = result.url;
 		}
 
 		// Create review in database
@@ -64,7 +75,7 @@ export class ReviewService {
 		const populatedReview = await Review.findById(review._id)
 			.populate("boardingId", "id title boardingType address city")
 			.populate("studentId", "id firstName lastName email")
-			.lean();
+			.lean({ virtuals: true });
 
 		return populatedReview;
 	}
@@ -156,6 +167,114 @@ export class ReviewService {
 	}
 
 	/**
+	 * Get all reviews written by a specific student
+	 */
+	async getMyReviews(
+		studentId: string,
+		options?: {
+			page?: number;
+			limit?: number;
+			sortBy?: "rating" | "commentedAt";
+			sortOrder?: "asc" | "desc";
+		},
+	) {
+		const {
+			page = 1,
+			limit = 10,
+			sortBy = "commentedAt",
+			sortOrder = "desc",
+		} = options ?? {};
+
+		const skip = (page - 1) * limit;
+
+		const [reviews, total] = await Promise.all([
+			Review.find({ studentId: new mongoose.Types.ObjectId(studentId) })
+				.populate({
+					path: "boardingId",
+					select: "id title boardingType address city",
+				})
+				.sort({ [sortBy]: sortOrder })
+				.skip(skip)
+				.limit(limit)
+				.lean({ virtuals: true }),
+
+			Review.countDocuments({
+				studentId: new mongoose.Types.ObjectId(studentId),
+			}),
+		]);
+
+		return {
+			data: reviews,
+			pagination: {
+				page,
+				limit,
+				total,
+				totalPages: Math.ceil(total / limit),
+			},
+		};
+	}
+
+	/**
+	 * Get all reviews for boardings owned by a specific user
+	 */
+	async getMyBoardingReviews(
+		ownerId: string,
+		options?: {
+			page?: number;
+			limit?: number;
+			sortBy?: "rating" | "commentedAt";
+			sortOrder?: "asc" | "desc";
+		},
+	) {
+		const {
+			page = 1,
+			limit = 10,
+			sortBy = "commentedAt",
+			sortOrder = "desc",
+		} = options ?? {};
+
+		const skip = (page - 1) * limit;
+
+		// Find all boardings owned by this user
+		const { Boarding } = await import("@/models/index.js");
+		const boardingIds = await Boarding.find({
+			ownerId: new mongoose.Types.ObjectId(ownerId),
+		})
+			.select("_id")
+			.lean();
+
+		const ids = boardingIds.map((b) => b._id);
+
+		const [reviews, total] = await Promise.all([
+			Review.find({ boardingId: { $in: ids } })
+				.populate({
+					path: "boardingId",
+					select: "id title boardingType address city",
+				})
+				.populate({
+					path: "studentId",
+					select: "id firstName lastName email",
+				})
+				.sort({ [sortBy]: sortOrder })
+				.skip(skip)
+				.limit(limit)
+				.lean({ virtuals: true }),
+
+			Review.countDocuments({ boardingId: { $in: ids } }),
+		]);
+
+		return {
+			data: reviews,
+			pagination: {
+				page,
+				limit,
+				total,
+				totalPages: Math.ceil(total / limit),
+			},
+		};
+	}
+
+	/**
 	 * Update a review (one-time edit only)
 	 */
 	async updateReview(
@@ -188,47 +307,47 @@ export class ReviewService {
 		// Upload new images if provided
 		let imagePaths: string[] = existingReview.images;
 		if (images && images.length > 0) {
-			// Delete old images
-			for (const oldPath of existingReview.images) {
+			// Delete old images from Cloudinary
+			for (const oldUrl of existingReview.images) {
 				try {
-					const publicId = oldPath.split("/").pop()?.split(".")[0] || "";
-					if (publicId) await openinary.delete(publicId);
+					const publicId = extractCloudinaryPublicId(oldUrl);
+					if (publicId) await deleteCloudinaryAsset(publicId, "image");
 				} catch {
 					// Ignore delete errors
 				}
 			}
 
-			// Upload new images
+			// Upload new images to Cloudinary
 			imagePaths = [];
 			for (const image of images) {
-				const result = await openinary.uploadImageWebp(
+				const result = await uploadReviewImage(
 					image.buffer,
-					`reviews/${existingReview.boardingId}/images`,
+					image.mimetype,
+					existingReview.boardingId.toString(),
 				);
-				imagePaths.push(result.path);
+				imagePaths.push(result.url);
 			}
 		}
 
 		// Upload new video if provided
 		let videoPath: string | null = existingReview.video || null;
 		if (video) {
-			// Delete old video
+			// Delete old video from Cloudinary
 			if (existingReview.video) {
 				try {
-					const publicId =
-						existingReview.video.split("/").pop()?.split(".")[0] || "";
-					if (publicId) await openinary.delete(publicId);
+					const publicId = extractCloudinaryPublicId(existingReview.video);
+					if (publicId) await deleteCloudinaryAsset(publicId, "video");
 				} catch {
 					// Ignore delete errors
 				}
 			}
 
-			// Upload new video
-			const result = await openinary.uploadVideoWebm(
+			// Upload new video to Cloudinary
+			const result = await uploadReviewVideo(
 				video.buffer,
-				`reviews/${existingReview.boardingId}/videos`,
+				existingReview.boardingId.toString(),
 			);
-			videoPath = result.path;
+			videoPath = result.url;
 		}
 
 		// Update review
@@ -268,22 +387,21 @@ export class ReviewService {
 			throw new Error("You can only delete your own reviews");
 		}
 
-		// Delete images from Openinary
-		for (const imagePath of existingReview.images) {
+		// Delete images from Cloudinary
+		for (const imageUrl of existingReview.images) {
 			try {
-				const publicId = imagePath.split("/").pop()?.split(".")[0] || "";
-				if (publicId) await openinary.delete(publicId);
+				const publicId = extractCloudinaryPublicId(imageUrl);
+				if (publicId) await deleteCloudinaryAsset(publicId, "image");
 			} catch {
 				// Ignore delete errors
 			}
 		}
 
-		// Delete video from Openinary
+		// Delete video from Cloudinary
 		if (existingReview.video) {
 			try {
-				const publicId =
-					existingReview.video.split("/").pop()?.split(".")[0] || "";
-				if (publicId) await openinary.delete(publicId);
+				const publicId = extractCloudinaryPublicId(existingReview.video);
+				if (publicId) await deleteCloudinaryAsset(publicId, "video");
 			} catch {
 				// Ignore delete errors
 			}
