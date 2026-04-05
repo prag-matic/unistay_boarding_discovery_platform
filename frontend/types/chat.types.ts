@@ -9,7 +9,7 @@ export interface ChatUser {
 
 export interface ChatBoarding {
   id: string;
-  title: string;
+  propertyName: string;
   address: string;
   city: string;
 }

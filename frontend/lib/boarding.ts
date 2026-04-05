@@ -149,7 +149,6 @@ export async function deleteBoardingImage(id: string, imageId: string) {
 export async function getBoardingReviews(slug: string) {
   const response = await api.get<UniStayApiResponse<{ reviews: BoardingReview[] }>>(
     `/boardings/${slug}/reviews`,
- );
- 
+  );
   return response.data;
 }

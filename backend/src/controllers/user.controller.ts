@@ -13,7 +13,6 @@ import { sendSuccess } from "@/lib/response.js";
 import { User } from "@/models/index.js";
 import type { UpdateUserInput } from "@/schemas/index.js";
 import type { ChangePasswordInput } from "@/schemas/user.validators.js";
-import { addId } from "@/utils/index.js";
 
 function sanitizeUser(user: unknown) {
 	if (!user || typeof user !== "object") return {};
@@ -35,7 +34,7 @@ export async function getMe(
 
 		if (!user) throw new UserNotFoundError();
 
-		sendSuccess(res, sanitizeUser(addId(user as Record<string, unknown>)));
+		sendSuccess(res, sanitizeUser(user));
 	} catch (error) {
 		next(error);
 	}
@@ -64,11 +63,7 @@ export async function updateMe(
 			{ new: true },
 		).lean();
 
-		sendSuccess(
-			res,
-			sanitizeUser(addId(user as Record<string, unknown>)),
-			"Profile Updated Successfully",
-		);
+		sendSuccess(res, sanitizeUser(user), "Profile Updated Successfully");
 	} catch (error) {
 		next(error);
 	}

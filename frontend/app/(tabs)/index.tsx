@@ -519,12 +519,12 @@ function StudentHome({ firstName }: { firstName: string }) {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.stuManageCard}
-            onPress={() => router.push('/my-reviews' as never)}
+            onPress={() => router.push('/(tabs)/search' as never)}
           >
             <View style={[styles.quickActionIcon, { backgroundColor: '#FDF4FF' }]}>
-              <Ionicons name="star-outline" size={22} color="#9333EA" />
+              <Ionicons name="search-outline" size={22} color="#9333EA" />
             </View>
-            <Text style={styles.quickActionLabel}>My Reviews</Text>
+            <Text style={styles.quickActionLabel}>Find Boarding</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -645,7 +645,6 @@ function OwnerHome({ firstName }: { firstName: string }) {
     getBoardingPayments()
       .then((r) => setOwnerPayments(r.data.payments))
       .catch(() => setOwnerPayments([]));
-
   }, []));
 
   const pendingPayments = ownerPayments.filter((p) => p.status === 'PENDING');

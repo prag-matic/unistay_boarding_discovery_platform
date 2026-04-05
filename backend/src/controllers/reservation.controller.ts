@@ -7,8 +7,8 @@ import {
 	ForbiddenError,
 	NotFoundError,
 } from "@/errors/AppError.js";
-import { withMongoTransaction } from "@/lib/mongodb.js";
 import { sendSuccess } from "@/lib/response.js";
+import { withMongoTransaction } from "@/lib/mongodb.js";
 import { Boarding, RentalPeriod, Reservation } from "@/models/index.js";
 
 import type {
@@ -16,7 +16,6 @@ import type {
 	RejectReservationInput,
 } from "@/schemas/reservation.validators.js";
 import { BoardingStatus, ReservationStatus } from "@/types/enums.js";
-import { transformReservationDoc } from "@/utils/index.js";
 
 const RESERVATION_EXPIRY_HOURS = 72;
 
@@ -151,11 +150,7 @@ export async function createReservation(
 
 		sendSuccess(
 			res,
-			{
-				reservation: transformReservationDoc(
-					populatedReservation as Record<string, unknown>,
-				),
-			},
+			{ reservation: populatedReservation },
 			"Reservation request created successfully",
 			201,
 		);
@@ -184,11 +179,7 @@ export async function getMyRequests(
 			.sort({ createdAt: -1 })
 			.lean();
 
-		sendSuccess(res, {
-			reservations: (reservations as Record<string, unknown>[]).map(
-				transformReservationDoc,
-			),
-		});
+		sendSuccess(res, { reservations });
 	} catch (err) {
 		next(err);
 	}
@@ -229,11 +220,7 @@ export async function getMyBoardingRequests(
 			.sort({ createdAt: -1 })
 			.lean();
 
-		sendSuccess(res, {
-			reservations: (reservations as Record<string, unknown>[]).map(
-				transformReservationDoc,
-			),
-		});
+		sendSuccess(res, { reservations });
 	} catch (err) {
 		next(err);
 	}
@@ -272,11 +259,7 @@ export async function getReservationById(
 			}
 		}
 
-		sendSuccess(res, {
-			reservation: transformReservationDoc(
-				reservation as Record<string, unknown>,
-			),
-		});
+		sendSuccess(res, { reservation });
 	} catch (err) {
 		next(err);
 	}
@@ -355,11 +338,7 @@ export async function approveReservation(
 		res.status(200).json({
 			success: true,
 			message: "Reservation approved",
-			data: {
-				reservation: transformReservationDoc(
-					updatedReservation as Record<string, unknown>,
-				),
-			},
+			data: { reservation: updatedReservation },
 			timestamp: new Date().toISOString(),
 		});
 	} catch (err) {
@@ -408,15 +387,7 @@ export async function rejectReservation(
 			.populate("boardingId", "title slug city district")
 			.lean();
 
-		sendSuccess(
-			res,
-			{
-				reservation: transformReservationDoc(
-					reservation as Record<string, unknown>,
-				),
-			},
-			"Reservation rejected",
-		);
+		sendSuccess(res, { reservation }, "Reservation rejected");
 	} catch (err) {
 		next(err);
 	}
@@ -468,19 +439,11 @@ export async function cancelReservation(
 					{
 						$inc: { currentOccupants: -1 },
 					},
-					session ? { session } : {},
+					(session ? { session } : {}),
 				);
 			}
 
-			sendSuccess(
-				res,
-				{
-					reservation: transformReservationDoc(
-						updated as Record<string, unknown>,
-					),
-				},
-				"Reservation cancelled",
-			);
+			sendSuccess(res, { reservation: updated }, "Reservation cancelled");
 		});
 	} catch (err) {
 		next(err);
@@ -533,18 +496,10 @@ export async function completeReservation(
 				{
 					$inc: { currentOccupants: -1 },
 				},
-				session ? { session } : {},
+				(session ? { session } : {}),
 			);
 
-			sendSuccess(
-				res,
-				{
-					reservation: transformReservationDoc(
-						updated as Record<string, unknown>,
-					),
-				},
-				"Reservation completed",
-			);
+			sendSuccess(res, { reservation: updated }, "Reservation completed");
 		});
 	} catch (err) {
 		next(err);

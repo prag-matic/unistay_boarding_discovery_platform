@@ -4,6 +4,7 @@ const MONGODB_URI =
 	process.env.MONGODB_URI || "mongodb://localhost:27017/unistay_db";
 
 export async function connectDB(): Promise<void> {
+
 	try {
 		await mongoose.connect(MONGODB_URI);
 		console.log(
@@ -16,8 +17,7 @@ export async function connectDB(): Promise<void> {
 }
 
 export function supportsMongoTransactions(): boolean {
-	const topologyType = (mongoose.connection as any)?.client?.topology
-		?.description?.type;
+	const topologyType = (mongoose.connection as any)?.client?.topology?.description?.type;
 	return topologyType === "ReplicaSetWithPrimary" || topologyType === "Sharded";
 }
 

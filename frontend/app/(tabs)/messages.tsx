@@ -345,7 +345,7 @@ export default function MessagesScreen() {
               <View style={styles.boardingTag}>
                 <Ionicons name="home-outline" size={12} color={COLORS.gray} />
                 <Text style={styles.boardingTagText} numberOfLines={1}>
-                  {item.boardingId.title}
+                  {item.boardingId.propertyName}
                 </Text>
               </View>
             )}
@@ -510,7 +510,7 @@ export default function MessagesScreen() {
                 </View>
               ) : currentRoom.boardingId ? (
                 <Text style={styles.headerSubtitle} numberOfLines={1}>
-                  {currentRoom.boardingId.title}
+                  {currentRoom.boardingId.propertyName}
                 </Text>
               ) : null}
             </View>

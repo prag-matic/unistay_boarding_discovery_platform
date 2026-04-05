@@ -108,33 +108,34 @@ export async function uploadBoardingImage(
 }
 
 export async function uploadPaymentProofImage(
-	fileBuffer: Buffer,
-	mimetype: string,
+  	fileBuffer: Buffer,
+  	mimetype: string,
+	
 ): Promise<string> {
+  
 	if (!ensureConfigured()) {
-		throw new Error(
-			"Cloudinary is not configured. Please set CLOUDINARY_* environment variables.",
-		);
-	}
-
+    	throw new Error('Cloudinary is not configured. Please set CLOUDINARY_* environment variables.');
+  	}
+  
 	return new Promise((resolve, reject) => {
-		const uploadStream = cloudinary.uploader.upload_stream(
-			{
-				folder: "unistay/payment-proofs",
-				resource_type: "image",
-				format: mimetype === "image/png" ? "png" : "jpg",
-			},
+    	const uploadStream = cloudinary.uploader.upload_stream({
+        	folder: 'unistay/payment-proofs',
+        	resource_type: 'image',
+        	format: mimetype === 'image/png' ? 'png' : 'jpg',
+      	},
 
-			(error, result) => {
-				if (error || !result) {
-					return reject(error ?? new Error("Upload failed"));
-				}
+      	(error, result) => {
+			
+        	if (error || !result) {
+          		return reject(error ?? new Error('Upload failed'));
+        	}
+        
+			resolve(result.secure_url);
+      	},
+    );
 
-				resolve(result.secure_url);
-			},
-		);
-
-		uploadStream.end(fileBuffer);
+    uploadStream.end(fileBuffer);
+  
 	});
 }
 
@@ -144,30 +145,28 @@ export async function uploadReviewImage(
 	boardingId: string,
 ): Promise<CloudinaryUploadResult> {
 	if (!ensureConfigured()) {
-		throw new Error(
-			"Cloudinary is not configured. Please set CLOUDINARY_* environment variables.",
-		);
+		throw new Error('Cloudinary is not configured. Please set CLOUDINARY_* environment variables.');
 	}
 
 	let format: string | undefined;
-	if (mimetype === "image/png") {
-		format = "png";
-	} else if (mimetype === "image/webp") {
-		format = "webp";
-	} else if (mimetype === "image/jpeg" || mimetype === "image/jpg") {
-		format = "jpg";
+	if (mimetype === 'image/png') {
+		format = 'png';
+	} else if (mimetype === 'image/webp') {
+		format = 'webp';
+	} else if (mimetype === 'image/jpeg' || mimetype === 'image/jpg') {
+		format = 'jpg';
 	}
 
 	return new Promise((resolve, reject) => {
 		const uploadStream = cloudinary.uploader.upload_stream(
 			{
 				folder: `unistay/reviews/${boardingId}/images`,
-				resource_type: "image",
+				resource_type: 'image',
 				...(format ? { format } : {}),
 			},
 			(error, result) => {
 				if (error || !result) {
-					return reject(error ?? new Error("Upload failed"));
+					return reject(error ?? new Error('Upload failed'));
 				}
 
 				resolve({ url: result.secure_url, publicId: result.public_id });
@@ -183,20 +182,18 @@ export async function uploadReviewVideo(
 	boardingId: string,
 ): Promise<CloudinaryUploadResult> {
 	if (!ensureConfigured()) {
-		throw new Error(
-			"Cloudinary is not configured. Please set CLOUDINARY_* environment variables.",
-		);
+		throw new Error('Cloudinary is not configured. Please set CLOUDINARY_* environment variables.');
 	}
 
 	return new Promise((resolve, reject) => {
 		const uploadStream = cloudinary.uploader.upload_stream(
 			{
 				folder: `unistay/reviews/${boardingId}/videos`,
-				resource_type: "video",
+				resource_type: 'video',
 			},
 			(error, result) => {
 				if (error || !result) {
-					return reject(error ?? new Error("Upload failed"));
+					return reject(error ?? new Error('Upload failed'));
 				}
 
 				resolve({ url: result.secure_url, publicId: result.public_id });
@@ -219,13 +216,12 @@ export async function deleteBoardingImage(publicId: string): Promise<void> {
 
 export async function deleteCloudinaryAsset(
 	publicId: string,
-	resourceType: "image" | "video" = "image",
+	resourceType: 'image' | 'video' = 'image',
 ): Promise<void> {
 	if (!ensureConfigured()) {
-		throw new Error(
-			"Cloudinary is not configured. Please set CLOUDINARY_* environment variables.",
-		);
+		throw new Error('Cloudinary is not configured. Please set CLOUDINARY_* environment variables.');
 	}
 
 	await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
 }
+

@@ -8,7 +8,6 @@ import {
 import { sendSuccess } from "@/lib/response.js";
 import { Boarding, SavedBoarding } from "@/models/index.js";
 import { BoardingStatus } from "@/types/enums.js";
-import { transformSavedBoardingDoc } from "@/utils/index.js";
 
 // POST /api/v1/saved-boardings/:boardingId  (student)
 export async function saveBoarding(
@@ -110,11 +109,7 @@ export async function getSavedBoardings(
 			.sort({ createdAt: -1 })
 			.lean();
 
-		sendSuccess(res, {
-			saved: (saved as Record<string, unknown>[]).map(
-				transformSavedBoardingDoc,
-			),
-		});
+		sendSuccess(res, { saved });
 	} catch (err) {
 		next(err);
 	}
