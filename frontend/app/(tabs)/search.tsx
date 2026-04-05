@@ -19,7 +19,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { useBoardingStore } from '@/store/boarding.store';
 import { useSaveBoarding } from '@/hooks/useSaveBoarding';
 import { searchBoardings } from '@/lib/boarding';
-import { COLORS } from '@/lib/constants';
+import { COLORS, TILE_URL } from '@/lib/constants';
 import { MapAttribution } from '@/components/ui/MapAttribution';
 import type { Boarding, SortOption } from '@/types/boarding.types';
 
@@ -404,7 +404,7 @@ export default function ExploreScreen() {
             showsMyLocationButton
           >
             <UrlTile
-              urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+              urlTemplate={`${TILE_URL}/{z}/{x}/{y}.png`}
               maximumZ={19}
               flipY={false}
             />
