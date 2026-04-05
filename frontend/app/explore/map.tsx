@@ -12,7 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Marker, Callout, UrlTile } from 'react-native-maps';
 import { searchBoardings } from '@/lib/boarding';
-import { COLORS } from '@/lib/constants';
+import { COLORS, TILE_URL } from '@/lib/constants';
 import { MapAttribution } from '@/components/ui/MapAttribution';
 import type { Boarding } from '@/types/boarding.types';
 
@@ -53,7 +53,7 @@ export default function MapViewScreen() {
         showsMyLocationButton
       >
         <UrlTile
-          urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+          urlTemplate={`${TILE_URL}/{z}/{x}/{y}.png`}
           maximumZ={19}
           flipY={false}
         />

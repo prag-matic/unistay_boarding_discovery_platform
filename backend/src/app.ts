@@ -5,12 +5,17 @@ import helmet from "helmet";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { apiLimiter } from "./middleware/rateLimit.js";
 import router from "./routes/index.js";
+import tileRoutes from "./routes/tile.routes.js";
 
 const app: Application = express();
 
 // Security middleware
 app.use(helmet());
 app.use(cors());
+
+// Tile proxy – mounted outside /api so tile requests use their own generous
+// rate limit instead of the stricter API limiter.
+app.use("/tiles", tileRoutes);
 
 // Rate limiting
 app.use("/api", apiLimiter);

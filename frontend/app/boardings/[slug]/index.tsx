@@ -19,7 +19,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { getBoardingBySlug } from '@/lib/boarding';
 import { getBoardingReviewsById, getReviewStats } from '@/lib/review';
 import { useSaveBoarding } from '@/hooks/useSaveBoarding';
-import { COLORS } from '@/lib/constants';
+import { COLORS, TILE_URL } from '@/lib/constants';
 import { MapAttribution } from '@/components/ui/MapAttribution';
 import type { Boarding, AmenityName } from '@/types/boarding.types';
 import type { Review, ReviewStats } from '@/types/review.types';
@@ -358,7 +358,7 @@ export default function BoardingDetailsScreen() {
                 pitchEnabled={false}
               >
                 <UrlTile
-                  urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  urlTemplate={`${TILE_URL}/{z}/{x}/{y}.png`}
                   maximumZ={19}
                   flipY={false}
                 />
