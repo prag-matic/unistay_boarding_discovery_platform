@@ -90,7 +90,6 @@ function SectionHeader({ title }: { title: string }) {
 
 export default function EditBoardingScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-
   const [boarding, setBoarding] = useState<Boarding | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
