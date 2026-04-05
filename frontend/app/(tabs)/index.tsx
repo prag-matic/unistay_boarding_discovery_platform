@@ -337,11 +337,11 @@ function CurrentHomeHeroCard({ reservation }: { reservation: Reservation }) {
           <Text style={[styles.activeResBadgeText, { color: COLORS.white }]}>ACTIVE</Text>
         </View>
       </View>
-      <Text style={styles.heroCardTitle} numberOfLines={2}>{reservation.boardingId.title}</Text>
+      <Text style={styles.heroCardTitle} numberOfLines={2}>{reservation.boarding.title}</Text>
       <View style={styles.heroCardLocation}>
         <Ionicons name="location-outline" size={13} color="rgba(255,255,255,0.8)" />
         <Text style={styles.heroCardLocationText}>
-          {reservation.boardingId.city}, {reservation.boardingId.district}
+          {reservation.boarding.city}, {reservation.boarding.district}
         </Text>
       </View>
       <View style={styles.heroCardDivider} />
