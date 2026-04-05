@@ -14,8 +14,8 @@ export type PaymentStatus = 'PENDING' | 'CONFIRMED' | 'REJECTED';
 
 export interface Payment {
   id: string;
-  /** Prisma Decimal serialised as string */
-  amount: string;
+  /** MongoDB Number serialised as a JSON number */
+  amount: number;
   paymentMethod: PaymentMethod;
   status: PaymentStatus;
   paidAt: string | null;
