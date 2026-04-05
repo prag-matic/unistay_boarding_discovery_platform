@@ -91,7 +91,8 @@ export default function CreateStep2Screen() {
         { latitude, longitude, latitudeDelta: 0.02, longitudeDelta: 0.02 },
         600,
       );
-    } catch {
+    } catch (err) {
+      console.warn('Location error:', err);
       Alert.alert('Error', 'Could not retrieve your current location. Please try again.');
     } finally {
       setIsLocating(false);
@@ -234,7 +235,7 @@ export default function CreateStep2Screen() {
           >
             <Ionicons name="locate-outline" size={16} color={isLocating ? COLORS.gray : COLORS.primary} />
             <Text style={[styles.locationBtnText, isLocating && styles.locationBtnTextDisabled]}>
-              {isLocating ? 'Getting Location…' : 'Use My Current Location'}
+              {isLocating ? 'Getting Location...' : 'Use My Current Location'}
             </Text>
           </TouchableOpacity>
         </View>
