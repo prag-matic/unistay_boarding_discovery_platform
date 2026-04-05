@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import api from '@/lib/api';
+import logger from '@/lib/logger';
 import { storage } from '@/lib/storage';
 import type { User } from '@/types/user.types';
 import type { RegisterData, LoginResponse, RefreshResponse } from '@/types/auth.types';
@@ -36,6 +37,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setSelectedRole: (role) => set({ selectedRole: role }),
 
   login: async (email, password) => {
+    logger.store.debug('login', { email });
     set({ isLoading: true });
     try {
       const response = await api.post<UniStayApiResponse<LoginResponse>>('/auth/login', {
@@ -53,6 +55,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   register: async (data) => {
+    logger.store.debug('register', { email: data.email, role: data.role });
     set({ isLoading: true });
     try {
       const apiRole = data.role === 'student' ? 'STUDENT' : 'OWNER';
@@ -69,6 +72,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: async () => {
+    logger.store.debug('logout');
     const refreshToken = get().refreshToken ?? (await storage.getRefreshToken());
     if (refreshToken) {
       try {
@@ -82,10 +86,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   updateProfile: async (data) => {
+    logger.store.debug('updateProfile');
     set({ isLoading: true });
     try {
-      const response = await api.put<UniStayApiResponse<{ user: User }>>('/users/me', data);
-      const updatedUser = response.data.data.user;
+      const response = await api.put<UniStayApiResponse<User>>('/users/me', data);
+      const updatedUser = response.data.data;
       await storage.setUser(updatedUser);
       set({ user: updatedUser });
     } finally {
@@ -94,6 +99,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   checkAuth: async () => {
+    logger.store.debug('checkAuth');
     const storedRefreshToken = await storage.getRefreshToken();
     if (!storedRefreshToken) return false;
     try {

@@ -57,7 +57,7 @@ function ActiveReservationCard({ reservation }: { reservation: Reservation }) {
       <View style={styles.activeResTop}>
         <View style={{ flex: 1, gap: 2 }}>
           <Text style={styles.activeResTitle} numberOfLines={1}>
-            {reservation.boarding.title}
+            {reservation.boardingId.title}
           </Text>
           <View style={styles.activeResLocation}>
             <Ionicons name="location-outline" size={12} color={COLORS.gray} />

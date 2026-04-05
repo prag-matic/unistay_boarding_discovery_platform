@@ -48,7 +48,7 @@ export default function EditProfileScreen() {
 
   const onSubmit = async (data: EditForm) => {
     try {
-      await updateProfile({ ...data, avatar: imageUri ?? user?.avatar });
+      await updateProfile({ ...data, profileImageUrl: imageUri ?? user?.profileImageUrl });
       Alert.alert('Success', 'Profile updated!', [{ text: 'OK', onPress: () => router.back() }]);
     } catch (err) {
       Alert.alert('Error', getErrorMessage(err));
@@ -66,7 +66,7 @@ export default function EditProfileScreen() {
           {/* Avatar */}
           <View style={styles.avatarSection}>
             <Avatar
-              uri={imageUri ?? user?.avatar}
+              uri={imageUri ?? user?.profileImageUrl}
               firstName={user?.firstName}
               lastName={user?.lastName}
               size={90}

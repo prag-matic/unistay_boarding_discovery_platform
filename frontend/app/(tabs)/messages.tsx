@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "@/lib/constants";
+import logger from "@/lib/logger";
 import { useChatStore } from "@/store/chat.store";
 import { useAuthStore } from "@/store/auth.store";
 import { ChatBubble } from "@/components/chat/ChatBubble";
@@ -115,10 +116,7 @@ export default function MessagesScreen() {
       setChatRooms(rooms);
       setRoomIssues(issueMap);
     } catch (error: unknown) {
-      console.error(
-        "Failed to load chat rooms:",
-        error instanceof Error ? error.message : error,
-      );
+      logger.chat.error('Failed to load chat rooms', { error: error instanceof Error ? error.message : error });
     } finally {
       setIsLoadingRooms(false);
     }
@@ -134,10 +132,7 @@ export default function MessagesScreen() {
         await loadMessages(room.id);
         setShowChatInterface(true);
       } catch (error: unknown) {
-        console.error(
-          "Failed to join room:",
-          error instanceof Error ? error.message : error,
-        );
+        logger.chat.error('Failed to join room', { error: error instanceof Error ? error.message : error });
       }
     },
     [joinRoom, setCurrentRoom, loadMessages, connectSocket],
@@ -434,10 +429,7 @@ export default function MessagesScreen() {
           />
         );
       } catch (error) {
-        console.error(
-          "[MessagesScreen] Error rendering message:",
-          error instanceof Error ? error.message : error,
-        );
+        logger.chat.error('Error rendering message', { error: error instanceof Error ? error.message : error });
         return null;
       }
     },

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import logger from "@/lib/logger";
 import socketService from "@/lib/socket";
 import type { ChatMessage } from "@/lib/socket";
 import type {
@@ -114,10 +115,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // Prevent duplicate messages by checking if message ID already exists
       const exists = state.messages.some((msg) => msg.id === message.id);
       if (exists) {
-        console.log(
-          "[ChatStore] Duplicate message detected, skipping:",
-          message.id,
-        );
+        logger.chat.debug('Duplicate message detected, skipping', { messageId: message.id });
         return state; // Don't add duplicate
       }
       return {
@@ -127,6 +125,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   loadMessages: async (roomId, limit = 50) => {
+    logger.chat.debug('loadMessages', { roomId, limit });
     set({ isLoading: true, messages: [], currentIssue: null });
     try {
       const { getChatHistory, getRoomIssues } = await import("@/lib/chat");
@@ -161,7 +160,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         hasMoreMessages: !!nextCursor,
       });
     } catch (error) {
-      console.error("Failed to load messages:", error);
+      logger.chat.error('Failed to load messages', { error: error instanceof Error ? error.message : error });
       throw error;
     } finally {
       set({ isLoading: false });
@@ -169,6 +168,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   loadMoreMessages: async (roomId, cursor, limit = 50) => {
+    logger.chat.debug('loadMoreMessages', { roomId, cursor, limit });
     if (get().isLoadingHistory) return;
 
     set({ isLoadingHistory: true });
@@ -184,7 +184,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         hasMoreMessages: !!nextCursor,
       }));
     } catch (error) {
-      console.error("Failed to load more messages:", error);
+      logger.chat.error('Failed to load more messages', { error: error instanceof Error ? error.message : error });
     } finally {
       set({ isLoadingHistory: false });
     }
@@ -264,7 +264,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
 
     socketService.onIssueAnalysis((analysis) => {
-      console.log("[ChatStore] Issue analysis received:", analysis);
+      logger.chat.debug('Issue analysis received', { roomId: analysis.roomId, isIssue: analysis.isIssue });
       // Only show if this is for the current room and is actually an issue
       if (analysis.isIssue && analysis.roomId === get().currentRoom?.id) {
         get().setPendingIssueAnalysis(analysis);
@@ -272,7 +272,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
 
     socketService.onError((error) => {
-      console.error("Socket error:", error);
+      logger.chat.error('Socket error', { error });
     });
   },
 
@@ -352,12 +352,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // Clear pending analysis
       get().dismissIssueAnalysis();
 
-      console.log("[ChatStore] Issue created successfully:", newIssue.id);
+      logger.chat.debug('Issue created successfully', { issueId: newIssue.id });
     } catch (error) {
-      console.error(
-        "[ChatStore] Failed to create issue:",
-        error instanceof Error ? error.message : error,
-      );
+      logger.chat.error('Failed to create issue', {
+        error: error instanceof Error ? error.message : error,
+      });
       throw error;
     }
   },

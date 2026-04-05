@@ -169,7 +169,7 @@ export default function ProfileScreen() {
         <View style={styles.avatarSection}>
           <View style={styles.avatarWrapper}>
             <Avatar
-              uri={user?.avatar}
+              uri={user?.profileImageUrl}
               firstName={user?.firstName}
               lastName={user?.lastName}
               size={100}
