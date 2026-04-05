@@ -11,11 +11,10 @@ import {
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Marker, UrlTile, MapPressEvent } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE, MapPressEvent } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useBoardingStore } from '@/store/boarding.store';
-import { COLORS, TILE_URL } from '@/lib/constants';
-import { MapAttribution } from '@/components/ui/MapAttribution';
+import { COLORS } from '@/lib/constants';
 
 const DISTRICTS = [
   'Colombo', 'Gampaha', 'Kalutara', 'Kandy', 'Matale', 'Nuwara Eliya',
@@ -192,7 +191,7 @@ export default function CreateStep2Screen() {
             <MapView
               ref={mapRef}
               style={styles.map}
-              mapType="none"
+              provider={PROVIDER_GOOGLE}
               initialRegion={
                 markerCoordinate
                   ? { ...markerCoordinate, latitudeDelta: 0.02, longitudeDelta: 0.02 }
@@ -200,11 +199,6 @@ export default function CreateStep2Screen() {
               }
               onPress={handleMapPress}
             >
-              <UrlTile
-                urlTemplate={`${TILE_URL}/{z}/{x}/{y}.png`}
-                maximumZ={19}
-                flipY={false}
-              />
               {markerCoordinate && (
                 <Marker
                   coordinate={markerCoordinate}
@@ -229,7 +223,6 @@ export default function CreateStep2Screen() {
                 </View>
               </View>
             )}
-            <MapAttribution />
           </View>
           <TouchableOpacity
             style={[styles.locationBtn, isLocating && styles.locationBtnDisabled]}

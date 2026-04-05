@@ -10,10 +10,9 @@ import {
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Marker, Callout, UrlTile } from 'react-native-maps';
+import MapView, { Marker, Callout, PROVIDER_GOOGLE } from 'react-native-maps';
 import { searchBoardings } from '@/lib/boarding';
-import { COLORS, TILE_URL } from '@/lib/constants';
-import { MapAttribution } from '@/components/ui/MapAttribution';
+import { COLORS } from '@/lib/constants';
 import type { Boarding } from '@/types/boarding.types';
 
 // Sri Lanka centre as the default region
@@ -47,16 +46,11 @@ export default function MapViewScreen() {
     <SafeAreaView style={styles.container}>
       <MapView
         style={styles.map}
-        mapType="none"
+        provider={PROVIDER_GOOGLE}
         initialRegion={INITIAL_REGION}
         showsUserLocation
         showsMyLocationButton
       >
-        <UrlTile
-          urlTemplate={`${TILE_URL}/{z}/{x}/{y}.png`}
-          maximumZ={19}
-          flipY={false}
-        />
         {filtered.map((boarding) => (
           <Marker
             key={boarding.id}
@@ -81,8 +75,6 @@ export default function MapViewScreen() {
           </Marker>
         ))}
       </MapView>
-
-      <MapAttribution />
 
       {/* Top overlay: Back + Search + Buttons */}
       <View style={styles.topOverlay}>

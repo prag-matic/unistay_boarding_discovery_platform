@@ -14,13 +14,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import MapView, { Marker, UrlTile } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useAuthStore } from '@/store/auth.store';
 import { useBoardingStore } from '@/store/boarding.store';
 import { useSaveBoarding } from '@/hooks/useSaveBoarding';
 import { searchBoardings } from '@/lib/boarding';
-import { COLORS, TILE_URL } from '@/lib/constants';
-import { MapAttribution } from '@/components/ui/MapAttribution';
+import { COLORS } from '@/lib/constants';
 import type { Boarding, SortOption } from '@/types/boarding.types';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -398,16 +397,11 @@ export default function ExploreScreen() {
         <View style={styles.mapContainer}>
           <MapView
             style={styles.map}
-            mapType="none"
+            provider={PROVIDER_GOOGLE}
             initialRegion={MAP_REGION}
             showsUserLocation
             showsMyLocationButton
           >
-            <UrlTile
-              urlTemplate={`${TILE_URL}/{z}/{x}/{y}.png`}
-              maximumZ={19}
-              flipY={false}
-            />
             {boardings.map((b) => {
               const isSelected = mapSelected?.id === b.id;
               return (
@@ -426,7 +420,6 @@ export default function ExploreScreen() {
               );
             })}
           </MapView>
-          <MapAttribution />
           {/* Boarding preview bottom sheet */}
           {mapSelected && (
             <MapBottomSheet
