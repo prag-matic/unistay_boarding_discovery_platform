@@ -46,8 +46,9 @@ function ReviewCard({ item }: { item: Review }) {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.boardingName} numberOfLines={1}>
-            {item.boardingId}
+            {item.boardingTitle ?? item.boardingId}
           </Text>
+          <Text style={styles.reviewerName} numberOfLines={1}>{item.reviewerName}</Text>
           <StarRow rating={item.rating} />
         </View>
         <Text style={styles.date}>{formatDate(item.createdAt)}</Text>
@@ -58,6 +59,10 @@ function ReviewCard({ item }: { item: Review }) {
       {item.comment ? (
         <Text style={styles.comment}>{item.comment}</Text>
       ) : null}
+      <View style={styles.footer}>
+        <Ionicons name="thumbs-up-outline" size={13} color={COLORS.gray} />
+        <Text style={styles.likeCount}>{item.reactions.likes}</Text>
+      </View>
     </View>
   );
 }
@@ -157,7 +162,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarText: { color: COLORS.white, fontWeight: '700', fontSize: 14 },
-  boardingName: { fontSize: 13, fontWeight: '700', color: COLORS.text, marginBottom: 3 },
+  boardingName: { fontSize: 13, fontWeight: '700', color: COLORS.text, marginBottom: 1 },
+  reviewerName: { fontSize: 11, color: COLORS.textSecondary, marginBottom: 3 },
   date: { fontSize: 11, color: COLORS.gray },
   editedBadge: {
     fontSize: 11,
@@ -166,6 +172,8 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   comment: { fontSize: 13, color: COLORS.textSecondary, lineHeight: 20 },
+  footer: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 10 },
+  likeCount: { fontSize: 12, color: COLORS.gray },
   emptyState: { alignItems: 'center', paddingTop: 80, gap: 12, paddingHorizontal: 32 },
   emptyTitle: { fontSize: 17, fontWeight: '700', color: COLORS.text },
   emptySub: { fontSize: 14, color: COLORS.textSecondary, textAlign: 'center' },
