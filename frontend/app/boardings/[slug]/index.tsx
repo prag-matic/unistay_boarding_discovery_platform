@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Image,
   Dimensions,
-  FlatList,
   ActivityIndicator,
   Alert,
   Platform,
@@ -141,30 +140,32 @@ export default function BoardingDetailsScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Image Carousel */}
         <View style={styles.carouselContainer}>
-          <FlatList
-            data={boarding.images}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            keyExtractor={(img) => img.id}
-            onMomentumScrollEnd={(e) => {
-              const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
-              setActiveImage(idx);
-            }}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                activeOpacity={0.95}
-                onPress={() => router.push(`/boardings/${slug}/gallery` as never)}
-              >
-                <Image source={{ uri: item.url }} style={styles.carouselImage} />
-              </TouchableOpacity>
-            )}
-            ListEmptyComponent={
-              <View style={[styles.carouselImage, styles.carouselPlaceholder]}>
-                <Ionicons name="home-outline" size={56} color={COLORS.gray} />
-              </View>
-            }
-          />
+          {boarding.images.length === 0 ? (
+            <View style={[styles.carouselImage, styles.carouselPlaceholder]}>
+              <Ionicons name="home-outline" size={56} color={COLORS.gray} />
+            </View>
+          ) : (
+            <ScrollView
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onMomentumScrollEnd={(e) => {
+                const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+                setActiveImage(idx);
+              }}
+              scrollEventThrottle={16}
+            >
+              {boarding.images.map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  activeOpacity={0.95}
+                  onPress={() => router.push(`/boardings/${slug}/gallery` as never)}
+                >
+                  <Image source={{ uri: item.url }} style={styles.carouselImage} />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
           {boarding.images.length > 1 && (
             <View style={styles.paginationDots}>
               {boarding.images.map((_, i) => (
