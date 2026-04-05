@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { View, Text, StyleSheet } from 'react-native';
 import { COLORS } from '@/lib/constants';
+import logger from '@/lib/logger';
 import { useNotificationStore } from '@/store/notification.store';
 import { useAuthStore } from '@/store/auth.store';
 import { useBoardingStore } from '@/store/boarding.store';
@@ -36,7 +37,7 @@ export default function TabsLayout() {
     if (!isAuthenticated || user?.role === 'OWNER') return;
     getSavedBoardings()
       .then((r) => setSavedIds(r.data.saved.map((s) => s.boardingId)))
-      .catch((err) => console.warn('[TabsLayout] Failed to load saved boarding IDs:', err));
+      .catch((err) => logger.store.warn('Failed to load saved boarding IDs', { error: err instanceof Error ? err.message : err }));
   }, [isAuthenticated, user?.role, setSavedIds]);
 
   return (
