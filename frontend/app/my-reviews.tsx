@@ -48,7 +48,6 @@ function ReviewCard({ item }: { item: Review }) {
           <Text style={styles.boardingName} numberOfLines={1}>
             {item.boardingTitle ?? item.boardingId}
           </Text>
-          <Text style={styles.reviewerName} numberOfLines={1}>{item.reviewerName}</Text>
           <StarRow rating={item.rating} />
         </View>
         <Text style={styles.date}>{formatDate(item.createdAt)}</Text>
@@ -162,8 +161,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarText: { color: COLORS.white, fontWeight: '700', fontSize: 14 },
-  boardingName: { fontSize: 13, fontWeight: '700', color: COLORS.text, marginBottom: 1 },
-  reviewerName: { fontSize: 11, color: COLORS.textSecondary, marginBottom: 3 },
+  boardingName: { fontSize: 13, fontWeight: '700', color: COLORS.text, marginBottom: 3 },
   date: { fontSize: 11, color: COLORS.gray },
   editedBadge: {
     fontSize: 11,
