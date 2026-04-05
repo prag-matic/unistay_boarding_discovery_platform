@@ -47,7 +47,7 @@ export interface ChatRoom {
   };
   boardingId?: {
     id: string;
-    propertyName: string;
+    title: string;
     address: string;
     city: string;
   };
