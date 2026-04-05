@@ -110,7 +110,7 @@ export default function MyVisitsScreen() {
           <Text style={styles.cardTitle} numberOfLines={2}>{item.boarding.title}</Text>
           <Text style={styles.cardAddress} numberOfLines={1}>
             <Ionicons name="location-outline" size={12} color={COLORS.gray} />{' '}
-            {item.boarding.address}, {item.boarding.city}
+            {[item.boarding.address, item.boarding.city].filter(Boolean).join(', ')}
           </Text>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: STATUS_COLORS[item.status] }]}>
