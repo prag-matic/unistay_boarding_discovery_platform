@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { getReservationById, getRentalPeriods, cancelReservation } from '@/lib/reservation';
 import { createPayment, uploadProofImage } from '@/lib/payment';
 import { COLORS } from '@/lib/constants';
+import logger from '@/lib/logger';
 import type { Reservation, RentalPeriod, ReservationStatus, RentalPeriodStatus, Payment, PaymentStatus } from '@/types/reservation.types';
 import type { PaymentMethod } from '@/types/reservation.types';
 import * as ImagePicker from 'expo-image-picker';
@@ -384,14 +385,14 @@ export default function ReservationDetailScreen() {
 
       await createPayment(paymentPayload);
 
-      console.log('[handleSubmitPayment] payment created successfully');
+      logger.reservation.debug('Payment created successfully');
       // Refresh rental periods
       const res = await getRentalPeriods(reservation.id);
       setRentalPeriods(res.data.rentalPeriods);
       setLogPaymentPeriod(null);
       Alert.alert('Payment Logged', 'Your payment has been submitted and is awaiting owner confirmation.');
     } catch (err: unknown) {
-      console.error('[handleSubmitPayment] error:', err);
+      logger.reservation.error('handleSubmitPayment error', { error: err instanceof Error ? err.message : err });
       const msg =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
         'Failed to log payment.';
