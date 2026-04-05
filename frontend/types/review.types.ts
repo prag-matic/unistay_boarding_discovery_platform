@@ -28,6 +28,7 @@ export interface ReviewComment {
 export interface Review {
   id: string;
   boardingId: string;
+  boardingTitle?: string;
   authorId: string;
   reviewerName: string;
   authorAvatar?: string;
