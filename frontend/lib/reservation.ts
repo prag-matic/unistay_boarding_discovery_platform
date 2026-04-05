@@ -1,4 +1,5 @@
 import api from './api';
+import logger from './logger';
 import type { UniStayApiResponse } from '@/types/api.types';
 import type {
   Reservation,
@@ -8,6 +9,7 @@ import type {
 } from '@/types/reservation.types';
 
 export async function createReservation(payload: CreateReservationPayload) {
+  logger.reservation.debug('createReservation', { boardingId: payload.boardingId });
   const response = await api.post<UniStayApiResponse<{ reservation: Reservation }>>(
     '/reservation',
     payload,
@@ -16,6 +18,7 @@ export async function createReservation(payload: CreateReservationPayload) {
 }
 
 export async function getMyReservations() {
+  logger.reservation.debug('getMyReservations');
   const response = await api.get<UniStayApiResponse<{ reservations: Reservation[] }>>(
     '/reservation/my-requests',
   );
@@ -23,6 +26,7 @@ export async function getMyReservations() {
 }
 
 export async function getReceivedReservations() {
+  logger.reservation.debug('getReceivedReservations');
   const response = await api.get<UniStayApiResponse<{ reservations: Reservation[] }>>(
     '/reservation/my-boardings',
   );
@@ -30,6 +34,7 @@ export async function getReceivedReservations() {
 }
 
 export async function getReservationById(id: string) {
+  logger.reservation.debug('getReservationById', { id });
   const response = await api.get<UniStayApiResponse<{ reservation: Reservation }>>(
     `/reservation/${id}`,
   );
@@ -37,6 +42,7 @@ export async function getReservationById(id: string) {
 }
 
 export async function getRentalPeriods(reservationId: string) {
+  logger.reservation.debug('getRentalPeriods', { reservationId });
   const response = await api.get<UniStayApiResponse<{ rentalPeriods: RentalPeriod[] }>>(
     `/reservation/${reservationId}/rental-periods`,
   );
@@ -44,6 +50,7 @@ export async function getRentalPeriods(reservationId: string) {
 }
 
 export async function approveReservation(id: string) {
+  logger.reservation.debug('approveReservation', { id });
   const response = await api.patch<UniStayApiResponse<{ reservation: Reservation }>>(
     `/reservation/${id}/approve`,
   );
@@ -51,6 +58,7 @@ export async function approveReservation(id: string) {
 }
 
 export async function rejectReservation(id: string, payload: RejectReservationPayload) {
+  logger.reservation.debug('rejectReservation', { id });
   const response = await api.patch<UniStayApiResponse<{ reservation: Reservation }>>(
     `/reservation/${id}/reject`,
     payload,
@@ -59,6 +67,7 @@ export async function rejectReservation(id: string, payload: RejectReservationPa
 }
 
 export async function cancelReservation(id: string) {
+  logger.reservation.debug('cancelReservation', { id });
   const response = await api.patch<UniStayApiResponse<{ reservation: Reservation }>>(
     `/reservation/${id}/cancel`,
   );
@@ -66,6 +75,7 @@ export async function cancelReservation(id: string) {
 }
 
 export async function completeReservation(id: string) {
+  logger.reservation.debug('completeReservation', { id });
   const response = await api.patch<UniStayApiResponse<{ reservation: Reservation }>>(
     `/reservation/${id}/complete`,
   );
