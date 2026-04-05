@@ -1,4 +1,5 @@
 import api from "./api";
+import logger from "./logger";
 import type { UniStayApiResponse } from "@/types/api.types";
 import type {
   ChatMessage,
@@ -50,6 +51,7 @@ export interface GetChatHistoryResponse {
  * - Owners: student ID from reservation/visit request
  */
 export async function createChatRoom(payload: CreateChatRoomPayload) {
+  logger.chat.debug('createChatRoom', { otherUserId: payload.otherUserId, boardingId: payload.boardingId });
   const response = await api.post<UniStayApiResponse<ChatRoom>>(
     "/chat/rooms",
     payload,
@@ -62,6 +64,7 @@ export async function createChatRoom(payload: CreateChatRoomPayload) {
  * GET /api/chat/rooms
  */
 export async function getChatRooms(limit: number = 20, cursor?: string) {
+  logger.chat.debug('getChatRooms', { limit, cursor });
   const params: Record<string, string> = { limit: String(limit) };
   if (cursor) params.cursor = cursor;
 
@@ -77,6 +80,7 @@ export async function getChatRooms(limit: number = 20, cursor?: string) {
  * GET /api/chat/rooms/:roomId
  */
 export async function getChatRoom(roomId: string) {
+  logger.chat.debug('getChatRoom', { roomId });
   const response = await api.get<UniStayApiResponse<ChatRoom>>(
     `/chat/rooms/${roomId}`,
   );
@@ -95,6 +99,7 @@ export async function getChatHistory(
   limit: number = 50,
   cursor?: string,
 ) {
+  logger.chat.debug('getChatHistory', { roomId, limit, cursor });
   const params: Record<string, string> = { limit: String(limit) };
   if (cursor) params.cursor = cursor;
 
@@ -110,6 +115,7 @@ export async function getChatHistory(
  * PUT /api/chat/rooms/:roomId/read-all
  */
 export async function markAllAsRead(roomId: string) {
+  logger.chat.debug('markAllAsRead', { roomId });
   const response = await api.put<UniStayApiResponse<{ modifiedCount: number }>>(
     `/chat/rooms/${roomId}/read-all`,
   );
@@ -124,6 +130,7 @@ export async function markAllAsRead(roomId: string) {
  * For owners: searches for students
  */
 export async function searchUsers(query: string, role?: "STUDENT" | "OWNER") {
+  logger.chat.debug('searchUsers', { query, role });
   const params: Record<string, string> = { q: query };
   if (role) params.role = role;
 
@@ -139,6 +146,7 @@ export async function searchUsers(query: string, role?: "STUDENT" | "OWNER") {
  * POST /api/issues
  */
 export async function createIssue(payload: CreateIssuePayload) {
+  logger.chat.debug('createIssue', { roomId: payload.roomId, messageId: payload.messageId });
   const response = await api.post<UniStayApiResponse<Issue>>(
     "/issues",
     payload,
@@ -151,6 +159,7 @@ export async function createIssue(payload: CreateIssuePayload) {
  * GET /api/issues?roomId=...
  */
 export async function getRoomIssues(roomId: string) {
+  logger.chat.debug('getRoomIssues', { roomId });
   const response = await api.get<UniStayApiResponse<{ issues: Issue[] }>>(
     "/issues",
     { params: { roomId, limit: 1 } },

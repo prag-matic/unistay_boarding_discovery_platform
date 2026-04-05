@@ -1,4 +1,5 @@
 import api from './api';
+import logger from './logger';
 import type { UniStayApiResponse } from '@/types/api.types';
 import type {
   VisitRequest,
@@ -7,6 +8,7 @@ import type {
 } from '@/types/visit.types';
 
 export async function createVisitRequest(payload: CreateVisitRequestPayload) {
+  logger.visit.debug('createVisitRequest', { boardingId: payload.boardingId });
   const response = await api.post<UniStayApiResponse<{ visitRequest: VisitRequest }>>(
     '/visit-requests',
     payload,
@@ -15,6 +17,7 @@ export async function createVisitRequest(payload: CreateVisitRequestPayload) {
 }
 
 export async function getMyVisitRequests() {
+  logger.visit.debug('getMyVisitRequests');
   const response = await api.get<UniStayApiResponse<{ visitRequests: VisitRequest[] }>>(
     '/visit-requests/my-requests',
   );
@@ -22,6 +25,7 @@ export async function getMyVisitRequests() {
 }
 
 export async function getReceivedVisitRequests() {
+  logger.visit.debug('getReceivedVisitRequests');
   const response = await api.get<UniStayApiResponse<{ visitRequests: VisitRequest[] }>>(
     '/visit-requests/my-boardings',
   );
@@ -29,6 +33,7 @@ export async function getReceivedVisitRequests() {
 }
 
 export async function approveVisitRequest(id: string) {
+  logger.visit.debug('approveVisitRequest', { id });
   const response = await api.patch<UniStayApiResponse<{ visitRequest: VisitRequest }>>(
     `/visit-requests/${id}/approve`,
   );
@@ -36,6 +41,7 @@ export async function approveVisitRequest(id: string) {
 }
 
 export async function rejectVisitRequest(id: string, payload: RejectVisitPayload) {
+  logger.visit.debug('rejectVisitRequest', { id });
   const response = await api.patch<UniStayApiResponse<{ visitRequest: VisitRequest }>>(
     `/visit-requests/${id}/reject`,
     payload,
@@ -44,6 +50,7 @@ export async function rejectVisitRequest(id: string, payload: RejectVisitPayload
 }
 
 export async function cancelVisitRequest(id: string) {
+  logger.visit.debug('cancelVisitRequest', { id });
   const response = await api.patch<UniStayApiResponse<{ visitRequest: VisitRequest }>>(
     `/visit-requests/${id}/cancel`,
   );

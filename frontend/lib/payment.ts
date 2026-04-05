@@ -1,4 +1,5 @@
 import api from './api';
+import logger from './logger';
 import type { UniStayApiResponse } from '@/types/api.types';
 import type {
   DetailedPayment,
@@ -12,6 +13,7 @@ import type {
  * automatically and React Native handles the multipart boundary correctly.
  */
 export async function uploadProofImage(uri: string): Promise<string> {
+  logger.payment.debug('uploadProofImage');
   const filename = uri.split('/').pop() ?? 'proof.jpg';
   const type = filename.endsWith('.png') ? 'image/png' : 'image/jpeg';
 
@@ -28,6 +30,7 @@ export async function uploadProofImage(uri: string): Promise<string> {
 }
 
 export async function createPayment(payload: CreatePaymentPayload) {
+  logger.payment.debug('createPayment', { reservationId: payload.reservationId, rentalPeriodId: payload.rentalPeriodId });
   const response = await api.post<UniStayApiResponse<{ payment: DetailedPayment }>>(
     '/payments',
     payload,
@@ -36,6 +39,7 @@ export async function createPayment(payload: CreatePaymentPayload) {
 }
 
 export async function getMyPayments() {
+  logger.payment.debug('getMyPayments');
   const response = await api.get<UniStayApiResponse<{ payments: DetailedPayment[] }>>(
     '/payments/my-payments',
   );
@@ -43,6 +47,7 @@ export async function getMyPayments() {
 }
 
 export async function getPaymentById(id: string) {
+  logger.payment.debug('getPaymentById', { id });
   const response = await api.get<UniStayApiResponse<{ payment: DetailedPayment }>>(
     `/payments/${id}`,
   );
@@ -50,6 +55,7 @@ export async function getPaymentById(id: string) {
 }
 
 export async function getBoardingPayments() {
+  logger.payment.debug('getBoardingPayments');
   const response = await api.get<UniStayApiResponse<{ payments: DetailedPayment[] }>>(
     '/payments/my-boardings',
   );
@@ -57,6 +63,7 @@ export async function getBoardingPayments() {
 }
 
 export async function confirmPayment(id: string) {
+  logger.payment.debug('confirmPayment', { id });
   const response = await api.patch<UniStayApiResponse<{ payment: DetailedPayment }>>(
     `/payments/${id}/confirm`,
   );
@@ -64,6 +71,7 @@ export async function confirmPayment(id: string) {
 }
 
 export async function rejectPayment(id: string, payload: RejectPaymentPayload) {
+  logger.payment.debug('rejectPayment', { id });
   const response = await api.patch<UniStayApiResponse<{ payment: DetailedPayment }>>(
     `/payments/${id}/reject`,
     payload,

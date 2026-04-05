@@ -1,4 +1,5 @@
 import api from './api';
+import logger from './logger';
 import type { UniStayApiResponse } from '@/types/api.types';
 import type {
   RawReview,
@@ -101,6 +102,7 @@ function normalizeReview(raw: RawReview): Review {
 // ── API functions ─────────────────────────────────────────────────────────────
 
 export async function getReviewStats(boardingId: string) {
+  logger.review.debug('getReviewStats', { boardingId });
   const response = await api.get<UniStayApiResponse<ReviewStats>>(
     `/reviews/boarding/${boardingId}/stats`,
   );
@@ -111,6 +113,7 @@ export async function getBoardingReviewsById(
   boardingId: string,
   params: ReviewsQueryParams = {},
 ) {
+  logger.review.debug('getBoardingReviewsById', { boardingId, params });
   const response = await api.get<UniStayApiResponse<{ reviews: RawReview[]; pagination: ReviewsListResponse['pagination'] }>>(
     `/reviews/boarding/${boardingId}`,
     { params },
@@ -126,6 +129,7 @@ export async function getBoardingReviewsById(
 }
 
 export async function getReviewById(reviewId: string) {
+  logger.review.debug('getReviewById', { reviewId });
   const response = await api.get<UniStayApiResponse<RawReview>>(
     `/reviews/${reviewId}`,
   );
@@ -137,6 +141,7 @@ export async function getReviewById(reviewId: string) {
 }
 
 export async function getMyReviews(params: ReviewsQueryParams = {}) {
+  logger.review.debug('getMyReviews', { params });
   const response = await api.get<UniStayApiResponse<{ reviews: RawReview[]; pagination: ReviewsListResponse['pagination'] }>>(
     '/reviews/my',
     { params },
@@ -152,6 +157,7 @@ export async function getMyReviews(params: ReviewsQueryParams = {}) {
 }
 
 export async function getMyBoardingReviews(params: ReviewsQueryParams = {}) {
+  logger.review.debug('getMyBoardingReviews', { params });
   const response = await api.get<UniStayApiResponse<{ reviews: RawReview[]; pagination: ReviewsListResponse['pagination'] }>>(
     '/reviews/my-boardings',
     { params },
@@ -167,6 +173,7 @@ export async function getMyBoardingReviews(params: ReviewsQueryParams = {}) {
 }
 
 export async function createReview(formData: FormData) {
+  logger.review.debug('createReview');
   const response = await api.post<UniStayApiResponse<RawReview>>(
     '/reviews',
     formData,
@@ -179,6 +186,7 @@ export async function createReview(formData: FormData) {
 }
 
 export async function updateReview(reviewId: string, formData: FormData) {
+  logger.review.debug('updateReview', { reviewId });
   const response = await api.put<UniStayApiResponse<RawReview>>(
     `/reviews/${reviewId}`,
     formData,
@@ -191,6 +199,7 @@ export async function updateReview(reviewId: string, formData: FormData) {
 }
 
 export async function deleteReview(reviewId: string) {
+  logger.review.debug('deleteReview', { reviewId });
   const response = await api.delete<UniStayApiResponse<null>>(
     `/reviews/${reviewId}`,
   );
@@ -198,6 +207,7 @@ export async function deleteReview(reviewId: string) {
 }
 
 export async function reactToReview(reviewId: string, reactionType: ReactionType) {
+  logger.review.debug('reactToReview', { reviewId, reactionType });
   const response = await api.post<
     UniStayApiResponse<{ action: ReactionAction; type: ReactionType }>
   >(`/reviews/${reviewId}/reactions`, { type: reactionType });
@@ -205,6 +215,7 @@ export async function reactToReview(reviewId: string, reactionType: ReactionType
 }
 
 export async function addComment(reviewId: string, payload: CreateCommentPayload) {
+  logger.review.debug('addComment', { reviewId });
   const response = await api.post<UniStayApiResponse<{ id: string; reviewId: string; commentor: Record<string, unknown> }>>(
     `/reviews/${reviewId}/comments`,
     payload,
@@ -213,6 +224,7 @@ export async function addComment(reviewId: string, payload: CreateCommentPayload
 }
 
 export async function updateComment(commentId: string, payload: UpdateCommentPayload) {
+  logger.review.debug('updateComment', { commentId });
   const response = await api.put<UniStayApiResponse<{ id: string; editedAt: string }>>(
     `/reviews/comments/${commentId}`,
     payload,
@@ -221,6 +233,7 @@ export async function updateComment(commentId: string, payload: UpdateCommentPay
 }
 
 export async function deleteComment(commentId: string) {
+  logger.review.debug('deleteComment', { commentId });
   const response = await api.delete<UniStayApiResponse<null>>(
     `/reviews/comments/${commentId}`,
   );
@@ -228,6 +241,7 @@ export async function deleteComment(commentId: string) {
 }
 
 export async function reactToComment(commentId: string, reactionType: ReactionType) {
+  logger.review.debug('reactToComment', { commentId, reactionType });
   const response = await api.post<
     UniStayApiResponse<{ action: ReactionAction; type: ReactionType }>
   >(`/reviews/comments/${commentId}/reactions`, { type: reactionType });
