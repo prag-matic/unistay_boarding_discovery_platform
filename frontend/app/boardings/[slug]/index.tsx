@@ -351,6 +351,12 @@ export default function BoardingDetailsScreen() {
                   latitudeDelta: 0.015,
                   longitudeDelta: 0.015,
                 }}
+                cameraBoundary={{
+                  northEast: { latitude: 7.035961932644662, longitude: 80.19100325001236 },
+                  southWest: { latitude: 6.8302835564392455, longitude: 79.89361663337401 },
+                }}
+                minZoomLevel={14}
+                maxZoomLevel={18}
                 scrollEnabled={false}
                 zoomEnabled={false}
                 rotateEnabled={false}

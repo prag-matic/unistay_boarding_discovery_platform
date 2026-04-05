@@ -29,10 +29,15 @@ const SRI_LANKA_LNG_MIN = 79.5;
 const SRI_LANKA_LNG_MAX = 81.9;
 
 const SRI_LANKA_INITIAL_REGION = {
-  latitude: 7.8731,
-  longitude: 80.7718,
-  latitudeDelta: 4.0,
-  longitudeDelta: 4.0,
+  latitude: 6.915137412076758,
+  longitude: 79.9731566669944,
+  latitudeDelta: 0.1,
+  longitudeDelta: 0.1,
+};
+
+const MAP_CAMERA_BOUNDARY = {
+  northEast: { latitude: 7.035961932644662, longitude: 80.19100325001236 },
+  southWest: { latitude: 6.8302835564392455, longitude: 79.89361663337401 },
 };
 
 function ProgressBar({ step, total }: { step: number; total: number }) {
@@ -197,6 +202,9 @@ export default function CreateStep2Screen() {
                   ? { ...markerCoordinate, latitudeDelta: 0.02, longitudeDelta: 0.02 }
                   : SRI_LANKA_INITIAL_REGION
               }
+              cameraBoundary={MAP_CAMERA_BOUNDARY}
+              minZoomLevel={14}
+              maxZoomLevel={18}
               onPress={handleMapPress}
             >
               {markerCoordinate && (

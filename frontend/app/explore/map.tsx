@@ -15,12 +15,16 @@ import { searchBoardings } from '@/lib/boarding';
 import { COLORS } from '@/lib/constants';
 import type { Boarding } from '@/types/boarding.types';
 
-// Sri Lanka centre as the default region
 const INITIAL_REGION = {
-  latitude: 7.8731,
-  longitude: 80.7718,
-  latitudeDelta: 4.0,
-  longitudeDelta: 4.0,
+  latitude: 6.915137412076758,
+  longitude: 79.9731566669944,
+  latitudeDelta: 0.1,
+  longitudeDelta: 0.1,
+};
+
+const CAMERA_BOUNDARY = {
+  northEast: { latitude: 7.035961932644662, longitude: 80.19100325001236 },
+  southWest: { latitude: 6.8302835564392455, longitude: 79.89361663337401 },
 };
 
 export default function MapViewScreen() {
@@ -48,6 +52,9 @@ export default function MapViewScreen() {
         style={styles.map}
         provider={PROVIDER_GOOGLE}
         initialRegion={INITIAL_REGION}
+        cameraBoundary={CAMERA_BOUNDARY}
+        minZoomLevel={14}
+        maxZoomLevel={18}
         showsUserLocation
         showsMyLocationButton
       >
