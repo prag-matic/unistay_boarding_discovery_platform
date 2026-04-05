@@ -24,6 +24,14 @@ export async function getMyVisitRequests() {
   return response.data;
 }
 
+export async function getVisitRequestById(id: string) {
+  logger.visit.debug('getVisitRequestById', { id });
+  const response = await api.get<UniStayApiResponse<{ visitRequest: VisitRequest }>>(
+    `/visit-requests/${id}`,
+  );
+  return response.data;
+}
+
 export async function getReceivedVisitRequests() {
   logger.visit.debug('getReceivedVisitRequests');
   const response = await api.get<UniStayApiResponse<{ visitRequests: VisitRequest[] }>>(
