@@ -58,7 +58,7 @@ function ActiveReservationCard({ reservation }: { reservation: Reservation }) {
       <View style={styles.activeResTop}>
         <View style={{ flex: 1, gap: 2 }}>
           <Text style={styles.activeResTitle} numberOfLines={1}>
-            {reservation.boarding.title}
+            {reservation.boardingId.title}
           </Text>
           <View style={styles.activeResLocation}>
             <Ionicons name="location-outline" size={12} color={COLORS.gray} />
@@ -337,11 +337,11 @@ function CurrentHomeHeroCard({ reservation }: { reservation: Reservation }) {
           <Text style={[styles.activeResBadgeText, { color: COLORS.white }]}>ACTIVE</Text>
         </View>
       </View>
-      <Text style={styles.heroCardTitle} numberOfLines={2}>{reservation.boarding.title}</Text>
+      <Text style={styles.heroCardTitle} numberOfLines={2}>{reservation.boardingId.title}</Text>
       <View style={styles.heroCardLocation}>
         <Ionicons name="location-outline" size={13} color="rgba(255,255,255,0.8)" />
         <Text style={styles.heroCardLocationText}>
-          {reservation.boarding.city}, {reservation.boarding.district}
+          {reservation.boardingId.city}, {reservation.boardingId.district}
         </Text>
       </View>
       <View style={styles.heroCardDivider} />
