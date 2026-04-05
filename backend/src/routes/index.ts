@@ -42,7 +42,7 @@ router.use("/admin", adminRoutes);
 router.use("/boardings", boardingRoutes);
 
 // Reservation Routes
-router.use("/reservation", reservationRouter);
+router.use("/reservations", reservationRouter);
 
 // saved-boarding Routes
 router.use("/saved-boardings", savedBoardingRoutes);
