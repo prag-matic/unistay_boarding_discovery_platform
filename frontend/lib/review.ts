@@ -61,12 +61,13 @@ function normalizeReview(raw: RawReview): Review {
          (raw.studentId as unknown as { _id: string })?._id ??
          '');
   // boardingId may also be populated (Mongoose replaces FK with the document)
+  const rawBoarding = raw.boardingId as unknown as { id?: string; _id?: string; title?: string } | string;
   const boardingId =
-    typeof raw.boardingId === 'string'
-      ? raw.boardingId
-      : ((raw.boardingId as unknown as { id?: string; _id?: string })?.id ??
-         (raw.boardingId as unknown as { id?: string; _id?: string })?._id ??
-         String(raw.boardingId));
+    typeof rawBoarding === 'string'
+      ? rawBoarding
+      : (rawBoarding?.id ?? rawBoarding?._id ?? String(raw.boardingId));
+  const boardingTitle =
+    typeof rawBoarding === 'string' ? undefined : (rawBoarding?.title ?? undefined);
   // id virtual may be absent if lean() was called without { virtuals: true }
   const id =
     raw.id ??
@@ -80,6 +81,7 @@ function normalizeReview(raw: RawReview): Review {
   return {
     id,
     boardingId,
+    boardingTitle,
     authorId,
     reviewerName: student
       ? `${student.firstName ?? ''} ${student.lastName ?? ''}`.trim() || 'Unknown'
