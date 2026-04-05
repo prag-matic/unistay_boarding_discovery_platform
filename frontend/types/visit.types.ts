@@ -3,7 +3,7 @@ export type VisitStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'E
 export interface VisitBoardingInfo {
   id: string;
   title: string;
-  address: string;
+  address?: string;
   city: string;
   slug: string;
 }
