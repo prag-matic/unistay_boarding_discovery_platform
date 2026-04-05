@@ -23,4 +23,5 @@ export interface UpdateProfileRequest {
   phone?: string;
   university?: string;
   nicNumber?: string;
+  profileImageUrl?: string;
 }
