@@ -7,6 +7,7 @@ import {
 	NotFoundError,
 	UnauthorizedError,
 } from "@/errors/AppError.js";
+import { uploadPaymentProofImage } from "@/lib/cloudinary.js";
 import { sendSuccess } from "@/lib/response.js";
 import {
 	Boarding,
@@ -14,12 +15,12 @@ import {
 	RentalPeriod,
 	Reservation,
 } from "@/models/index.js";
-import { uploadPaymentProofImage } from "@/lib/cloudinary.js";
 import type {
 	LogPaymentInput,
 	RejectPaymentInput,
 } from "@/schemas/payment.validators.js";
 import { PaymentStatus, RentalPeriodStatus } from "@/types/enums.js";
+import { addId, transformPaymentDoc } from "@/utils/index.js";
 
 async function recalcRentalPeriodStatus(rentalPeriodId: string): Promise<void> {
 	const rentalPeriod = await RentalPeriod.findById(rentalPeriodId);
@@ -119,7 +120,7 @@ export async function logPayment(
 
 		sendSuccess(
 			res,
-			{ payment: populatedPayment },
+			{ payment: addId(populatedPayment as Record<string, unknown>) },
 			"Payment logged successfully",
 			201,
 		);
@@ -143,10 +144,25 @@ export async function getMyPayments(
 		const payments = await Payment.find({
 			studentId: new mongoose.Types.ObjectId(studentId),
 		})
+			.populate({
+				path: "rentalPeriodId",
+				select: "periodLabel dueDate amountDue status",
+			})
+			.populate({
+				path: "reservationId",
+				populate: {
+					path: "boardingId",
+					select: "title",
+				},
+			})
 			.sort({ createdAt: -1 })
 			.lean();
 
-		sendSuccess(res, { payments });
+		sendSuccess(res, {
+			payments: (payments as Record<string, unknown>[]).map(
+				transformPaymentDoc,
+			),
+		});
 	} catch (err) {
 		next(err);
 	}
@@ -201,7 +217,11 @@ export async function getMyBoardingPayments(
 			.sort({ createdAt: -1 })
 			.lean();
 
-		sendSuccess(res, { payments });
+		sendSuccess(res, {
+			payments: (payments as Record<string, unknown>[]).map(
+				transformPaymentDoc,
+			),
+		});
 	} catch (err) {
 		next(err);
 	}
@@ -254,25 +274,35 @@ export async function confirmPayment(
 
 		const payment = await Payment.findById(id).lean();
 
-		sendSuccess(res, { payment }, "Payment confirmed");
+		sendSuccess(
+			res,
+			{ payment: addId(payment as Record<string, unknown>) },
+			"Payment confirmed",
+		);
 	} catch (err) {
 		next(err);
 	}
 }
 
 // PUT /api/payments/:id/proof-image  (student)
-export async function uploadProofImage(req: Request, res: Response, next: NextFunction): Promise<void> {
-  	try {
+export async function uploadProofImage(
+	req: Request,
+	res: Response,
+	next: NextFunction,
+): Promise<void> {
+	try {
 		if (!req.user) throw new UnauthorizedError();
-		if (!req.file) throw new BadRequestError('No image file provided');
+		if (!req.file) throw new BadRequestError("No image file provided");
 
-		const proofImageUrl = await uploadPaymentProofImage(req.file.buffer, req.file.mimetype);
+		const proofImageUrl = await uploadPaymentProofImage(
+			req.file.buffer,
+			req.file.mimetype,
+		);
 
-		sendSuccess(res, { proofImageUrl }, 'Proof image uploaded successfully');
-
+		sendSuccess(res, { proofImageUrl }, "Proof image uploaded successfully");
 	} catch (err) {
 		next(err);
-  	}
+	}
 }
 
 // PATCH /api/v1/payments/:id/reject  (owner)
@@ -323,7 +353,11 @@ export async function rejectPayment(
 			{ new: true },
 		).lean();
 
-		sendSuccess(res, { payment }, "Payment rejected");
+		sendSuccess(
+			res,
+			{ payment: addId(payment as Record<string, unknown>) },
+			"Payment rejected",
+		);
 	} catch (err) {
 		next(err);
 	}

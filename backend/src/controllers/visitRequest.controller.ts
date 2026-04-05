@@ -15,6 +15,7 @@ import type {
 	RejectVisitRequestInput,
 } from "@/schemas/visitRequest.validators.js";
 import { BoardingStatus, VisitRequestStatus } from "@/types/enums.js";
+import { transformVisitRequestDoc } from "@/utils/index.js";
 
 const VISIT_EXPIRY_HOURS = 72;
 
@@ -84,7 +85,11 @@ export async function createVisitRequest(
 
 		sendSuccess(
 			res,
-			{ visitRequest: populated },
+			{
+				visitRequest: transformVisitRequestDoc(
+					populated as Record<string, unknown>,
+				),
+			},
 			"Visit request created successfully",
 			201,
 		);
@@ -113,7 +118,11 @@ export async function getMyVisitRequests(
 			.sort({ createdAt: -1 })
 			.lean();
 
-		sendSuccess(res, { visitRequests });
+		sendSuccess(res, {
+			visitRequests: (visitRequests as Record<string, unknown>[]).map(
+				transformVisitRequestDoc,
+			),
+		});
 	} catch (err) {
 		next(err);
 	}
@@ -154,7 +163,11 @@ export async function getMyBoardingVisitRequests(
 			.sort({ createdAt: -1 })
 			.lean();
 
-		sendSuccess(res, { visitRequests });
+		sendSuccess(res, {
+			visitRequests: (visitRequests as Record<string, unknown>[]).map(
+				transformVisitRequestDoc,
+			),
+		});
 	} catch (err) {
 		next(err);
 	}
@@ -193,7 +206,11 @@ export async function getVisitRequestById(
 			}
 		}
 
-		sendSuccess(res, { visitRequest });
+		sendSuccess(res, {
+			visitRequest: transformVisitRequestDoc(
+				visitRequest as Record<string, unknown>,
+			),
+		});
 	} catch (err) {
 		next(err);
 	}
@@ -246,7 +263,15 @@ export async function approveVisitRequest(
 			.populate("boardingId", "title slug city district")
 			.lean();
 
-		sendSuccess(res, { visitRequest }, "Visit request approved");
+		sendSuccess(
+			res,
+			{
+				visitRequest: transformVisitRequestDoc(
+					visitRequest as Record<string, unknown>,
+				),
+			},
+			"Visit request approved",
+		);
 	} catch (err) {
 		next(err);
 	}
@@ -296,7 +321,15 @@ export async function rejectVisitRequest(
 			.populate("boardingId", "title slug city district")
 			.lean();
 
-		sendSuccess(res, { visitRequest }, "Visit request rejected");
+		sendSuccess(
+			res,
+			{
+				visitRequest: transformVisitRequestDoc(
+					visitRequest as Record<string, unknown>,
+				),
+			},
+			"Visit request rejected",
+		);
 	} catch (err) {
 		next(err);
 	}
@@ -341,7 +374,15 @@ export async function cancelVisitRequest(
 			.populate("boardingId", "title slug city district")
 			.lean();
 
-		sendSuccess(res, { visitRequest }, "Visit request cancelled");
+		sendSuccess(
+			res,
+			{
+				visitRequest: transformVisitRequestDoc(
+					visitRequest as Record<string, unknown>,
+				),
+			},
+			"Visit request cancelled",
+		);
 	} catch (err) {
 		next(err);
 	}
