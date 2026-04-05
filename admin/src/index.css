@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+@theme {
+  --color-inverse-on-surface: #9a9d9f;
+  --color-secondary-fixed: #d5e3fc;
+  --color-surface-variant: #d9e4ea;
+  --color-on-primary-fixed: #304153;
+  --color-outline-variant: #a9b4b9;
+  --color-primary: #4f6073;
+  --color-secondary-fixed-dim: #c7d5ed;
+  --color-secondary: #526074;
+  --color-surface-bright: #f7f9fb;
+  --color-on-tertiary-container: #005a3c;
+  --color-surface-tint: #4f6073;
+  --color-error: #9e3f4e;
+  --color-error-container: #ff8b9a;
+  --color-surface-container-highest: #d9e4ea;
+  --color-on-tertiary-fixed-variant: #006544;
+  --color-on-secondary: #f8f8ff;
+  --color-primary-container: #d2e4fb;
+  --color-tertiary: #006d4a;
+  --color-primary-fixed: #d2e4fb;
+  --color-surface-container-low: #f0f4f7;
+  --color-secondary-dim: #465468;
+  --color-inverse-primary: #cfe1f8;
+  --color-on-secondary-fixed-variant: #4e5c71;
+  --color-tertiary-fixed: #69f6b8;
+  --color-tertiary-fixed-dim: #58e7ab;
+  --color-on-primary: #f5f8ff;
+  --color-on-background: #2a3439;
+  --color-tertiary-container: #69f6b8;
+  --color-on-surface-variant: #566166;
+  --color-inverse-surface: #0b0f10;
+  --color-error-dim: #4f0116;
+  --color-on-secondary-fixed: #324053;
+  --color-on-secondary-container: #455367;
+  --color-on-tertiary: #e6ffee;
+  --color-on-surface: #2a3439;
+  --color-on-error-container: #782232;
+  --color-outline: #717c82;
+  --color-on-tertiary-fixed: #00452d;
+  --color-surface-container-high: #e1e9ee;
+  --color-surface-container: #e8eff3;
+  --color-tertiary-dim: #005f40;
+  --color-secondary-container: #d5e3fc;
+  --color-primary-fixed-dim: #c4d6ed;
+  --color-surface-dim: #cfdce3;
+  --color-on-primary-fixed-variant: #4c5d70;
+  --color-surface: #f7f9fb;
+  --color-background: #f7f9fb;
+  --color-surface-container-lowest: #ffffff;
+  --color-on-error: #fff7f7;
+  --color-on-primary-container: #425366;
+  --color-primary-dim: #435467;
+
+  --font-headline: "Manrope", sans-serif;
+  --font-body: "Inter", sans-serif;
+  --font-label: "Inter", sans-serif;
+}
+
+@layer utilities {
+  .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  }
+  .thin-scrollbar::-webkit-scrollbar {
+    width: 4px;
+  }
+  .thin-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .thin-scrollbar::-webkit-scrollbar-thumb {
+    background: var(--color-surface-variant);
+  }
+}
