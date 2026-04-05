@@ -28,6 +28,10 @@ export const API_URL = "http://192.168.1.7:3000/api";
  * Routing tiles through the backend proxy ensures the User-Agent header
  * required by the OSM Tile Usage Policy is attached to every request.
  * https://operations.osmfoundation.org/policies/tiles/
+ *
+ * Assumes API_URL ends with "/api" (e.g. "http://host:3000/api").
+ * The proxy is mounted at /tiles on the same host, so we strip the "/api"
+ * suffix to get the root URL.
  */
 export const TILE_URL = `${API_URL.replace(/\/api$/, "")}/tiles`;
 
