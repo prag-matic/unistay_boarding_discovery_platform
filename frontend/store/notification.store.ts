@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import api from '@/lib/api';
+import logger from '@/lib/logger';
 import type { Notification } from '@/types/notification.types';
 
 interface NotificationState {
@@ -18,6 +19,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   isLoading: false,
 
   fetchNotifications: async () => {
+    logger.store.debug('fetchNotifications');
     set({ isLoading: true });
     try {
       const response = await api.get<{ notifications: Notification[] }>('/notifications');
@@ -32,6 +34,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   },
 
   markAsRead: async (id) => {
+    logger.store.debug('markNotificationAsRead', { id });
     try {
       await api.put(`/notifications/${id}/read`);
       set((state) => {
@@ -46,6 +49,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   },
 
   markAllAsRead: async () => {
+    logger.store.debug('markAllNotificationsAsRead');
     try {
       await api.put('/notifications/read-all');
       set((state) => ({
@@ -58,6 +62,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   },
 
   deleteNotification: async (id) => {
+    logger.store.debug('deleteNotification', { id });
     try {
       await api.delete(`/notifications/${id}`);
       set((state) => {
