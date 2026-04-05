@@ -89,8 +89,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     logger.store.debug('updateProfile');
     set({ isLoading: true });
     try {
-      const response = await api.put<UniStayApiResponse<{ user: User }>>('/users/me', data);
-      const updatedUser = response.data.data.user;
+      const response = await api.put<UniStayApiResponse<User>>('/users/me', data);
+      const updatedUser = response.data.data;
       await storage.setUser(updatedUser);
       set({ user: updatedUser });
     } finally {
