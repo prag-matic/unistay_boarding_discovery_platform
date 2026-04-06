@@ -70,7 +70,6 @@ const MAP_CAMERA_BOUNDARY = {
   northEast: { latitude: 7.035961932644662, longitude: 80.19100325001236 },
   southWest: { latitude: 6.8302835564392455, longitude: 79.89361663337401 },
 };
-
 // ─── Boarding List Card (full-width, horizontal) ──────────────────────────────
 function BoardingCard({ item }: { item: Boarding }) {
   const { user } = useAuthStore();
@@ -404,7 +403,7 @@ export default function ExploreScreen() {
             style={styles.map}
             provider={PROVIDER_GOOGLE}
             initialRegion={MAP_REGION}
-            cameraBoundary={MAP_CAMERA_BOUNDARY}
+            // cameraBoundary={MAP_CAMERA_BOUNDARY}
             minZoomLevel={14}
             maxZoomLevel={18}
             showsUserLocation
@@ -414,20 +413,16 @@ export default function ExploreScreen() {
               const isSelected = mapSelected?.id === b.id;
               return (
                 <Marker
-                  key={b.id}
+                  key={`${b.id}-${isSelected ? 'selected' : 'default'}`}
                   coordinate={{ latitude: b.latitude ?? DEFAULT_LATITUDE, longitude: b.longitude ?? DEFAULT_LONGITUDE }}
                   onPress={() => setMapSelected(isSelected ? null : b)}
-                  zIndex={isSelected ? 1 : 0}
-                >
-                  <View style={[styles.mapMarker, isSelected && styles.mapMarkerSelected]}>
-                    <Text style={[styles.mapMarkerText, isSelected && styles.mapMarkerTextSelected]}>
-                      {b.monthlyRent ? `LKR ${(b.monthlyRent / 1000).toFixed(0)}k` : '—'}
-                    </Text>
-                  </View>
-                </Marker>
+                  zIndex={isSelected ? 1000 : 0}
+                  pinColor={isSelected ? COLORS.red : COLORS.gray}
+                />
               );
             })}
           </MapView>
+
           {/* Boarding preview bottom sheet */}
           {mapSelected && (
             <MapBottomSheet
@@ -452,7 +447,7 @@ export default function ExploreScreen() {
 
       {/* ── View Toggle FAB (round, bottom-right) ── */}
       <TouchableOpacity
-        style={styles.viewToggleFab}
+        style={[styles.viewToggleFab, viewMode === 'map' && mapSelected && styles.viewToggleFabRaised]}
         activeOpacity={0.85}
         onPress={() => { setShowSortMenu(false); setMapSelected(null); setViewMode((v) => (v === 'list' ? 'map' : 'list')); }}
       >
@@ -692,37 +687,17 @@ const styles = StyleSheet.create({
   // ── Map
   mapContainer: { flex: 1 },
   map: { flex: 1 },
-  mapMarker: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  mapMarkerText: { fontSize: 12, fontWeight: '700', color: COLORS.white },
-  mapMarkerSelected: {
-    backgroundColor: COLORS.text,
-    transform: [{ scale: 1.2 }],
-    shadowOpacity: 0.35,
-    elevation: 8,
-  },
-  mapMarkerTextSelected: { color: COLORS.white },
-
   // ── Map bottom sheet
   bottomSheet: {
     position: 'absolute',
-    bottom: 0,
+    bottom: -1,
     left: 0,
     right: 0,
     backgroundColor: COLORS.white,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 16,
-    paddingBottom: 28,
+    paddingBottom: 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.1,
@@ -806,5 +781,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.45,
     shadowRadius: 8,
     elevation: 8,
+  },
+  viewToggleFabRaised: {
+    bottom: 180,
   },
 });
