@@ -420,8 +420,14 @@ export default function ExploreScreen() {
                   onPress={() => setMapSelected(isSelected ? null : b)}
                   zIndex={isSelected ? 1 : 0}
                   anchor={{ x: 0.5, y: 1 }}
+                  tracksViewChanges={false}
                 >
-                  <View style={styles.mapMarkerContainer}>
+                  <View
+                    style={styles.mapMarkerContainer}
+                    collapsable={false}
+                    renderToHardwareTextureAndroid
+                    shouldRasterizeIOS
+                  >
                     <View style={[styles.mapMarker, isSelected && styles.mapMarkerSelected]}>
                       <Text style={[styles.mapMarkerText, isSelected && styles.mapMarkerTextSelected]}>
                         {b.monthlyRent ? `LKR ${(b.monthlyRent / 1000).toFixed(0)}k` : '—'}
