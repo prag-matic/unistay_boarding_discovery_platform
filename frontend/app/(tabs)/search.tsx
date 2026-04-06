@@ -417,11 +417,14 @@ export default function ExploreScreen() {
                   coordinate={{ latitude: b.latitude ?? DEFAULT_LATITUDE, longitude: b.longitude ?? DEFAULT_LONGITUDE }}
                   onPress={() => setMapSelected(isSelected ? null : b)}
                   zIndex={isSelected ? 1000 : 0}
+                  anchor={{ x: 0.5, y: 0.5 }}
                 >
-                  <View style={[styles.mapMarkerPill, isSelected && styles.mapMarkerPillSelected]}>
-                    <Text style={[styles.mapMarkerText, isSelected && styles.mapMarkerTextSelected]}>
-                      {b.monthlyRent ? `LKR ${b.monthlyRent.toLocaleString()}` : "LKR —"}
-                    </Text>
+                  <View style={styles.mapMarkerWrap}>
+                    <View style={[styles.mapMarkerPill, isSelected && styles.mapMarkerPillSelected]}>
+                      <Text style={[styles.mapMarkerText, isSelected && styles.mapMarkerTextSelected]}>
+                        {b.monthlyRent ? `LKR ${b.monthlyRent.toLocaleString()}` : "LKR —"}
+                      </Text>
+                    </View>
                   </View>
                 </Marker>
               );
@@ -691,6 +694,11 @@ const styles = StyleSheet.create({
   // ── Map
   mapContainer: { flex: 1 },
   map: { flex: 1 },
+  mapMarkerWrap: {
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    overflow: 'visible',
+  },
   mapMarkerPill: {
     backgroundColor: COLORS.white,
     borderColor: COLORS.primary,
@@ -708,7 +716,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     borderColor: COLORS.primaryDark,
     borderWidth: 2,
-    transform: [{ scale: 1.08 }],
     shadowOpacity: 0.22,
     shadowRadius: 6,
     elevation: 6,
