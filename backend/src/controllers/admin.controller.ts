@@ -12,19 +12,28 @@ import type { AdminListUsersQuery } from "@/schemas/user.validators.js";
 import { BoardingStatus } from "@/types/enums.js";
 import { addId, transformBoardingDoc } from "@/utils/index.js";
 
-// GET /api/v1/admin/users
+// GET /api/admin/users
 export async function listUsers(
 	req: Request,
 	res: Response,
 	next: NextFunction,
 ): Promise<void> {
 	try {
-		const { page, size, role, active } =
+		const { page, size, role, active, search } =
 			req.query as unknown as AdminListUsersQuery;
 
 		const query: Record<string, unknown> = {};
 		if (role !== undefined) query.role = role;
 		if (active !== undefined) query.isActive = active;
+		if (search !== undefined && search.length > 0) {
+			const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+			query.$or = [
+				{ firstName: { $regex: escapedSearch, $options: "i" } },
+				{ lastName: { $regex: escapedSearch, $options: "i" } },
+				{ email: { $regex: escapedSearch, $options: "i" } },
+				{ phone: { $regex: escapedSearch, $options: "i" } },
+			];
+		}
 
 		const [users, total] = await Promise.all([
 			User.find(query)

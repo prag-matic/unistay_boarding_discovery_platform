@@ -100,4 +100,14 @@ describe("adminListUsersQuerySchema", () => {
 		const r = adminListUsersQuerySchema.parse({ active: "false" });
 		expect(r.active).toBe(false);
 	});
+
+	it("accepts search query and trims spaces", () => {
+		const r = adminListUsersQuerySchema.parse({ search: "  john doe  " });
+		expect(r.search).toBe("john doe");
+	});
+
+	it("rejects search longer than 100 chars", () =>
+		expect(() =>
+			adminListUsersQuerySchema.parse({ search: "a".repeat(101) }),
+		).toThrow());
 });

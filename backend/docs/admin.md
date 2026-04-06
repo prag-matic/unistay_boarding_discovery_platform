@@ -11,6 +11,7 @@
 
 - `GET /users`
   - Supports filtering by `role` and `active`
+  - Supports server-side text search via `search` (case-insensitive partial match across `firstName`, `lastName`, `email`, `phone`)
   - Returns paginated users ordered by `createdAt desc`
 - `GET /users/:id`
   - Returns selected user profile fields
@@ -42,6 +43,7 @@
 - `size`: positive int, max `100`, default `20`
 - `role`: `STUDENT | OWNER | ADMIN` (optional)
 - `active`: boolean-like string via `z.stringbool()` (optional)
+- `search`: trimmed string, max length `100` (optional)
 
 ### Body Validation
 
