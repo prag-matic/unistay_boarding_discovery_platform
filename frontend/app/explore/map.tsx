@@ -66,10 +66,12 @@ export default function MapViewScreen() {
             coordinate={{ latitude: boarding.latitude ?? 7.8731, longitude: boarding.longitude ?? 80.7718 }}
             onPress={() => setSelected(selected?.id === boarding.id ? null : boarding)}
           >
-            <View style={styles.marker}>
-              <Text style={styles.markerText}>
-                {boarding.monthlyRent ? `LKR ${(boarding.monthlyRent / 1000).toFixed(0)}k` : '—'}
-              </Text>
+            <View style={styles.markerWrapper}>
+              <View style={styles.marker}>
+                <Text style={styles.markerText}>
+                  {boarding.monthlyRent ? `LKR ${(boarding.monthlyRent / 1000).toFixed(0)}k` : '—'}
+                </Text>
+              </View>
             </View>
             <Callout tooltip>
               <View style={styles.callout}>
@@ -162,6 +164,10 @@ const styles = StyleSheet.create({
   map: { flex: 1 },
 
   // Markers
+  markerWrapper: {
+    padding: 6,
+    overflow: 'visible',
+  },
   marker: {
     backgroundColor: COLORS.primary,
     borderRadius: 20,
