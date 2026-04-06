@@ -12,29 +12,46 @@ import type { AdminListUsersQuery } from "@/schemas/user.validators.js";
 import { BoardingStatus } from "@/types/enums.js";
 import { addId, transformBoardingDoc } from "@/utils/index.js";
 
-// GET /api/v1/admin/users
+// GET /api/admin/users
 export async function listUsers(
 	req: Request,
 	res: Response,
 	next: NextFunction,
 ): Promise<void> {
 	try {
-		const { page, size, role, active } =
+		const { page, size, role, active, search } =
 			req.query as unknown as AdminListUsersQuery;
 
-		const query: Record<string, unknown> = {};
-		if (role !== undefined) query.role = role;
-		if (active !== undefined) query.isActive = active;
+		const escapedSearch =
+			search && search.length > 0
+				? search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+				: undefined;
+		const searchRegex = escapedSearch ? new RegExp(escapedSearch, "i") : undefined;
+
+		const filters = {
+			...(role !== undefined ? { role } : {}),
+			...(active !== undefined ? { isActive: active } : {}),
+			...(searchRegex
+				? {
+						$or: [
+							{ firstName: searchRegex },
+							{ lastName: searchRegex },
+							{ email: searchRegex },
+							{ phone: searchRegex },
+						],
+					}
+				: {}),
+		};
 
 		const [users, total] = await Promise.all([
-			User.find(query)
+			User.find(filters)
 				.select("-passwordHash")
 				.skip((page - 1) * size)
 				.limit(size)
 				.sort({ createdAt: -1 })
 				.lean(),
 
-			User.countDocuments(query),
+			User.countDocuments(filters),
 		]);
 
 		sendSuccess(res, {
