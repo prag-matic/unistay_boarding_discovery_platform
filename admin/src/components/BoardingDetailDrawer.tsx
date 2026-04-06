@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { cn } from '../lib/utils';
 import type { Boarding } from '../services/api';
 
@@ -12,6 +12,40 @@ interface Props {
 export default function BoardingDetailDrawer({ boarding, onClose, onApprove, onReject }: Props) {
   const [isRejecting, setIsRejecting] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+  const [activeImageIndex, setActiveImageIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    setIsRejecting(false);
+    setRejectReason('');
+    setActiveImageIndex(null);
+  }, [boarding?.id]);
+
+  const formatAmenityLabel = (name: string) =>
+    name
+      .toLowerCase()
+      .split('_')
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
+
+  const getAmenityIcon = (name: string) => {
+    const amenity = name.toUpperCase();
+
+    if (amenity.includes('WIFI')) return 'wifi';
+    if (amenity.includes('AIR_CONDITIONING')) return 'ac_unit';
+    if (amenity.includes('HOT_WATER')) return 'shower';
+    if (amenity.includes('LAUNDRY')) return 'local_laundry_service';
+    if (amenity.includes('PARKING')) return 'local_parking';
+    if (amenity.includes('SECURITY')) return 'shield';
+    if (amenity.includes('KITCHEN')) return 'kitchen';
+    if (amenity.includes('GYM')) return 'fitness_center';
+    if (amenity.includes('SWIMMING_POOL')) return 'pool';
+    if (amenity.includes('STUDY_ROOM')) return 'menu_book';
+    if (amenity.includes('COMMON_AREA')) return 'weekend';
+    if (amenity.includes('BALCONY')) return 'balcony';
+    if (amenity.includes('GENERATOR')) return 'bolt';
+    if (amenity.includes('WATER_TANK')) return 'water_drop';
+    return 'home';
+  };
 
   if (!boarding) return null;
 
@@ -52,28 +86,47 @@ export default function BoardingDetailDrawer({ boarding, onClose, onApprove, onR
           {boarding.images && boarding.images.length > 0 && (
             <section>
               <div className="grid grid-cols-4 gap-2 h-48">
-                <div className="col-span-3 rounded-lg overflow-hidden relative">
+                <button
+                  type="button"
+                  onClick={() => setActiveImageIndex(0)}
+                  className="col-span-3 rounded-lg overflow-hidden relative cursor-zoom-in"
+                >
                   <img src={boarding.images[0].url} className="w-full h-full object-cover" alt="Main" referrerPolicy="no-referrer" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
-                </div>
+                </button>
                 {boarding.images.length > 1 && (
                   <div className="flex flex-col gap-2">
-                    <div className="flex-1 rounded-lg overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setActiveImageIndex(1)}
+                      className="flex-1 rounded-lg overflow-hidden cursor-zoom-in"
+                    >
                       <img src={boarding.images[1].url} className="w-full h-full object-cover" alt="Secondary" referrerPolicy="no-referrer" />
-                    </div>
+                    </button>
                     {boarding.images.length > 2 && (
-                      <div className="flex-1 rounded-lg overflow-hidden relative">
+                      <button
+                        type="button"
+                        onClick={() => setActiveImageIndex(2)}
+                        className="flex-1 rounded-lg overflow-hidden relative cursor-zoom-in"
+                      >
                         <img src={boarding.images[2].url} className="w-full h-full object-cover" alt="Tertiary" referrerPolicy="no-referrer" />
                         {boarding.images.length > 3 && (
                           <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white text-xs font-bold">
                             +{boarding.images.length - 3}
                           </div>
                         )}
-                      </div>
+                      </button>
                     )}
                   </div>
                 )}
               </div>
+              <button
+                type="button"
+                onClick={() => setActiveImageIndex(0)}
+                className="mt-3 text-xs font-bold text-primary hover:underline"
+              >
+                View Gallery
+              </button>
             </section>
           )}
 
@@ -84,44 +137,44 @@ export default function BoardingDetailDrawer({ boarding, onClose, onApprove, onR
             </p>
           </section>
 
-          <section className="grid grid-cols-2 gap-6">
+            <section className="grid grid-cols-2 gap-6">
             <div>
-              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-2">Boarding Type (boardingType)</h4>
+              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-2">Boarding Type</h4>
               <div className="flex items-center gap-2 text-sm">
                 <span className="material-symbols-outlined text-primary text-lg">home</span>
                 <span>{boarding.boardingType}</span>
               </div>
             </div>
             <div>
-              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-2">Gender Preference (genderPref)</h4>
+              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-2">Gender Preference</h4>
               <div className="flex items-center gap-2 text-sm">
                 <span className="material-symbols-outlined text-primary text-lg">wc</span>
                 <span>{boarding.genderPref}</span>
               </div>
             </div>
             <div>
-              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-2">Max Occupants (maxOccupants)</h4>
+              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-2">Max Occupants</h4>
               <div className="flex items-center gap-2 text-sm">
                 <span className="material-symbols-outlined text-primary text-lg">groups</span>
                 <span>{boarding.maxOccupants}</span>
               </div>
             </div>
             <div>
-              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-2">Current Occupants (currentOccupants)</h4>
+              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-2">Current Occupants</h4>
               <div className="flex items-center gap-2 text-sm">
                 <span className="material-symbols-outlined text-primary text-lg">person</span>
                 <span>{boarding.currentOccupants}</span>
               </div>
             </div>
             <div>
-              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-2">City (city)</h4>
+              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-2">City</h4>
               <div className="flex items-center gap-2 text-sm">
                 <span className="material-symbols-outlined text-primary text-lg">location_city</span>
                 <span>{boarding.city}</span>
               </div>
             </div>
             <div>
-              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-2">District (district)</h4>
+              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-2">District</h4>
               <div className="flex items-center gap-2 text-sm">
                 <span className="material-symbols-outlined text-primary text-lg">map</span>
                 <span>{boarding.district}</span>
@@ -131,10 +184,13 @@ export default function BoardingDetailDrawer({ boarding, onClose, onApprove, onR
 
           {boarding.amenities && boarding.amenities.length > 0 && (
             <section>
-              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-3">Amenities (amenities)</h4>
+              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-3">Amenities</h4>
               <div className="flex flex-wrap gap-2">
                 {boarding.amenities.map((amenity) => (
-                  <span key={amenity.id} className="bg-surface-variant text-xs px-3 py-1 rounded-sm">{amenity.name}</span>
+                  <span key={amenity.id} className="bg-surface-variant text-xs px-3 py-1 rounded-sm inline-flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-sm text-primary">{getAmenityIcon(amenity.name)}</span>
+                    {formatAmenityLabel(amenity.name)}
+                  </span>
                 ))}
               </div>
             </section>
@@ -142,7 +198,7 @@ export default function BoardingDetailDrawer({ boarding, onClose, onApprove, onR
 
           {boarding.rules && boarding.rules.length > 0 && (
             <section>
-              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-3">Rules (rules)</h4>
+              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-3">Rules</h4>
               <ul className="space-y-2 text-sm text-on-surface/80">
                 {boarding.rules.map((rule) => {
                   let icon = 'info';
@@ -183,7 +239,7 @@ export default function BoardingDetailDrawer({ boarding, onClose, onApprove, onR
               />
             </div>
           )}
-          <div className="grid grid-cols-2 gap-4">
+          <div className={cn('grid gap-4', isRejecting ? 'grid-cols-3' : 'grid-cols-2')}>
             <button
               onClick={handleRejectClick}
               className="flex items-center justify-center gap-2 py-3 bg-error text-on-error rounded-md font-bold text-sm tracking-wide transition-all hover:brightness-110 active:scale-[0.98]"
@@ -191,6 +247,18 @@ export default function BoardingDetailDrawer({ boarding, onClose, onApprove, onR
               <span className="material-symbols-outlined text-lg">cancel</span>
               {isRejecting ? 'CONFIRM REJECT' : 'REJECT LISTING'}
             </button>
+            {isRejecting && (
+              <button
+                onClick={() => {
+                  setIsRejecting(false);
+                  setRejectReason('');
+                }}
+                className="flex items-center justify-center gap-2 py-3 bg-surface text-on-surface border border-outline-variant/40 rounded-md font-bold text-sm tracking-wide transition-all hover:bg-surface-container-high active:scale-[0.98]"
+              >
+                <span className="material-symbols-outlined text-lg">undo</span>
+                CANCEL
+              </button>
+            )}
             <button
               onClick={onApprove}
               disabled={isRejecting}
@@ -202,6 +270,78 @@ export default function BoardingDetailDrawer({ boarding, onClose, onApprove, onR
           </div>
         </div>
       </div>
+
+      {activeImageIndex !== null && boarding.images && boarding.images[activeImageIndex] && (
+        <div
+          className="fixed inset-0 z-[60] bg-inverse-surface/80 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setActiveImageIndex(null)}
+        >
+          <div
+            className="relative w-full max-w-4xl max-h-[90vh] bg-surface-container-lowest rounded-xl p-4"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setActiveImageIndex(null)}
+              className="absolute top-3 right-3 p-2 rounded-full bg-surface-container text-on-surface hover:bg-surface-container-high"
+            >
+              <span className="material-symbols-outlined">close</span>
+            </button>
+            <div className="relative h-[70vh] flex items-center justify-center">
+              <img
+                src={boarding.images[activeImageIndex].url}
+                alt={`Boarding image ${activeImageIndex + 1}`}
+                className="max-w-full max-h-full object-contain rounded-lg"
+                referrerPolicy="no-referrer"
+              />
+              {boarding.images.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setActiveImageIndex((prev) => (prev! - 1 + boarding.images.length) % boarding.images.length)
+                    }
+                    className="absolute left-2 p-2 rounded-full bg-surface-container/90 hover:bg-surface-container-high"
+                  >
+                    <span className="material-symbols-outlined">chevron_left</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setActiveImageIndex((prev) => (prev! + 1) % boarding.images.length)
+                    }
+                    className="absolute right-2 p-2 rounded-full bg-surface-container/90 hover:bg-surface-container-high"
+                  >
+                    <span className="material-symbols-outlined">chevron_right</span>
+                  </button>
+                </>
+              )}
+            </div>
+            {boarding.images.length > 1 && (
+              <div className="mt-3 flex gap-2 overflow-x-auto thin-scrollbar pb-1">
+                {boarding.images.map((image, index) => (
+                  <button
+                    key={image.id}
+                    type="button"
+                    onClick={() => setActiveImageIndex(index)}
+                    className={cn(
+                      'h-14 w-20 rounded overflow-hidden border-2 shrink-0',
+                      index === activeImageIndex ? 'border-primary' : 'border-transparent',
+                    )}
+                  >
+                    <img
+                      src={image.url}
+                      alt={`Thumbnail ${index + 1}`}
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 }
