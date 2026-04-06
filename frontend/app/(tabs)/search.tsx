@@ -447,7 +447,7 @@ export default function ExploreScreen() {
 
       {/* ── View Toggle FAB (round, bottom-right) ── */}
       <TouchableOpacity
-        style={styles.viewToggleFab}
+        style={[styles.viewToggleFab, viewMode === 'map' && mapSelected && styles.viewToggleFabRaised]}
         activeOpacity={0.85}
         onPress={() => { setShowSortMenu(false); setMapSelected(null); setViewMode((v) => (v === 'list' ? 'map' : 'list')); }}
       >
@@ -690,14 +690,14 @@ const styles = StyleSheet.create({
   // ── Map bottom sheet
   bottomSheet: {
     position: 'absolute',
-    bottom: 0,
+    bottom: -1,
     left: 0,
     right: 0,
     backgroundColor: COLORS.white,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 16,
-    paddingBottom: 28,
+    paddingBottom: 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.1,
@@ -781,5 +781,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.45,
     shadowRadius: 8,
     elevation: 8,
+  },
+  viewToggleFabRaised: {
+    bottom: 180,
   },
 });
