@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import MapView, { Marker, Callout, UrlTile } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useAuthStore } from '@/store/auth.store';
 import { useBoardingStore } from '@/store/boarding.store';
 import { useSaveBoarding } from '@/hooks/useSaveBoarding';
@@ -60,10 +60,15 @@ const TOP_AMENITIES = Object.keys(AMENITY_ICONS);
 const DEFAULT_LATITUDE = 7.8731;
 const DEFAULT_LONGITUDE = 80.7718;
 const MAP_REGION = {
-  latitude: DEFAULT_LATITUDE,
-  longitude: DEFAULT_LONGITUDE,
-  latitudeDelta: 4.0,
-  longitudeDelta: 4.0,
+  latitude: 6.915137412076758,
+  longitude: 79.9731566669944,
+  latitudeDelta: 0.1,
+  longitudeDelta: 0.1,
+};
+
+const MAP_CAMERA_BOUNDARY = {
+  northEast: { latitude: 7.035961932644662, longitude: 80.19100325001236 },
+  southWest: { latitude: 6.8302835564392455, longitude: 79.89361663337401 },
 };
 
 // ─── Boarding List Card (full-width, horizontal) ──────────────────────────────
@@ -397,35 +402,31 @@ export default function ExploreScreen() {
         <View style={styles.mapContainer}>
           <MapView
             style={styles.map}
-            mapType="none"
+            provider={PROVIDER_GOOGLE}
             initialRegion={MAP_REGION}
+            cameraBoundary={MAP_CAMERA_BOUNDARY}
+            minZoomLevel={14}
+            maxZoomLevel={18}
             showsUserLocation
             showsMyLocationButton
           >
-            <UrlTile
-              urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-              maximumZ={19}
-              flipY={false}
-            />
-            {boardings.map((b) => (
-              <Marker
-                key={b.id}
-                coordinate={{ latitude: b.latitude ?? DEFAULT_LATITUDE, longitude: b.longitude ?? DEFAULT_LONGITUDE }}
-                onPress={() => setMapSelected(mapSelected?.id === b.id ? null : b)}
-              >
-                <View style={styles.mapMarker}>
-                  <Text style={styles.mapMarkerText}>
-                    {b.monthlyRent ? `LKR ${(b.monthlyRent / 1000).toFixed(0)}k` : '—'}
-                  </Text>
-                </View>
-                <Callout tooltip>
-                  <View style={styles.callout}>
-                    <Text style={styles.calloutTitle} numberOfLines={1}>{b.title}</Text>
-                    <Text style={styles.calloutSub}>{b.city}</Text>
+            {boardings.map((b) => {
+              const isSelected = mapSelected?.id === b.id;
+              return (
+                <Marker
+                  key={b.id}
+                  coordinate={{ latitude: b.latitude ?? DEFAULT_LATITUDE, longitude: b.longitude ?? DEFAULT_LONGITUDE }}
+                  onPress={() => setMapSelected(isSelected ? null : b)}
+                  zIndex={isSelected ? 1 : 0}
+                >
+                  <View style={[styles.mapMarker, isSelected && styles.mapMarkerSelected]}>
+                    <Text style={[styles.mapMarkerText, isSelected && styles.mapMarkerTextSelected]}>
+                      {b.monthlyRent ? `LKR ${(b.monthlyRent / 1000).toFixed(0)}k` : '—'}
+                    </Text>
                   </View>
-                </Callout>
-              </Marker>
-            ))}
+                </Marker>
+              );
+            })}
           </MapView>
           {/* Boarding preview bottom sheet */}
           {mapSelected && (
@@ -703,19 +704,13 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   mapMarkerText: { fontSize: 12, fontWeight: '700', color: COLORS.white },
-  callout: {
-    backgroundColor: COLORS.white,
-    borderRadius: 10,
-    padding: 8,
-    minWidth: 140,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 4,
+  mapMarkerSelected: {
+    backgroundColor: COLORS.text,
+    transform: [{ scale: 1.2 }],
+    shadowOpacity: 0.35,
+    elevation: 8,
   },
-  calloutTitle: { fontSize: 13, fontWeight: '700', color: COLORS.text },
-  calloutSub: { fontSize: 11, color: COLORS.textSecondary, marginTop: 2 },
+  mapMarkerTextSelected: { color: COLORS.white },
 
   // ── Map bottom sheet
   bottomSheet: {

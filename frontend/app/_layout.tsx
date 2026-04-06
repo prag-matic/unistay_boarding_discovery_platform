@@ -31,6 +31,7 @@ export default function RootLayout() {
         <Stack.Screen name="explore" />
         <Stack.Screen name="visits" />
         <Stack.Screen name="reservations" />
+        <Stack.Screen name="location-picker" />
       </Stack>
       <Toast />
     </GestureHandlerRootView>

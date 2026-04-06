@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,23 +10,28 @@ import {
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Marker, Callout, UrlTile } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { searchBoardings } from '@/lib/boarding';
 import { COLORS } from '@/lib/constants';
 import type { Boarding } from '@/types/boarding.types';
 
-// Sri Lanka centre as the default region
 const INITIAL_REGION = {
-  latitude: 7.8731,
-  longitude: 80.7718,
-  latitudeDelta: 4.0,
-  longitudeDelta: 4.0,
+  latitude: 6.915137412076758,
+  longitude: 79.9731566669944,
+  latitudeDelta: 0.1,
+  longitudeDelta: 0.1,
+};
+
+const CAMERA_BOUNDARY = {
+  northEast: { latitude: 7.035961932644662, longitude: 80.19100325001236 },
+  southWest: { latitude: 6.8302835564392455, longitude: 79.89361663337401 },
 };
 
 export default function MapViewScreen() {
   const [selected, setSelected] = useState<Boarding | null>(null);
   const [query, setQuery] = useState('');
   const [allBoardings, setAllBoardings] = useState<Boarding[]>([]);
+  const mapRef = useRef<MapView>(null);
 
   useEffect(() => {
     searchBoardings({ size: 100 })
@@ -45,39 +50,24 @@ export default function MapViewScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <MapView
+        ref={mapRef}
         style={styles.map}
-        mapType="none"
+        provider={PROVIDER_GOOGLE}
         initialRegion={INITIAL_REGION}
+        cameraBoundary={CAMERA_BOUNDARY}
+        minZoomLevel={14}
+        maxZoomLevel={18}
         showsUserLocation
         showsMyLocationButton
       >
-        <UrlTile
-          urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-          maximumZ={19}
-          flipY={false}
-        />
         {filtered.map((boarding) => (
           <Marker
             key={boarding.id}
             coordinate={{ latitude: boarding.latitude ?? 7.8731, longitude: boarding.longitude ?? 80.7718 }}
+            title={boarding.title}
+            description={`${boarding.city}, ${boarding.district}`}
             onPress={() => setSelected(selected?.id === boarding.id ? null : boarding)}
-          >
-            <View style={styles.marker}>
-              <Text style={styles.markerText}>
-                {boarding.monthlyRent ? `LKR ${(boarding.monthlyRent / 1000).toFixed(0)}k` : '—'}
-              </Text>
-            </View>
-            <Callout tooltip>
-              <View style={styles.callout}>
-                <Text style={styles.calloutTitle} numberOfLines={1}>
-                  {boarding.title}
-                </Text>
-                <Text style={styles.calloutSub}>
-                  {boarding.city}, {boarding.district}
-                </Text>
-              </View>
-            </Callout>
-          </Marker>
+          />
         ))}
       </MapView>
 
@@ -109,6 +99,14 @@ export default function MapViewScreen() {
           <Ionicons name="list-outline" size={20} color={COLORS.text} />
         </TouchableOpacity>
       </View>
+
+      {/* Recenter button */}
+      <TouchableOpacity
+        style={styles.recenterBtn}
+        onPress={() => mapRef.current?.animateToRegion(INITIAL_REGION, 400)}
+      >
+        <Ionicons name="locate" size={20} color={COLORS.primary} />
+      </TouchableOpacity>
 
       {/* Bottom sheet preview */}
       {selected && (
@@ -148,35 +146,6 @@ export default function MapViewScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   map: { flex: 1 },
-
-  // Markers
-  marker: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  markerText: { fontSize: 12, fontWeight: '700', color: COLORS.white },
-
-  // Callout
-  callout: {
-    backgroundColor: COLORS.white,
-    borderRadius: 10,
-    padding: 8,
-    minWidth: 140,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  calloutTitle: { fontSize: 13, fontWeight: '700', color: COLORS.text },
-  calloutSub: { fontSize: 11, color: COLORS.textSecondary, marginTop: 2 },
 
   // Top overlay
   topOverlay: {
@@ -231,6 +200,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 4,
     elevation: 3,
+  },
+  recenterBtn: {
+    position: 'absolute',
+    right: 14,
+    bottom: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 5,
   },
 
   // Bottom sheet

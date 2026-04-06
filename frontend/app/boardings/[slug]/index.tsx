@@ -7,13 +7,14 @@ import {
   TouchableOpacity,
   Image,
   Dimensions,
-  FlatList,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useAuthStore } from '@/store/auth.store';
 import { getBoardingBySlug } from '@/lib/boarding';
 import { getBoardingReviewsById, getReviewStats } from '@/lib/review';
@@ -138,30 +139,32 @@ export default function BoardingDetailsScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Image Carousel */}
         <View style={styles.carouselContainer}>
-          <FlatList
-            data={boarding.images}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            keyExtractor={(img) => img.id}
-            onMomentumScrollEnd={(e) => {
-              const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
-              setActiveImage(idx);
-            }}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                activeOpacity={0.95}
-                onPress={() => router.push(`/boardings/${slug}/gallery` as never)}
-              >
-                <Image source={{ uri: item.url }} style={styles.carouselImage} />
-              </TouchableOpacity>
-            )}
-            ListEmptyComponent={
-              <View style={[styles.carouselImage, styles.carouselPlaceholder]}>
-                <Ionicons name="home-outline" size={56} color={COLORS.gray} />
-              </View>
-            }
-          />
+          {boarding.images.length === 0 ? (
+            <View style={[styles.carouselImage, styles.carouselPlaceholder]}>
+              <Ionicons name="home-outline" size={56} color={COLORS.gray} />
+            </View>
+          ) : (
+            <ScrollView
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onMomentumScrollEnd={(e) => {
+                const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+                setActiveImage(idx);
+              }}
+              scrollEventThrottle={16}
+            >
+              {boarding.images.map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  activeOpacity={0.95}
+                  onPress={() => router.push(`/boardings/${slug}/gallery` as never)}
+                >
+                  <Image source={{ uri: item.url }} style={styles.carouselImage} />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
           {boarding.images.length > 1 && (
             <View style={styles.paginationDots}>
               {boarding.images.map((_, i) => (
@@ -337,22 +340,67 @@ export default function BoardingDetailsScreen() {
 
           {/* ── Location ── */}
           <Text style={styles.sectionTitle}>Location</Text>
-          <TouchableOpacity
-            style={styles.mapCard}
-            onPress={() => router.push('/explore/map' as never)}
-            activeOpacity={0.85}
-          >
-            <View style={styles.mapIconWrap}>
-              <Ionicons name="map-outline" size={28} color={COLORS.primary} />
+          {boarding.latitude && boarding.longitude ? (
+            <View style={styles.mapWrapper}>
+              <MapView
+                style={styles.embeddedMap}
+                provider={PROVIDER_GOOGLE}
+                initialRegion={{
+                  latitude: boarding.latitude,
+                  longitude: boarding.longitude,
+                  latitudeDelta: 0.015,
+                  longitudeDelta: 0.015,
+                }}
+                cameraBoundary={{
+                  northEast: { latitude: 7.035961932644662, longitude: 80.19100325001236 },
+                  southWest: { latitude: 6.8302835564392455, longitude: 79.89361663337401 },
+                }}
+                minZoomLevel={14}
+                maxZoomLevel={18}
+                scrollEnabled={false}
+                zoomEnabled={false}
+                rotateEnabled={false}
+                pitchEnabled={false}
+              >
+                <Marker coordinate={{ latitude: boarding.latitude, longitude: boarding.longitude }}>
+                  <View style={styles.mapPin}>
+                    <Ionicons name="location" size={30} color={COLORS.primary} />
+                  </View>
+                </Marker>
+              </MapView>
+              <TouchableOpacity
+                style={styles.mapExpandBtn}
+                onPress={() => router.push('/explore/map' as never)}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="expand-outline" size={16} color={COLORS.white} />
+                <Text style={styles.mapExpandBtnText}>View on Map</Text>
+              </TouchableOpacity>
+              <View style={styles.mapAddressOverlay}>
+                <Ionicons name="location-outline" size={14} color={COLORS.primary} />
+                <Text style={styles.mapAddressText} numberOfLines={1}>
+                  {boarding.address}, {boarding.city}
+                </Text>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.mapCardTitle}>{boarding.city}, {boarding.district}</Text>
-              <Text style={styles.mapCardSub}>{boarding.address}</Text>
-            </View>
-            <View style={styles.mapCardArrow}>
-              <Ionicons name="chevron-forward" size={18} color={COLORS.primary} />
-            </View>
-          </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.mapCard}
+              onPress={() => router.push('/explore/map' as never)}
+              activeOpacity={0.85}
+            >
+              <View style={styles.mapIconWrap}>
+                <Ionicons name="map-outline" size={28} color={COLORS.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.mapCardTitle}>{boarding.city}, {boarding.district}</Text>
+                <Text style={styles.mapCardSub}>{boarding.address}</Text>
+              </View>
+              <View style={styles.mapCardArrow}>
+                <Ionicons name="chevron-forward" size={18} color={COLORS.primary} />
+              </View>
+            </TouchableOpacity>
+          )}
 
           <View style={styles.divider} />
 
@@ -705,7 +753,7 @@ const styles = StyleSheet.create({
   },
   ruleText: { fontSize: 14, color: COLORS.textSecondary, flex: 1 },
 
-  // Map card
+  // Map card (fallback when no coordinates)
   mapCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -734,6 +782,45 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Embedded map
+  mapWrapper: {
+    borderRadius: 14,
+    overflow: Platform.OS === 'ios' ? 'hidden' : 'visible',
+    borderWidth: 1,
+    borderColor: COLORS.grayBorder,
+    height: 200,
+    position: 'relative',
+  },
+  embeddedMap: { flex: 1 },
+  mapPin: { alignItems: 'center' },
+  mapExpandBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  mapExpandBtnText: { fontSize: 12, fontWeight: '600', color: COLORS.white },
+  mapAddressOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  mapAddressText: { fontSize: 12, color: COLORS.text, fontWeight: '500', flex: 1 },
+  // Attribution sits above the address overlay (address bar is ~34px tall)
+  mapAttributionOverride: { bottom: 38, left: 4 },
 
   // Owner card
   ownerCard: {
