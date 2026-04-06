@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,10 +8,13 @@ import {
   TextInput,
   Alert,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import * as Location from 'expo-location';
 import { useBoardingStore } from '@/store/boarding.store';
+import { useLocationPickerStore } from '@/store/location-picker.store';
 import { COLORS } from '@/lib/constants';
 
 const DISTRICTS = [
@@ -26,6 +29,18 @@ const SRI_LANKA_LAT_MAX = 9.9;
 const SRI_LANKA_LNG_MIN = 79.5;
 const SRI_LANKA_LNG_MAX = 81.9;
 
+const SRI_LANKA_INITIAL_REGION = {
+  latitude: 6.915137412076758,
+  longitude: 79.9731566669944,
+  latitudeDelta: 0.1,
+  longitudeDelta: 0.1,
+};
+
+const MAP_CAMERA_BOUNDARY = {
+  northEast: { latitude: 7.035961932644662, longitude: 80.19100325001236 },
+  southWest: { latitude: 6.8302835564392455, longitude: 79.89361663337401 },
+};
+
 function ProgressBar({ step, total }: { step: number; total: number }) {
   return (
     <View style={styles.progressContainer}>
@@ -39,6 +54,7 @@ function ProgressBar({ step, total }: { step: number; total: number }) {
 
 export default function CreateStep2Screen() {
   const { createDraft, setCreateDraft } = useBoardingStore();
+  const { pending, clearPending } = useLocationPickerStore();
 
   const [address, setAddress] = useState(createDraft.address ?? '');
   const [city, setCity] = useState(createDraft.city ?? '');
@@ -46,12 +62,46 @@ export default function CreateStep2Screen() {
   const [showDistricts, setShowDistricts] = useState(false);
   const [lat, setLat] = useState(String(createDraft.latitude ?? ''));
   const [lng, setLng] = useState(String(createDraft.longitude ?? ''));
+  const [isLocating, setIsLocating] = useState(false);
+  const mapRef = useRef<MapView>(null);
 
-  const handleUseLocation = () => {
-    // Mock current location
-    setLat('6.9271');
-    setLng('79.8612');
-    Alert.alert('Location Set', 'Using mock location: Colombo, Sri Lanka');
+  // Apply coordinates returned from the location picker
+  useFocusEffect(
+    useCallback(() => {
+      if (pending) {
+        setLat(pending.lat.toFixed(6));
+        setLng(pending.lng.toFixed(6));
+        clearPending();
+      }
+    }, [pending, clearPending]),
+  );
+
+  const handleUseLocation = async () => {
+    setIsLocating(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Denied',
+          'Location permission is required to use this feature. Please enable it in your device settings.',
+        );
+        return;
+      }
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Low,
+      });
+      const { latitude, longitude } = location.coords;
+      setLat(latitude.toFixed(6));
+      setLng(longitude.toFixed(6));
+      mapRef.current?.animateToRegion(
+        { latitude, longitude, latitudeDelta: 0.02, longitudeDelta: 0.02 },
+        600,
+      );
+    } catch {
+      Alert.alert('Error', 'Could not retrieve your current location. Please try again.');
+    } finally {
+      setIsLocating(false);
+    }
   };
 
   const validate = () => {
@@ -139,17 +189,64 @@ export default function CreateStep2Screen() {
           </View>
         )}
 
-        {/* Map placeholder */}
-        <Text style={styles.label}>Map Location</Text>
+        {/* Map Location Picker */}
+        <Text style={styles.label}>Map Location *</Text>
+        <Text style={styles.mapHint}>Drag the map to position the pin on your boarding's exact location</Text>
         <View style={styles.mapContainer}>
-          <View style={styles.mapPlaceholder}>
-            <Ionicons name="map-outline" size={40} color={COLORS.gray} />
-            <Text style={styles.mapPlaceholderText}>Interactive map coming soon</Text>
-            <Text style={styles.mapPlaceholderSub}>Drag the marker to set exact location</Text>
-          </View>
-          <TouchableOpacity style={styles.locationBtn} onPress={handleUseLocation}>
-            <Ionicons name="locate-outline" size={16} color={COLORS.primary} />
-            <Text style={styles.locationBtnText}>Use My Current Location</Text>
+          {/* Read-only preview shown once a location is set */}
+          {lat && lng && !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lng)) && (
+            <View style={styles.mapViewWrapper}>
+              <MapView
+                ref={mapRef}
+                style={styles.map}
+                provider={PROVIDER_GOOGLE}
+                region={{
+                  latitude: parseFloat(lat),
+                  longitude: parseFloat(lng),
+                  latitudeDelta: 0.02,
+                  longitudeDelta: 0.02,
+                }}
+                cameraBoundary={MAP_CAMERA_BOUNDARY}
+                minZoomLevel={14}
+                maxZoomLevel={18}
+                scrollEnabled={false}
+                zoomEnabled={false}
+                rotateEnabled={false}
+                pitchEnabled={false}
+              >
+                <Marker coordinate={{ latitude: parseFloat(lat), longitude: parseFloat(lng) }}>
+                  <View style={styles.locationPin}>
+                    <Ionicons name="location" size={32} color={COLORS.primary} />
+                  </View>
+                </Marker>
+              </MapView>
+            </View>
+          )}
+
+          {/* Open full-screen picker */}
+          <TouchableOpacity
+            style={styles.pickOnMapBtn}
+            onPress={() =>
+              router.push(
+                `/location-picker?initialLat=${lat || ''}&initialLng=${lng || ''}` as never,
+              )
+            }
+          >
+            <Ionicons name="map-outline" size={16} color={COLORS.primary} />
+            <Text style={styles.pickOnMapText}>
+              {lat && lng ? 'Change Location on Map' : 'Pick Location on Map'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.locationBtn, isLocating && styles.locationBtnDisabled]}
+            onPress={handleUseLocation}
+            disabled={isLocating}
+          >
+            <Ionicons name="locate-outline" size={16} color={isLocating ? COLORS.gray : COLORS.primary} />
+            <Text style={[styles.locationBtnText, isLocating && styles.locationBtnTextDisabled]}>
+              {isLocating ? 'Getting Location...' : 'Use My Current Location'}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -259,18 +356,29 @@ const styles = StyleSheet.create({
   dropdownItemText: { fontSize: 14, color: COLORS.text },
   dropdownItemActive: { color: COLORS.primary, fontWeight: '600' },
   mapContainer: { gap: 8 },
-  mapPlaceholder: {
-    backgroundColor: COLORS.grayLight,
+  mapViewWrapper: {
+    height: 180,
     borderRadius: 12,
-    height: 160,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: COLORS.grayBorder,
   },
-  mapPlaceholderText: { fontSize: 14, color: COLORS.textSecondary, fontWeight: '500' },
-  mapPlaceholderSub: { fontSize: 12, color: COLORS.gray },
+  map: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  mapHint: { fontSize: 12, color: COLORS.textSecondary, marginBottom: 4 },
+  locationPin: { alignItems: 'center' },
+  pickOnMapBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: COLORS.white,
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
+  },
+  pickOnMapText: { fontSize: 14, color: COLORS.primary, fontWeight: '600' },
   locationBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -279,7 +387,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 12,
   },
+  locationBtnDisabled: { backgroundColor: COLORS.grayLight },
   locationBtnText: { fontSize: 14, color: COLORS.primary, fontWeight: '600' },
+  locationBtnTextDisabled: { color: COLORS.gray },
   coordsRow: { flexDirection: 'row', gap: 10 },
   coordInput: { backgroundColor: COLORS.grayLight },
   footer: {

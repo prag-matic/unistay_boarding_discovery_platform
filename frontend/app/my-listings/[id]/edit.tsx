@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,10 +10,11 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import {
   getMyListings,
   updateBoarding,
@@ -25,6 +26,7 @@ import {
 import type { UpdateBoardingPayload } from '@/lib/boarding';
 import { COLORS } from '@/lib/constants';
 import logger from '@/lib/logger';
+import { useLocationPickerStore } from '@/store/location-picker.store';
 import type { Boarding, BoardingType, GenderPreference, AmenityName, BoardingImage } from '@/types/boarding.types';
 
 type ApiError = { response?: { data?: { message?: string; details?: { field: string; message: string }[] } } };
@@ -79,6 +81,11 @@ const SRI_LANKA_LAT_MAX = 9.9;
 const SRI_LANKA_LNG_MIN = 79.5;
 const SRI_LANKA_LNG_MAX = 81.9;
 
+const MAP_CAMERA_BOUNDARY = {
+  northEast: { latitude: 7.035961932644662, longitude: 80.19100325001236 },
+  southWest: { latitude: 6.8302835564392455, longitude: 79.89361663337401 },
+};
+
 function SectionHeader({ title }: { title: string }) {
   return (
     <View style={styles.sectionHeader}>
@@ -93,6 +100,8 @@ export default function EditBoardingScreen() {
   const [boarding, setBoarding] = useState<Boarding | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const mapRef = useRef<MapView>(null);
+  const { pending, clearPending } = useLocationPickerStore();
 
   // Basic info
   const [title, setTitle] = useState('');
@@ -185,14 +194,19 @@ export default function EditBoardingScreen() {
   const isLocked = boarding?.status === 'ACTIVE';
   const totalImages = existingImages.filter((img) => !deletedImageIds.includes(img.id)).length + newImageUris.length;
 
+  // Apply coordinates returned from the location picker
+  useFocusEffect(
+    useCallback(() => {
+      if (pending) {
+        setLat(pending.lat.toFixed(6));
+        setLng(pending.lng.toFixed(6));
+        clearPending();
+      }
+    }, [pending, clearPending]),
+  );
+
   const toggleAmenity = (key: AmenityName) => {
     setAmenities((prev) => prev.includes(key) ? prev.filter((a) => a !== key) : [...prev, key]);
-  };
-
-  const handleUseLocation = () => {
-    setLat('6.9271');
-    setLng('79.8612');
-    Alert.alert('Location Set', 'Using mock location: Colombo, Sri Lanka');
   };
 
   const handleAddPhoto = async () => {
@@ -572,13 +586,49 @@ export default function EditBoardingScreen() {
         )}
 
         <Text style={styles.label}>Map Location</Text>
-        <View style={styles.mapPlaceholder}>
-          <Ionicons name="map-outline" size={36} color={COLORS.gray} />
-          <Text style={styles.mapPlaceholderText}>Interactive map coming soon</Text>
-        </View>
-        <TouchableOpacity style={styles.locationBtn} onPress={handleUseLocation}>
-          <Ionicons name="locate-outline" size={16} color={COLORS.primary} />
-          <Text style={styles.locationBtnText}>Use My Current Location</Text>
+
+        {/* Read-only preview when coordinates are set */}
+        {lat.trim() && lng.trim() && !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lng)) && (
+          <View style={styles.mapViewWrapper}>
+            <MapView
+              ref={mapRef}
+              style={styles.map}
+              provider={PROVIDER_GOOGLE}
+              region={{
+                latitude: parseFloat(lat),
+                longitude: parseFloat(lng),
+                latitudeDelta: 0.02,
+                longitudeDelta: 0.02,
+              }}
+              cameraBoundary={MAP_CAMERA_BOUNDARY}
+              minZoomLevel={14}
+              maxZoomLevel={18}
+              scrollEnabled={false}
+              zoomEnabled={false}
+              rotateEnabled={false}
+              pitchEnabled={false}
+            >
+              <Marker coordinate={{ latitude: parseFloat(lat), longitude: parseFloat(lng) }}>
+                <View style={styles.locationPin}>
+                  <Ionicons name="location" size={32} color={COLORS.primary} />
+                </View>
+              </Marker>
+            </MapView>
+          </View>
+        )}
+
+        <TouchableOpacity
+          style={styles.locationBtn}
+          onPress={() =>
+            router.push(
+              `/location-picker?initialLat=${lat || ''}&initialLng=${lng || ''}` as never,
+            )
+          }
+        >
+          <Ionicons name="map-outline" size={16} color={COLORS.primary} />
+          <Text style={styles.locationBtnText}>
+            {lat && lng ? 'Change Location on Map' : 'Pick Location on Map'}
+          </Text>
         </TouchableOpacity>
 
         <View style={styles.coordsRow}>
@@ -868,26 +918,29 @@ const styles = StyleSheet.create({
   dropdownItemText: { fontSize: 14, color: COLORS.text },
   dropdownItemActive: { color: COLORS.primary, fontWeight: '600' },
   // Map
-  mapPlaceholder: {
-    backgroundColor: COLORS.grayLight,
+  mapViewWrapper: {
+    height: 180,
     borderRadius: 12,
-    height: 130,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: COLORS.grayBorder,
     marginTop: 6,
+    marginBottom: 8,
   },
-  mapPlaceholderText: { fontSize: 13, color: COLORS.textSecondary },
+  map: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  locationPin: { alignItems: 'center' },
   locationBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#EBF0FF',
+    backgroundColor: COLORS.white,
     borderRadius: 10,
     padding: 12,
     marginTop: 8,
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
   },
   locationBtnText: { fontSize: 14, color: COLORS.primary, fontWeight: '600' },
   coordsRow: { flexDirection: 'row', gap: 10 },
