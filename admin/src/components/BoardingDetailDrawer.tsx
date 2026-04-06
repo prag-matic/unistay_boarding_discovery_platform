@@ -299,9 +299,7 @@ export default function BoardingDetailDrawer({ boarding, onClose, onApprove, onR
                   <button
                     type="button"
                     onClick={() =>
-                      setActiveImageIndex((prev) =>
-                        prev === null ? 0 : (prev - 1 + boarding.images.length) % boarding.images.length,
-                      )
+                      setActiveImageIndex((prev) => (prev! - 1 + boarding.images.length) % boarding.images.length)
                     }
                     className="absolute left-2 p-2 rounded-full bg-surface-container/90 hover:bg-surface-container-high"
                   >
@@ -310,9 +308,7 @@ export default function BoardingDetailDrawer({ boarding, onClose, onApprove, onR
                   <button
                     type="button"
                     onClick={() =>
-                      setActiveImageIndex((prev) =>
-                        prev === null ? 0 : (prev + 1) % boarding.images.length,
-                      )
+                      setActiveImageIndex((prev) => (prev! + 1) % boarding.images.length)
                     }
                     className="absolute right-2 p-2 rounded-full bg-surface-container/90 hover:bg-surface-container-high"
                   >
