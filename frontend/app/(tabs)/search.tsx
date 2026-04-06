@@ -419,7 +419,7 @@ export default function ExploreScreen() {
                   coordinate={{ latitude: b.latitude ?? DEFAULT_LATITUDE, longitude: b.longitude ?? DEFAULT_LONGITUDE }}
                   onPress={() => setMapSelected(isSelected ? null : b)}
                   zIndex={isSelected ? 1 : 0}
-                  anchor={{ x: 0.5, y: 0.5 }}
+                  anchor={{ x: 0.5, y: 1 }}
                 >
                   <View style={styles.mapMarkerContainer}>
                     <View style={[styles.mapMarker, isSelected && styles.mapMarkerSelected]}>
