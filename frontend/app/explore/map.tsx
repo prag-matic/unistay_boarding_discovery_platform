@@ -65,6 +65,7 @@ export default function MapViewScreen() {
             key={boarding.id}
             coordinate={{ latitude: boarding.latitude ?? 7.8731, longitude: boarding.longitude ?? 80.7718 }}
             onPress={() => setSelected(selected?.id === boarding.id ? null : boarding)}
+            tracksViewChanges={false}
           >
             <View style={styles.markerWrapper}>
               <View style={styles.marker}>
@@ -165,8 +166,7 @@ const styles = StyleSheet.create({
 
   // Markers
   markerWrapper: {
-    padding: 6,
-    overflow: 'visible',
+    padding: 4,
   },
   marker: {
     backgroundColor: COLORS.primary,
@@ -177,7 +177,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
-    elevation: 4,
   },
   markerText: { fontSize: 12, fontWeight: '700', color: COLORS.white },
 
