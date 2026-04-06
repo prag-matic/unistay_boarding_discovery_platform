@@ -38,7 +38,7 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-surface flex items-center justify-center p-6">
       <div className="w-full max-w-md bg-surface-container-lowest rounded-xl p-8 border border-outline-variant/20 shadow-[0px_20px_40px_rgba(42,52,57,0.06)]">
-        <p className="font-label text-xs uppercase tracking-[0.15em] text-primary mb-2">Admin Access</p>
+        <p className="font-label text-xs uppercase tracking-[0.15em] text-primary mb-2">UniStay Admin</p>
         <h1 className="font-headline text-3xl font-extrabold text-on-surface mb-6">Sign in</h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
