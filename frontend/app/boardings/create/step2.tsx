@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,12 +8,13 @@ import {
   TextInput,
   Alert,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Marker, PROVIDER_GOOGLE, MapPressEvent } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useBoardingStore } from '@/store/boarding.store';
+import { useLocationPickerStore } from '@/store/location-picker.store';
 import { COLORS } from '@/lib/constants';
 
 const DISTRICTS = [
@@ -53,6 +54,7 @@ function ProgressBar({ step, total }: { step: number; total: number }) {
 
 export default function CreateStep2Screen() {
   const { createDraft, setCreateDraft } = useBoardingStore();
+  const { pending, clearPending } = useLocationPickerStore();
 
   const [address, setAddress] = useState(createDraft.address ?? '');
   const [city, setCity] = useState(createDraft.city ?? '');
@@ -63,16 +65,16 @@ export default function CreateStep2Screen() {
   const [isLocating, setIsLocating] = useState(false);
   const mapRef = useRef<MapView>(null);
 
-  const markerCoordinate =
-    lat && lng && !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lng))
-      ? { latitude: parseFloat(lat), longitude: parseFloat(lng) }
-      : null;
-
-  const handleMapPress = (e: MapPressEvent) => {
-    const { latitude, longitude } = e.nativeEvent.coordinate;
-    setLat(latitude.toFixed(6));
-    setLng(longitude.toFixed(6));
-  };
+  // Apply coordinates returned from the location picker
+  useFocusEffect(
+    useCallback(() => {
+      if (pending) {
+        setLat(pending.lat.toFixed(6));
+        setLng(pending.lng.toFixed(6));
+        clearPending();
+      }
+    }, [pending, clearPending]),
+  );
 
   const handleUseLocation = async () => {
     setIsLocating(true);
@@ -95,8 +97,7 @@ export default function CreateStep2Screen() {
         { latitude, longitude, latitudeDelta: 0.02, longitudeDelta: 0.02 },
         600,
       );
-    } catch (err) {
-      console.warn('Location error:', err);
+    } catch {
       Alert.alert('Error', 'Could not retrieve your current location. Please try again.');
     } finally {
       setIsLocating(false);
@@ -190,48 +191,53 @@ export default function CreateStep2Screen() {
 
         {/* Map Location Picker */}
         <Text style={styles.label}>Map Location *</Text>
-        <Text style={styles.mapHint}>Tap on the map to pin the exact location of your boarding</Text>
+        <Text style={styles.mapHint}>Drag the map to position the pin on your boarding's exact location</Text>
         <View style={styles.mapContainer}>
-          <View style={styles.mapViewWrapper}>
-            <MapView
-              ref={mapRef}
-              style={styles.map}
-              provider={PROVIDER_GOOGLE}
-              initialRegion={
-                markerCoordinate
-                  ? { ...markerCoordinate, latitudeDelta: 0.02, longitudeDelta: 0.02 }
-                  : SRI_LANKA_INITIAL_REGION
-              }
-              cameraBoundary={MAP_CAMERA_BOUNDARY}
-              minZoomLevel={14}
-              maxZoomLevel={18}
-              onPress={handleMapPress}
-            >
-              {markerCoordinate && (
-                <Marker
-                  coordinate={markerCoordinate}
-                  draggable
-                  onDragEnd={(e) => {
-                    const { latitude, longitude } = e.nativeEvent.coordinate;
-                    setLat(latitude.toFixed(6));
-                    setLng(longitude.toFixed(6));
-                  }}
-                >
+          {/* Read-only preview shown once a location is set */}
+          {lat && lng && !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lng)) && (
+            <View style={styles.mapViewWrapper}>
+              <MapView
+                ref={mapRef}
+                style={styles.map}
+                provider={PROVIDER_GOOGLE}
+                region={{
+                  latitude: parseFloat(lat),
+                  longitude: parseFloat(lng),
+                  latitudeDelta: 0.02,
+                  longitudeDelta: 0.02,
+                }}
+                cameraBoundary={MAP_CAMERA_BOUNDARY}
+                minZoomLevel={14}
+                maxZoomLevel={18}
+                scrollEnabled={false}
+                zoomEnabled={false}
+                rotateEnabled={false}
+                pitchEnabled={false}
+              >
+                <Marker coordinate={{ latitude: parseFloat(lat), longitude: parseFloat(lng) }}>
                   <View style={styles.locationPin}>
                     <Ionicons name="location" size={32} color={COLORS.primary} />
                   </View>
                 </Marker>
-              )}
-            </MapView>
-            {!markerCoordinate && (
-              <View style={styles.mapOverlayHint} pointerEvents="none">
-                <View style={styles.mapOverlayBadge}>
-                  <Ionicons name="finger-print-outline" size={16} color={COLORS.text} />
-                  <Text style={styles.mapOverlayText}>Tap to pin location</Text>
-                </View>
-              </View>
-            )}
-          </View>
+              </MapView>
+            </View>
+          )}
+
+          {/* Open full-screen picker */}
+          <TouchableOpacity
+            style={styles.pickOnMapBtn}
+            onPress={() =>
+              router.push(
+                `/location-picker?initialLat=${lat || ''}&initialLng=${lng || ''}` as never,
+              )
+            }
+          >
+            <Ionicons name="map-outline" size={16} color={COLORS.primary} />
+            <Text style={styles.pickOnMapText}>
+              {lat && lng ? 'Change Location on Map' : 'Pick Location on Map'}
+            </Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={[styles.locationBtn, isLocating && styles.locationBtnDisabled]}
             onPress={handleUseLocation}
@@ -351,7 +357,7 @@ const styles = StyleSheet.create({
   dropdownItemActive: { color: COLORS.primary, fontWeight: '600' },
   mapContainer: { gap: 8 },
   mapViewWrapper: {
-    height: 220,
+    height: 180,
     borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 1,
@@ -360,32 +366,19 @@ const styles = StyleSheet.create({
   map: {
     ...StyleSheet.absoluteFillObject,
   },
-  mapOverlayHint: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mapOverlayBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  mapOverlayText: { fontSize: 13, fontWeight: '600', color: COLORS.text },
   mapHint: { fontSize: 12, color: COLORS.textSecondary, marginBottom: 4 },
   locationPin: { alignItems: 'center' },
+  pickOnMapBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: COLORS.white,
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
+  },
+  pickOnMapText: { fontSize: 14, color: COLORS.primary, fontWeight: '600' },
   locationBtn: {
     flexDirection: 'row',
     alignItems: 'center',

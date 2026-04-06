@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -31,6 +31,7 @@ export default function MapViewScreen() {
   const [selected, setSelected] = useState<Boarding | null>(null);
   const [query, setQuery] = useState('');
   const [allBoardings, setAllBoardings] = useState<Boarding[]>([]);
+  const mapRef = useRef<MapView>(null);
 
   useEffect(() => {
     searchBoardings({ size: 100 })
@@ -49,6 +50,7 @@ export default function MapViewScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <MapView
+        ref={mapRef}
         style={styles.map}
         provider={PROVIDER_GOOGLE}
         initialRegion={INITIAL_REGION}
@@ -111,6 +113,14 @@ export default function MapViewScreen() {
           <Ionicons name="list-outline" size={20} color={COLORS.text} />
         </TouchableOpacity>
       </View>
+
+      {/* Recenter button */}
+      <TouchableOpacity
+        style={styles.recenterBtn}
+        onPress={() => mapRef.current?.animateToRegion(INITIAL_REGION, 400)}
+      >
+        <Ionicons name="locate" size={20} color={COLORS.primary} />
+      </TouchableOpacity>
 
       {/* Bottom sheet preview */}
       {selected && (
@@ -233,6 +243,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 4,
     elevation: 3,
+  },
+  recenterBtn: {
+    position: 'absolute',
+    right: 14,
+    bottom: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 5,
   },
 
   // Bottom sheet
