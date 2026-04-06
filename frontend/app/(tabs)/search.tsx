@@ -416,7 +416,8 @@ export default function ExploreScreen() {
                   key={b.id}
                   coordinate={{ latitude: b.latitude ?? DEFAULT_LATITUDE, longitude: b.longitude ?? DEFAULT_LONGITUDE }}
                   onPress={() => setMapSelected(isSelected ? null : b)}
-                  zIndex={isSelected ? 1 : 0}
+                  zIndex={isSelected ? 1000 : 0}
+                  opacity={isSelected ? 1 : 0.65}
                   pinColor={isSelected ? COLORS.green : COLORS.primary}
                 />
               );
