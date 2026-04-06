@@ -70,6 +70,7 @@ const MAP_CAMERA_BOUNDARY = {
   northEast: { latitude: 7.035961932644662, longitude: 80.19100325001236 },
   southWest: { latitude: 6.8302835564392455, longitude: 79.89361663337401 },
 };
+const MAP_MARKER_CONTAINER_PADDING = 6;
 
 // ─── Boarding List Card (full-width, horizontal) ──────────────────────────────
 function BoardingCard({ item }: { item: Boarding }) {
@@ -696,8 +697,8 @@ const styles = StyleSheet.create({
   mapContainer: { flex: 1 },
   map: { flex: 1 },
   mapMarkerContainer: {
-    paddingHorizontal: 6,
-    paddingVertical: 6,
+    paddingHorizontal: MAP_MARKER_CONTAINER_PADDING,
+    paddingVertical: MAP_MARKER_CONTAINER_PADDING,
     overflow: 'visible',
   },
   mapMarker: {
