@@ -239,7 +239,7 @@ export default function BoardingDetailDrawer({ boarding, onClose, onApprove, onR
               />
             </div>
           )}
-          <div className={cn('grid gap-4', isRejecting ? 'grid-cols-3' : 'grid-cols-2')}>
+          <div className="grid grid-cols-2 gap-4">
             <button
               onClick={handleRejectClick}
               className="flex items-center justify-center gap-2 py-3 bg-error text-on-error rounded-md font-bold text-sm tracking-wide transition-all hover:brightness-110 active:scale-[0.98]"
@@ -249,6 +249,7 @@ export default function BoardingDetailDrawer({ boarding, onClose, onApprove, onR
             </button>
             {isRejecting && (
               <button
+                type="button"
                 onClick={() => {
                   setIsRejecting(false);
                   setRejectReason('');
@@ -259,14 +260,20 @@ export default function BoardingDetailDrawer({ boarding, onClose, onApprove, onR
                 CANCEL
               </button>
             )}
-            <button
-              onClick={onApprove}
-              disabled={isRejecting}
-              className="flex items-center justify-center gap-2 py-3 bg-tertiary text-on-tertiary rounded-md font-bold text-sm tracking-wide transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span className="material-symbols-outlined text-lg">verified</span>
-              APPROVE LISTING
-            </button>
+            {!isRejecting && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('Are you sure you want to approve this boarding listing?')) {
+                    onApprove();
+                  }
+                }}
+                className="flex items-center justify-center gap-2 py-3 bg-tertiary text-on-tertiary rounded-md font-bold text-sm tracking-wide transition-all hover:brightness-110 active:scale-[0.98]"
+              >
+                <span className="material-symbols-outlined text-lg">verified</span>
+                APPROVE LISTING
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -283,7 +290,8 @@ export default function BoardingDetailDrawer({ boarding, onClose, onApprove, onR
             <button
               type="button"
               onClick={() => setActiveImageIndex(null)}
-              className="absolute top-3 right-3 p-2 rounded-full bg-surface-container text-on-surface hover:bg-surface-container-high"
+              className="absolute top-3 right-3 z-10 p-2 rounded-full bg-inverse-surface text-inverse-on-surface shadow-md hover:opacity-90"
+              aria-label="Close gallery"
             >
               <span className="material-symbols-outlined">close</span>
             </button>
