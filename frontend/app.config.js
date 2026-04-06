@@ -18,6 +18,8 @@ export default {
   scheme: 'unistay',
   userInterfaceStyle: 'light',
   splash: {
+    image: './assets/icon.png',
+    resizeMode: 'contain',
     backgroundColor: '#4A7BF7',
   },
   ios: {
@@ -28,6 +30,11 @@ export default {
     },
   },
   android: {
+    splash: {
+      image: './assets/icon.png',
+      resizeMode: 'contain',
+      backgroundColor: '#4A7BF7',
+    },
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
       backgroundColor: '#4A7BF7',
@@ -49,6 +56,14 @@ export default {
     'expo-secure-store',
     'expo-image-picker',
     'expo-location',
+    [
+      'expo-splash-screen',
+      {
+        image: './assets/icon.png',
+        resizeMode: 'contain',
+        backgroundColor: '#4A7BF7',
+      },
+    ],
   ],
   experiments: {
     typedRoutes: true,
