@@ -101,7 +101,7 @@ export default function BoardingModeration() {
                 <th className="px-6 py-4 font-bold">Title</th>
                 <th className="px-6 py-4 font-bold">Owner</th>
                 <th className="px-6 py-4 font-bold">City / District</th>
-                <th className="px-6 py-4 font-bold text-right">monthlyRent</th>
+                <th className="px-6 py-4 font-bold text-right">Monthly Rent (monthlyRent)</th>
                 <th className="px-6 py-4 font-bold">Updated At</th>
                 <th className="px-6 py-4 font-bold">Status</th>
                 <th className="px-6 py-4 font-bold text-center">Actions</th>

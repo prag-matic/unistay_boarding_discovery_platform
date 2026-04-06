@@ -22,28 +22,36 @@ export async function listUsers(
 		const { page, size, role, active, search } =
 			req.query as unknown as AdminListUsersQuery;
 
-		const query: Record<string, unknown> = {};
-		if (role !== undefined) query.role = role;
-		if (active !== undefined) query.isActive = active;
-		if (search !== undefined && search.length > 0) {
-			const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-			query.$or = [
-				{ firstName: { $regex: escapedSearch, $options: "i" } },
-				{ lastName: { $regex: escapedSearch, $options: "i" } },
-				{ email: { $regex: escapedSearch, $options: "i" } },
-				{ phone: { $regex: escapedSearch, $options: "i" } },
-			];
-		}
+		const escapedSearch =
+			search && search.length > 0
+				? search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+				: undefined;
+		const searchRegex = escapedSearch ? new RegExp(escapedSearch, "i") : undefined;
+
+		const filters = {
+			...(role !== undefined ? { role } : {}),
+			...(active !== undefined ? { isActive: active } : {}),
+			...(searchRegex
+				? {
+						$or: [
+							{ firstName: searchRegex },
+							{ lastName: searchRegex },
+							{ email: searchRegex },
+							{ phone: searchRegex },
+						],
+					}
+				: {}),
+		};
 
 		const [users, total] = await Promise.all([
-			User.find(query)
+			User.find(filters)
 				.select("-passwordHash")
 				.skip((page - 1) * size)
 				.limit(size)
 				.sort({ createdAt: -1 })
 				.lean(),
 
-			User.countDocuments(query),
+			User.countDocuments(filters),
 		]);
 
 		sendSuccess(res, {
