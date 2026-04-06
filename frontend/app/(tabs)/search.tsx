@@ -425,6 +425,7 @@ export default function ExploreScreen() {
                   <View
                     style={styles.mapMarkerContainer}
                     collapsable={false}
+                    // Keep custom marker view rasterized so Google Maps doesn't partially clip it.
                     renderToHardwareTextureAndroid
                     shouldRasterizeIOS
                   >
