@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Marker, Callout, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { searchBoardings } from '@/lib/boarding';
 import { COLORS } from '@/lib/constants';
 import type { Boarding } from '@/types/boarding.types';
@@ -26,47 +26,6 @@ const CAMERA_BOUNDARY = {
   northEast: { latitude: 7.035961932644662, longitude: 80.19100325001236 },
   southWest: { latitude: 6.8302835564392455, longitude: 79.89361663337401 },
 };
-
-// Renders a price-pill marker that defers the bitmap snapshot until after
-// the view has been fully laid out on Android.
-function BoardingMarker({
-  boarding,
-  selected,
-  onPress,
-}: {
-  boarding: Boarding;
-  selected: boolean;
-  onPress: () => void;
-}) {
-  const [tracksViewChanges, setTracksViewChanges] = useState(true);
-  const onLayout = useCallback(() => setTracksViewChanges(false), []);
-
-  return (
-    <Marker
-      coordinate={{ latitude: boarding.latitude ?? 7.8731, longitude: boarding.longitude ?? 80.7718 }}
-      onPress={onPress}
-      tracksViewChanges={tracksViewChanges}
-    >
-      <View style={styles.markerWrapper} onLayout={onLayout}>
-        <View style={styles.marker}>
-          <Text style={styles.markerText}>
-            {boarding.monthlyRent ? `LKR ${(boarding.monthlyRent / 1000).toFixed(0)}k` : '—'}
-          </Text>
-        </View>
-      </View>
-      <Callout tooltip>
-        <View style={styles.callout}>
-          <Text style={styles.calloutTitle} numberOfLines={1}>
-            {boarding.title}
-          </Text>
-          <Text style={styles.calloutSub}>
-            {boarding.city}, {boarding.district}
-          </Text>
-        </View>
-      </Callout>
-    </Marker>
-  );
-}
 
 export default function MapViewScreen() {
   const [selected, setSelected] = useState<Boarding | null>(null);
@@ -102,10 +61,11 @@ export default function MapViewScreen() {
         showsMyLocationButton
       >
         {filtered.map((boarding) => (
-          <BoardingMarker
+          <Marker
             key={boarding.id}
-            boarding={boarding}
-            selected={selected?.id === boarding.id}
+            coordinate={{ latitude: boarding.latitude ?? 7.8731, longitude: boarding.longitude ?? 80.7718 }}
+            title={boarding.title}
+            description={`${boarding.city}, ${boarding.district}`}
             onPress={() => setSelected(selected?.id === boarding.id ? null : boarding)}
           />
         ))}
@@ -186,38 +146,6 @@ export default function MapViewScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   map: { flex: 1 },
-
-  // Markers
-  markerWrapper: {
-    padding: 4,
-    alignSelf: 'flex-start',
-  },
-  marker: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-  markerText: { fontSize: 12, fontWeight: '700', color: COLORS.white },
-
-  // Callout
-  callout: {
-    backgroundColor: COLORS.white,
-    borderRadius: 10,
-    padding: 8,
-    minWidth: 140,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  calloutTitle: { fontSize: 13, fontWeight: '700', color: COLORS.text },
-  calloutSub: { fontSize: 11, color: COLORS.textSecondary, marginTop: 2 },
 
   // Top overlay
   topOverlay: {
