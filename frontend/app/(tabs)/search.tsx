@@ -417,9 +417,13 @@ export default function ExploreScreen() {
                   coordinate={{ latitude: b.latitude ?? DEFAULT_LATITUDE, longitude: b.longitude ?? DEFAULT_LONGITUDE }}
                   onPress={() => setMapSelected(isSelected ? null : b)}
                   zIndex={isSelected ? 1000 : 0}
-                  opacity={isSelected ? 1 : 0.65}
-                  pinColor={isSelected ? COLORS.green : COLORS.primary}
-                />
+                >
+                  <View style={[styles.mapMarkerPill, isSelected && styles.mapMarkerPillSelected]}>
+                    <Text style={[styles.mapMarkerText, isSelected && styles.mapMarkerTextSelected]}>
+                      {b.monthlyRent ? `LKR ${b.monthlyRent.toLocaleString()}` : "LKR —"}
+                    </Text>
+                  </View>
+                </Marker>
               );
             })}
           </MapView>
@@ -687,6 +691,36 @@ const styles = StyleSheet.create({
   // ── Map
   mapContainer: { flex: 1 },
   map: { flex: 1 },
+  mapMarkerPill: {
+    backgroundColor: COLORS.white,
+    borderColor: COLORS.primary,
+    borderWidth: 1.5,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  mapMarkerPillSelected: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primaryDark,
+    borderWidth: 2,
+    transform: [{ scale: 1.08 }],
+    shadowOpacity: 0.22,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  mapMarkerText: {
+    color: COLORS.primary,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  mapMarkerTextSelected: {
+    color: COLORS.white,
+  },
   // ── Map bottom sheet
   bottomSheet: {
     position: 'absolute',
