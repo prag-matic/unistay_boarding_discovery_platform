@@ -70,8 +70,6 @@ const MAP_CAMERA_BOUNDARY = {
   northEast: { latitude: 7.035961932644662, longitude: 80.19100325001236 },
   southWest: { latitude: 6.8302835564392455, longitude: 79.89361663337401 },
 };
-const MAP_MARKER_CONTAINER_PADDING = 6;
-
 // ─── Boarding List Card (full-width, horizontal) ──────────────────────────────
 function BoardingCard({ item }: { item: Boarding }) {
   const { user } = useAuthStore();
@@ -419,16 +417,8 @@ export default function ExploreScreen() {
                   coordinate={{ latitude: b.latitude ?? DEFAULT_LATITUDE, longitude: b.longitude ?? DEFAULT_LONGITUDE }}
                   onPress={() => setMapSelected(isSelected ? null : b)}
                   zIndex={isSelected ? 1 : 0}
-                  anchor={{ x: 0.5, y: 1 }}
-                >
-                  <View style={styles.mapMarkerContainer}>
-                    <View style={[styles.mapMarker, isSelected && styles.mapMarkerSelected]}>
-                      <Text style={[styles.mapMarkerText, isSelected && styles.mapMarkerTextSelected]}>
-                        {b.monthlyRent ? `LKR ${(b.monthlyRent / 1000).toFixed(0)}k` : '—'}
-                      </Text>
-                    </View>
-                  </View>
-                </Marker>
+                  pinColor={isSelected ? COLORS.primary : COLORS.error}
+                />
               );
             })}
           </MapView>
@@ -696,31 +686,6 @@ const styles = StyleSheet.create({
   // ── Map
   mapContainer: { flex: 1 },
   map: { flex: 1 },
-  mapMarkerContainer: {
-    paddingHorizontal: MAP_MARKER_CONTAINER_PADDING,
-    paddingVertical: MAP_MARKER_CONTAINER_PADDING,
-    overflow: 'visible',
-  },
-  mapMarker: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  mapMarkerText: { fontSize: 12, fontWeight: '700', color: COLORS.white },
-  mapMarkerSelected: {
-    backgroundColor: COLORS.text,
-    transform: [{ scale: 1.2 }],
-    shadowOpacity: 0.35,
-    elevation: 8,
-  },
-  mapMarkerTextSelected: { color: COLORS.white },
-
   // ── Map bottom sheet
   bottomSheet: {
     position: 'absolute',
