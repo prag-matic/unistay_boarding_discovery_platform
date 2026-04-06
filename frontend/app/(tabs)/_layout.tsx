@@ -47,8 +47,11 @@ export default function TabsLayout() {
         tabBarActiveTintColor: COLORS.primary,
         tabBarInactiveTintColor: COLORS.gray,
         tabBarStyle: {
-          borderTopWidth: 1,
-          borderTopColor: COLORS.grayBorder,
+          borderTopWidth: 0,
+          borderTopColor: 'transparent',
+          elevation: 0,
+          shadowOpacity: 0,
+          shadowColor: 'transparent',
           paddingBottom: 4,
         },
       }}
