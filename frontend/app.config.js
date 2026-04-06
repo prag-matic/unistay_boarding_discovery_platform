@@ -49,12 +49,6 @@ export default {
     'expo-secure-store',
     'expo-image-picker',
     'expo-location',
-    [
-      'react-native-maps',
-      {
-        googleMapsApiKey,
-      },
-    ],
   ],
   experiments: {
     typedRoutes: true,
