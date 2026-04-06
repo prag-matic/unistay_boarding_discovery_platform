@@ -7,6 +7,10 @@
     "android": "expo start --android --clear",
     "ios": "expo start --ios --clear",
     "web": "expo start --web --clear",
+    "build:android": "npx eas build --platform android",
+    "build:android:preview": "npx eas build --platform android --profile preview",
+    "build:ios": "npx eas build --platform ios",
+    "build:ios:preview": "npx eas build --platform ios --profile preview",
     "lint": "eslint . --ext .ts,.tsx",
     "typecheck": "tsc --noEmit"
   },
