@@ -1,0 +1,27 @@
+import type { ReactNode } from 'react';
+import { Navigate } from 'react-router-dom';
+import { useAuth } from './AuthContext';
+
+export function ProtectedRoute({ children }: { children: ReactNode }) {
+  const { isAuthenticated } = useAuth();
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+export function AdminRoute({ children }: { children: ReactNode }) {
+  const { user, isAuthenticated } = useAuth();
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (user?.role !== 'ADMIN') {
+    return <Navigate to="/forbidden" replace />;
+  }
+
+  return <>{children}</>;
+}

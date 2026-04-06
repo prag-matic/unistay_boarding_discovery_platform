@@ -1,136 +1,240 @@
+export type UserRole = 'STUDENT' | 'OWNER' | 'ADMIN';
+export type BoardingStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'ACTIVE' | 'REJECTED';
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: UserRole;
+  isVerified: boolean;
+  isActive: boolean;
+  phone?: string;
+  university?: string;
+  nicNumber?: string;
+  profileImageUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface User {
   id: string;
   firstName: string;
   lastName: string;
   email: string;
-  phone: string;
-  role: 'STUDENT' | 'OWNER' | 'ADMIN';
+  phone?: string;
+  role: UserRole;
   isActive: boolean;
   createdAt: string;
+}
+
+export interface Pagination {
+  total: number;
+  page: number;
+  size: number;
+  totalPages: number;
 }
 
 export interface Boarding {
   id: string;
   title: string;
-  ownerName: string;
-  ownerPhone: string;
-  location: string;
+  city: string;
+  district: string;
+  address?: string;
   monthlyRent: number;
-  amenities: string[];
-  updatedAt: string;
-  status: 'PENDING_APPROVAL' | 'ACTIVE' | 'REJECTED';
+  boardingType: string;
+  genderPref: string;
+  maxOccupants: number;
+  currentOccupants: number;
+  status: BoardingStatus;
   description: string;
-  occupancy: string;
-  rentTerm: string;
-  rules: string[];
-  images: string[];
+  rejectionReason?: string;
+  updatedAt: string;
+  ownerId: string;
+  owner?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    phone?: string;
+  };
+  amenities?: Array<{ id: string; name: string }>;
+  rules?: Array<{ id: string; rule: string }>;
+  images?: Array<{ id: string; url: string }>;
 }
 
-// Mock Data
-let users: User[] = [
-  { id: 'USR-001', firstName: 'Admin', lastName: 'User', email: 'admin@example.com', phone: '+94 77 000 0000', role: 'ADMIN', isActive: true, createdAt: new Date().toISOString() },
-  { id: 'USR-002', firstName: 'John', lastName: 'Doe', email: 'john@example.com', phone: '+94 77 111 1111', role: 'STUDENT', isActive: true, createdAt: new Date().toISOString() },
-];
+interface ApiSuccess<T> {
+  success: true;
+  message: string;
+  data: T;
+  timestamp: string;
+}
 
-let boardings: Boarding[] = [
-  {
-    id: '#BRD-9402',
-    title: 'Starlight Premium Annex',
-    ownerName: 'Samantha Perera',
-    ownerPhone: '+94 77 123 4567',
-    location: 'Colombo 07',
-    monthlyRent: 45000,
-    amenities: ['WiFi', 'AC'],
-    updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    status: 'PENDING_APPROVAL',
-    description: 'A premium annex located in the heart of Colombo 07. Recently renovated with modern furniture and high-end fittings. Ideally suited for professionals or postgraduate students seeking a quiet, secure environment. Private entrance and secure parking included.',
-    occupancy: 'Max 02 persons',
-    rentTerm: '6 Months Deposit',
-    rules: ['No smoking allowed indoors', 'No pets permitted', 'Quiet hours: 10:00 PM - 6:00 AM'],
-    images: [
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuD-a1BLD0hFxFKJvrAQvNg70eFZyayKn2aDHvygv_y2Zsj_g5IMPemISnJxkPrqVnWoKkuhxzKm1eHD1z2jlBRqAy4HMFtODscFRO-sObu82tN7y-8XpjxJEKtXWyD_l08uXMR5H0IZX9vv0aR_tNFVkBgADee2wByO95s1hDsRMAUd0abgv1lBYHDmbJVzzkj8OqBRLzqMdG7xjrWyRB-RWET092bfwfsVp2OavwjFwy28kbNsYP0GQPt5zFTIkGSp1IVDqGXzL68',
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuALrTqxlvpF_nwC-am-LsauGQOaRTMLHiYlfa178okLKfZTlrgEUrJ_0734_6XA2-UajNggRhtfx9IYDZGGsV4eE7kpxDhsI33PN8ncS8WHuz7FU_qKqPolU_PfRftjpMYnweKgEZ0Hv5FWZJamqJOfl0y3dqKgbDK9qIx6XwE1fEGxWykNQ6erc4WfKt_MsXBrABQUkxZ76lM41_2e6E_moGkeJ_YRye9VnXaPJI9jkComH318cL8TOUepGoqOuQLgnH1nSjUr_Mo',
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDiOirpmfEmZcA2fCQEhPtdDBtKnt8tM30n5Hgv3If_CCUpoTtAKzrDnP0ImaRSdwpS6HlBD2QXOvqglDwTAP4oNOdT7Rx4simTf62RE7wPJN7dcCnDrgr-vILbPug6H1EQVnnUJXklmRCW0llXbm3U5Z81VMSoDxlnDSr4lXEPn7hgOymXwxf9R-UGxvzpZM0zwKx4zWXZPNtA7YyQ5HbtX8WL8hEO9RbH86zAx4xcvRpfnfD5OUP8KVuNheFScv5v6LAfPbUbxYA'
-    ]
-  },
-  {
-    id: '#BRD-9398',
-    title: 'Modern Studio Loft',
-    ownerName: 'Kasun Kalhara',
-    ownerPhone: '+94 71 999 8877',
-    location: 'Kandy Central',
-    monthlyRent: 28500,
-    amenities: ['Parking'],
-    updatedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-    status: 'PENDING_APPROVAL',
-    description: 'A modern studio loft in Kandy.',
-    occupancy: 'Max 01 person',
-    rentTerm: '3 Months Deposit',
-    rules: ['No pets'],
-    images: []
-  },
-  {
-    id: '#BRD-9382',
-    title: 'Riverside Shared Living',
-    ownerName: 'Amara Fonseka',
-    ownerPhone: '+94 77 444 3322',
-    location: 'Galle District',
-    monthlyRent: 18000,
-    amenities: ['Water', 'Power'],
-    updatedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    status: 'PENDING_APPROVAL',
-    description: 'Shared living space near the river.',
-    occupancy: 'Max 04 persons',
-    rentTerm: '1 Month Deposit',
-    rules: ['Quiet hours after 10PM'],
-    images: []
+interface ApiError {
+  success: false;
+  error: string;
+  message: string;
+  details?: unknown;
+  timestamp: string;
+}
+
+export interface ApiClientError extends Error {
+  status: number;
+  code: string;
+  details?: unknown;
+}
+
+export interface LoginResponse {
+  accessToken: string;
+  refreshToken: string;
+  user: AuthUser;
+}
+
+const API_BASE_URL =
+  (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/+$/, '') ||
+  'http://localhost:3000/api';
+
+const ACCESS_TOKEN_KEY = 'admin.accessToken';
+const REFRESH_TOKEN_KEY = 'admin.refreshToken';
+const USER_KEY = 'admin.user';
+
+let accessToken: string | null = localStorage.getItem(ACCESS_TOKEN_KEY);
+
+function toApiError(status: number, payload: ApiError | null): ApiClientError {
+  const error = new Error(payload?.message || 'Request failed') as ApiClientError;
+  error.status = status;
+  error.code = payload?.error || 'RequestError';
+  error.details = payload?.details;
+  return error;
+}
+
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const headers = new Headers(options.headers);
+  headers.set('Content-Type', 'application/json');
+  if (accessToken) {
+    headers.set('Authorization', `Bearer ${accessToken}`);
   }
-];
 
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers,
+  });
+
+  const payload = (await response.json()) as ApiSuccess<T> | ApiError;
+
+  if (!response.ok || !payload.success) {
+    throw toApiError(response.status, (payload as ApiError) ?? null);
+  }
+
+  return (payload as ApiSuccess<T>).data;
+}
+
+function setAuthSession(data: LoginResponse): void {
+  accessToken = data.accessToken;
+  localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
+  localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
+  localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+}
+
+function clearAuthSession(): void {
+  accessToken = null;
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+}
+
+export function getStoredAuthUser(): AuthUser | null {
+  const raw = localStorage.getItem(USER_KEY);
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw) as AuthUser;
+  } catch {
+    return null;
+  }
+}
+
+export function hasStoredAccessToken(): boolean {
+  return Boolean(localStorage.getItem(ACCESS_TOKEN_KEY));
+}
 
 export const api = {
-  getPendingBoardings: async () => {
-    await delay(500);
-    return {
-      success: true,
-      data: { boardings: boardings.filter(b => b.status === 'PENDING_APPROVAL') }
-    };
+  getStoredAuthUser,
+  hasStoredAccessToken,
+
+  async login(email: string, password: string): Promise<LoginResponse> {
+    const data = await request<LoginResponse>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+    setAuthSession(data);
+    return data;
   },
-  approveBoarding: async (id: string) => {
-    await delay(500);
-    const boarding = boardings.find(b => b.id === id);
-    if (!boarding) throw new Error('Boarding not found');
-    boarding.status = 'ACTIVE';
-    return { success: true, message: 'Boarding approved successfully', data: { boarding } };
+
+  async logout(): Promise<void> {
+    const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+    if (refreshToken) {
+      try {
+        await request('/auth/logout', {
+          method: 'POST',
+          body: JSON.stringify({ refreshToken }),
+        });
+      } catch {
+        // Ignore logout API failures and clear local session anyway.
+      }
+    }
+
+    clearAuthSession();
   },
-  rejectBoarding: async (id: string, reason: string) => {
-    await delay(500);
-    if (!reason) throw new Error('Rejection reason is required');
-    const boarding = boardings.find(b => b.id === id);
-    if (!boarding) throw new Error('Boarding not found');
-    boarding.status = 'REJECTED';
-    return { success: true, message: 'Boarding rejected successfully', data: { boarding } };
+
+  clearSession(): void {
+    clearAuthSession();
   },
-  getUsers: async (page = 1, size = 20) => {
-    await delay(500);
-    return {
-      success: true,
-      data: { users, pagination: { page, size, total: users.length, totalPages: 1 } }
-    };
+
+  async getPendingBoardings(): Promise<{ boardings: Boarding[] }> {
+    return request<{ boardings: Boarding[] }>('/admin/boardings/pending');
   },
-  activateUser: async (id: string) => {
-    await delay(500);
-    const user = users.find(u => u.id === id);
-    if (!user) throw new Error('User not found');
-    user.isActive = true;
-    return { success: true, message: 'User activated', data: { user } };
+
+  async approveBoarding(id: string): Promise<{ boarding: Boarding }> {
+    return request<{ boarding: Boarding }>(`/admin/boardings/${id}/approve`, {
+      method: 'PATCH',
+    });
   },
-  deactivateUser: async (id: string) => {
-    await delay(500);
-    const user = users.find(u => u.id === id);
-    if (!user) throw new Error('User not found');
-    user.isActive = false;
-    return { success: true, message: 'User deactivated', data: { user } };
-  }
+
+  async rejectBoarding(id: string, reason: string): Promise<{ boarding: Boarding }> {
+    return request<{ boarding: Boarding }>(`/admin/boardings/${id}/reject`, {
+      method: 'PATCH',
+      body: JSON.stringify({ reason }),
+    });
+  },
+
+  async getUsers(params: {
+    page: number;
+    size: number;
+    role?: UserRole;
+    active?: boolean;
+    search?: string;
+  }): Promise<{ users: User[]; pagination: Pagination }> {
+    const query = new URLSearchParams({
+      page: String(params.page),
+      size: String(params.size),
+    });
+
+    if (params.role) query.set('role', params.role);
+    if (params.active !== undefined) query.set('active', String(params.active));
+    if (params.search) query.set('search', params.search);
+
+    return request<{ users: User[]; pagination: Pagination }>(`/admin/users?${query.toString()}`);
+  },
+
+  async activateUser(id: string): Promise<{ id: string; isActive: boolean }> {
+    return request<{ id: string; isActive: boolean }>(`/admin/users/${id}/activate`, {
+      method: 'PATCH',
+    });
+  },
+
+  async deactivateUser(id: string): Promise<{ id: string; isActive: boolean }> {
+    return request<{ id: string; isActive: boolean }>(`/admin/users/${id}/deactivate`, {
+      method: 'PATCH',
+    });
+  },
 };

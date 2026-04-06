@@ -1,9 +1,17 @@
-import { Link, Outlet, useLocation } from 'react-router-dom';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../lib/utils';
+import { useAuth } from '../auth/AuthContext';
 
 export default function Layout() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const isDashboard = location.pathname === '/';
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login', { replace: true });
+  };
 
   return (
     <div className="flex min-h-screen bg-surface font-body text-on-surface overflow-hidden">
@@ -53,19 +61,18 @@ export default function Layout() {
             </Link>
           </nav>
           <div className="p-4 mt-auto space-y-1 border-t border-slate-200/50">
-            <a href="#" className="flex items-center gap-3 px-3 py-2 text-slate-500 dark:text-slate-400 hover:text-indigo-600 hover:bg-indigo-50/50 transition-colors rounded-lg">
-              <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 0" }}>settings</span>
-              <span>Settings</span>
-            </a>
-            <a href="#" className="flex items-center gap-3 px-3 py-2 text-slate-500 dark:text-slate-400 hover:text-indigo-600 hover:bg-indigo-50/50 transition-colors rounded-lg">
-              <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 0" }}>help</span>
-              <span>Support</span>
-            </a>
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center gap-3 px-3 py-2 text-left text-slate-500 dark:text-slate-400 hover:text-indigo-600 hover:bg-indigo-50/50 transition-colors rounded-lg"
+            >
+              <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 0" }}>logout</span>
+              <span>Logout</span>
+            </button>
             <div className="flex items-center gap-3 p-3 mt-4 bg-slate-100 dark:bg-slate-900 rounded-xl">
               <img alt="Executive User Profile" className="w-8 h-8 rounded-full bg-slate-200" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDgkMVah6VtiK3ZFmqyBdWD8qmpnHr44ZWVrE2majtcxFFV_GvXc3DiEOAQaT7bsmWa_iuEPTDeUz8a3ifSwxj_a_SvWji5rQwlS_XXFQr0VQKhUYDQfD4HXoZJx-f9EK17FpfaCNhWZW-apBADOlhZGnew8M8uDQw2EjveGbMGeXDL6i5AN2w0WYcNl97HBJADZIJLea36bUruCjJteklFsqX9ftGguoVUVGaM5fBSfNEuPrPogmXrIewstyiQj-xl1VwlxMShBrs"/>
               <div className="overflow-hidden">
-                <p className="font-bold text-xs truncate">Executive Admin</p>
-                <p className="text-[10px] text-slate-500">System Controller</p>
+                <p className="font-bold text-xs truncate">{user ? `${user.firstName} ${user.lastName}` : 'Admin User'}</p>
+                <p className="text-[10px] text-slate-500">{user?.role ?? 'ADMIN'}</p>
               </div>
             </div>
           </div>
