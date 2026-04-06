@@ -22,6 +22,7 @@ export const adminListUsersQuerySchema = z.object({
 	size: z.coerce.number().int().positive().max(100).default(20),
 	role: z.enum(["STUDENT", "OWNER", "ADMIN"]).optional(),
 	active: z.stringbool().optional(),
+	search: z.string().trim().max(100).optional(),
 });
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
