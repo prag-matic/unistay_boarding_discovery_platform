@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -26,6 +26,47 @@ const CAMERA_BOUNDARY = {
   northEast: { latitude: 7.035961932644662, longitude: 80.19100325001236 },
   southWest: { latitude: 6.8302835564392455, longitude: 79.89361663337401 },
 };
+
+// Renders a price-pill marker that defers the bitmap snapshot until after
+// the view has been fully laid out on Android.
+function BoardingMarker({
+  boarding,
+  selected,
+  onPress,
+}: {
+  boarding: Boarding;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  const [tracksViewChanges, setTracksViewChanges] = useState(true);
+  const onLayout = useCallback(() => setTracksViewChanges(false), []);
+
+  return (
+    <Marker
+      coordinate={{ latitude: boarding.latitude ?? 7.8731, longitude: boarding.longitude ?? 80.7718 }}
+      onPress={onPress}
+      tracksViewChanges={tracksViewChanges}
+    >
+      <View style={styles.markerWrapper} onLayout={onLayout}>
+        <View style={styles.marker}>
+          <Text style={styles.markerText}>
+            {boarding.monthlyRent ? `LKR ${(boarding.monthlyRent / 1000).toFixed(0)}k` : '—'}
+          </Text>
+        </View>
+      </View>
+      <Callout tooltip>
+        <View style={styles.callout}>
+          <Text style={styles.calloutTitle} numberOfLines={1}>
+            {boarding.title}
+          </Text>
+          <Text style={styles.calloutSub}>
+            {boarding.city}, {boarding.district}
+          </Text>
+        </View>
+      </Callout>
+    </Marker>
+  );
+}
 
 export default function MapViewScreen() {
   const [selected, setSelected] = useState<Boarding | null>(null);
@@ -61,30 +102,12 @@ export default function MapViewScreen() {
         showsMyLocationButton
       >
         {filtered.map((boarding) => (
-          <Marker
+          <BoardingMarker
             key={boarding.id}
-            coordinate={{ latitude: boarding.latitude ?? 7.8731, longitude: boarding.longitude ?? 80.7718 }}
+            boarding={boarding}
+            selected={selected?.id === boarding.id}
             onPress={() => setSelected(selected?.id === boarding.id ? null : boarding)}
-            tracksViewChanges={false}
-          >
-            <View style={styles.markerWrapper}>
-              <View style={styles.marker}>
-                <Text style={styles.markerText}>
-                  {boarding.monthlyRent ? `LKR ${(boarding.monthlyRent / 1000).toFixed(0)}k` : '—'}
-                </Text>
-              </View>
-            </View>
-            <Callout tooltip>
-              <View style={styles.callout}>
-                <Text style={styles.calloutTitle} numberOfLines={1}>
-                  {boarding.title}
-                </Text>
-                <Text style={styles.calloutSub}>
-                  {boarding.city}, {boarding.district}
-                </Text>
-              </View>
-            </Callout>
-          </Marker>
+          />
         ))}
       </MapView>
 
@@ -167,6 +190,7 @@ const styles = StyleSheet.create({
   // Markers
   markerWrapper: {
     padding: 4,
+    alignSelf: 'flex-start',
   },
   marker: {
     backgroundColor: COLORS.primary,
