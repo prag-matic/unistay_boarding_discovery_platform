@@ -418,11 +418,14 @@ export default function ExploreScreen() {
                   coordinate={{ latitude: b.latitude ?? DEFAULT_LATITUDE, longitude: b.longitude ?? DEFAULT_LONGITUDE }}
                   onPress={() => setMapSelected(isSelected ? null : b)}
                   zIndex={isSelected ? 1 : 0}
+                  anchor={{ x: 0.5, y: 0.5 }}
                 >
-                  <View style={[styles.mapMarker, isSelected && styles.mapMarkerSelected]}>
-                    <Text style={[styles.mapMarkerText, isSelected && styles.mapMarkerTextSelected]}>
-                      {b.monthlyRent ? `LKR ${(b.monthlyRent / 1000).toFixed(0)}k` : '—'}
-                    </Text>
+                  <View style={styles.mapMarkerContainer}>
+                    <View style={[styles.mapMarker, isSelected && styles.mapMarkerSelected]}>
+                      <Text style={[styles.mapMarkerText, isSelected && styles.mapMarkerTextSelected]}>
+                        {b.monthlyRent ? `LKR ${(b.monthlyRent / 1000).toFixed(0)}k` : '—'}
+                      </Text>
+                    </View>
                   </View>
                 </Marker>
               );
@@ -692,6 +695,11 @@ const styles = StyleSheet.create({
   // ── Map
   mapContainer: { flex: 1 },
   map: { flex: 1 },
+  mapMarkerContainer: {
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+    overflow: 'visible',
+  },
   mapMarker: {
     backgroundColor: COLORS.primary,
     borderRadius: 20,
