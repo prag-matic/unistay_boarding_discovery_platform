@@ -54,7 +54,7 @@ export default function MapViewScreen() {
         style={styles.map}
         provider={PROVIDER_GOOGLE}
         initialRegion={INITIAL_REGION}
-        cameraBoundary={CAMERA_BOUNDARY}
+        // cameraBoundary={CAMERA_BOUNDARY}
         minZoomLevel={14}
         maxZoomLevel={18}
         showsUserLocation
