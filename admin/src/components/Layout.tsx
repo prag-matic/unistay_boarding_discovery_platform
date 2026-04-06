@@ -19,8 +19,8 @@ export default function Layout() {
       {!isDashboard && (
         <aside className="h-screen w-64 fixed left-0 top-0 bg-slate-50 dark:bg-slate-950 flex flex-col border-r border-slate-200/50 dark:border-slate-800/50 font-headline text-sm tracking-tight z-50">
           <div className="p-6">
-            <h1 className="text-xl font-bold tracking-tight text-indigo-900 dark:text-indigo-100">The Architect</h1>
-            <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mt-1">Admin Terminal</p>
+            <h1 className="text-xl font-bold tracking-tight text-primary">UniStay</h1>
+            <p className="text-[10px] uppercase tracking-[0.2em] text-on-surface-variant mt-1">Admin Panel</p>
           </div>
           <nav className="flex-1 px-4 space-y-1">
             <Link
@@ -28,8 +28,8 @@ export default function Layout() {
               className={cn(
                 "flex items-center gap-3 px-3 py-2 transition-colors rounded-lg",
                 location.pathname === '/' 
-                  ? "text-indigo-700 dark:text-indigo-300 font-semibold border-r-2 border-indigo-600 bg-indigo-50/50 dark:bg-indigo-900/20 rounded-r-none" 
-                  : "text-slate-500 dark:text-slate-400 hover:text-indigo-600 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20"
+                  ? "text-primary font-semibold border-r-2 border-primary bg-primary-container/40 rounded-r-none" 
+                  : "text-on-surface-variant hover:text-primary hover:bg-primary-container/30"
               )}
             >
               <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 0" }}>dashboard</span>
@@ -40,8 +40,8 @@ export default function Layout() {
               className={cn(
                 "flex items-center gap-3 px-3 py-2 transition-colors rounded-lg",
                 location.pathname === '/users' 
-                  ? "text-indigo-700 dark:text-indigo-300 font-semibold border-r-2 border-indigo-600 bg-indigo-50/50 dark:bg-indigo-900/20 rounded-r-none" 
-                  : "text-slate-500 dark:text-slate-400 hover:text-indigo-600 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20"
+                  ? "text-primary font-semibold border-r-2 border-primary bg-primary-container/40 rounded-r-none" 
+                  : "text-on-surface-variant hover:text-primary hover:bg-primary-container/30"
               )}
             >
               <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 0" }}>group</span>
@@ -52,8 +52,8 @@ export default function Layout() {
               className={cn(
                 "flex items-center gap-3 px-3 py-2 transition-colors rounded-lg",
                 location.pathname === '/moderation' 
-                  ? "text-indigo-700 dark:text-indigo-300 font-semibold border-r-2 border-indigo-600 bg-indigo-50/50 dark:bg-indigo-900/20 rounded-r-none" 
-                  : "text-slate-500 dark:text-slate-400 hover:text-indigo-600 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20"
+                  ? "text-primary font-semibold border-r-2 border-primary bg-primary-container/40 rounded-r-none" 
+                  : "text-on-surface-variant hover:text-primary hover:bg-primary-container/30"
               )}
             >
               <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 0" }}>security</span>
@@ -63,16 +63,16 @@ export default function Layout() {
           <div className="p-4 mt-auto space-y-1 border-t border-slate-200/50">
             <button
               onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-3 py-2 text-left text-slate-500 dark:text-slate-400 hover:text-indigo-600 hover:bg-indigo-50/50 transition-colors rounded-lg"
+              className="w-full flex items-center gap-3 px-3 py-2 text-left text-on-surface-variant hover:text-primary hover:bg-primary-container/30 transition-colors rounded-lg"
             >
               <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 0" }}>logout</span>
               <span>Logout</span>
             </button>
-            <div className="flex items-center gap-3 p-3 mt-4 bg-slate-100 dark:bg-slate-900 rounded-xl">
+            <div className="flex items-center gap-3 p-3 mt-4 bg-surface-container rounded-xl">
               <img alt="Executive User Profile" className="w-8 h-8 rounded-full bg-slate-200" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDgkMVah6VtiK3ZFmqyBdWD8qmpnHr44ZWVrE2majtcxFFV_GvXc3DiEOAQaT7bsmWa_iuEPTDeUz8a3ifSwxj_a_SvWji5rQwlS_XXFQr0VQKhUYDQfD4HXoZJx-f9EK17FpfaCNhWZW-apBADOlhZGnew8M8uDQw2EjveGbMGeXDL6i5AN2w0WYcNl97HBJADZIJLea36bUruCjJteklFsqX9ftGguoVUVGaM5fBSfNEuPrPogmXrIewstyiQj-xl1VwlxMShBrs"/>
               <div className="overflow-hidden">
                 <p className="font-bold text-xs truncate">{user ? `${user.firstName} ${user.lastName}` : 'Admin User'}</p>
-                <p className="text-[10px] text-slate-500">{user?.role ?? 'ADMIN'}</p>
+                <p className="text-[10px] text-on-surface-variant">{user?.role ?? 'ADMIN'}</p>
               </div>
             </div>
           </div>
