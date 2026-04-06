@@ -86,42 +86,42 @@ export default function BoardingDetailDrawer({ boarding, onClose, onApprove, onR
 
           <section className="grid grid-cols-2 gap-6">
             <div>
-              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-2">boardingType</h4>
+              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-2">Boarding Type (boardingType)</h4>
               <div className="flex items-center gap-2 text-sm">
                 <span className="material-symbols-outlined text-primary text-lg">home</span>
                 <span>{boarding.boardingType}</span>
               </div>
             </div>
             <div>
-              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-2">genderPref</h4>
+              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-2">Gender Preference (genderPref)</h4>
               <div className="flex items-center gap-2 text-sm">
                 <span className="material-symbols-outlined text-primary text-lg">wc</span>
                 <span>{boarding.genderPref}</span>
               </div>
             </div>
             <div>
-              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-2">maxOccupants</h4>
+              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-2">Max Occupants (maxOccupants)</h4>
               <div className="flex items-center gap-2 text-sm">
                 <span className="material-symbols-outlined text-primary text-lg">groups</span>
                 <span>{boarding.maxOccupants}</span>
               </div>
             </div>
             <div>
-              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-2">currentOccupants</h4>
+              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-2">Current Occupants (currentOccupants)</h4>
               <div className="flex items-center gap-2 text-sm">
                 <span className="material-symbols-outlined text-primary text-lg">person</span>
                 <span>{boarding.currentOccupants}</span>
               </div>
             </div>
             <div>
-              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-2">city</h4>
+              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-2">City (city)</h4>
               <div className="flex items-center gap-2 text-sm">
                 <span className="material-symbols-outlined text-primary text-lg">location_city</span>
                 <span>{boarding.city}</span>
               </div>
             </div>
             <div>
-              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-2">district</h4>
+              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-2">District (district)</h4>
               <div className="flex items-center gap-2 text-sm">
                 <span className="material-symbols-outlined text-primary text-lg">map</span>
                 <span>{boarding.district}</span>
@@ -131,7 +131,7 @@ export default function BoardingDetailDrawer({ boarding, onClose, onApprove, onR
 
           {boarding.amenities && boarding.amenities.length > 0 && (
             <section>
-              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-3">amenities</h4>
+              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-3">Amenities (amenities)</h4>
               <div className="flex flex-wrap gap-2">
                 {boarding.amenities.map((amenity) => (
                   <span key={amenity.id} className="bg-surface-variant text-xs px-3 py-1 rounded-sm">{amenity.name}</span>
@@ -142,7 +142,7 @@ export default function BoardingDetailDrawer({ boarding, onClose, onApprove, onR
 
           {boarding.rules && boarding.rules.length > 0 && (
             <section>
-              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-3">rules</h4>
+              <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-3">Rules (rules)</h4>
               <ul className="space-y-2 text-sm text-on-surface/80">
                 {boarding.rules.map((rule) => {
                   let icon = 'info';
