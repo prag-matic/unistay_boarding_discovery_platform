@@ -14,6 +14,7 @@ app.use(cors());
 
 // Rate limiting
 app.use("/api", apiLimiter);
+app.use("/api/v1", apiLimiter);
 
 // Body parsing
 app.use(express.json());
@@ -21,6 +22,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // API routes
 app.use("/api", router);
+app.use("/api/v1", router);
 
 // 404 handler
 app.use((_req: Request, res: Response) => {

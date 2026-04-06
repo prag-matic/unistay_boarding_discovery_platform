@@ -12,7 +12,7 @@ import type { AdminListUsersQuery } from "@/schemas/user.validators.js";
 import { BoardingStatus } from "@/types/enums.js";
 import { addId, transformBoardingDoc } from "@/utils/index.js";
 
-// GET /api/v1/admin/users
+// GET /api/admin/users (also available at /api/v1/admin/users)
 export async function listUsers(
 	req: Request,
 	res: Response,
