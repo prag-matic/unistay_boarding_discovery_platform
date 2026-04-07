@@ -23,6 +23,7 @@ import {
   uploadBoardingImages,
   deleteBoardingImage,
   getBoardingStatusHistory,
+  getBoardingLifecycleSpec,
 } from '@/lib/boarding';
 import type { UpdateBoardingPayload } from '@/lib/boarding';
 import { COLORS } from '@/lib/constants';
@@ -136,6 +137,7 @@ export default function EditBoardingScreen() {
   const [deletedImageIds, setDeletedImageIds] = useState<string[]>([]);
   const [newImageUris, setNewImageUris] = useState<string[]>([]);
   const [statusHistory, setStatusHistory] = useState<BoardingStatusHistoryEntry[]>([]);
+  const [lifecycleTransitions, setLifecycleTransitions] = useState<Record<string, { allowedFrom: Boarding['status'][]; actorRoles: string[] }> | undefined>(undefined);
 
   useEffect(() => {
     logger.boarding.debug('useEffect:start', { id });
@@ -181,6 +183,9 @@ export default function EditBoardingScreen() {
         setRules(b.rules.map((r) => r.rule));
         // Images
         setExistingImages(b.images);
+        getBoardingLifecycleSpec()
+          .then((spec) => setLifecycleTransitions(spec.data.transitions as Record<string, { allowedFrom: Boarding['status'][]; actorRoles: string[] }>))
+          .catch(() => setLifecycleTransitions(undefined));
         getBoardingStatusHistory(b.id)
           .then((historyResult) => setStatusHistory(historyResult.data.history))
           .catch(() => setStatusHistory([]));
@@ -198,7 +203,7 @@ export default function EditBoardingScreen() {
   }, [id]);
 
   const isLocked = boarding?.status === 'ACTIVE';
-  const ownerActions = boarding ? getOwnerListingActions(boarding.status) : null;
+  const ownerActions = boarding ? getOwnerListingActions(boarding.status, lifecycleTransitions) : null;
   const totalImages = existingImages.filter((img) => !deletedImageIds.includes(img.id)).length + newImageUris.length;
 
   // Apply coordinates returned from the location picker
