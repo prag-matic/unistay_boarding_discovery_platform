@@ -12,7 +12,7 @@ import {
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getMyListings, deactivateBoarding, activateBoarding, archiveBoarding } from '@/lib/boarding';
+import { getMyListings, deactivateBoarding, activateBoarding, archiveBoarding, getBoardingLifecycleSpec } from '@/lib/boarding';
 import { COLORS } from '@/lib/constants';
 import type { Boarding, BoardingStatus } from '@/types/boarding.types';
 import { getOwnerListingActions } from '@/lib/boarding-lifecycle';
@@ -46,10 +46,15 @@ export default function MyListingsScreen() {
   const [activeTab, setActiveTab] = useState<BoardingStatus | 'ALL'>('ALL');
   const [listings, setListings] = useState<Boarding[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [lifecycleTransitions, setLifecycleTransitions] = useState<Record<string, { allowedFrom: BoardingStatus[]; actorRoles: string[] }> | undefined>(undefined);
 
   const loadListings = useCallback(async () => {
     setIsLoading(true);
     try {
+      const spec = await getBoardingLifecycleSpec().catch(() => null);
+      if (spec) {
+        setLifecycleTransitions(spec.data.transitions as Record<string, { allowedFrom: BoardingStatus[]; actorRoles: string[] }>);
+      }
       const result = await getMyListings();
       setListings(result.data.boardings);
     } catch {
@@ -122,7 +127,7 @@ export default function MyListingsScreen() {
 
   const renderItem = ({ item }: { item: Boarding }) => {
     const primaryImage = item.images[0];
-    const available = getOwnerListingActions(item.status);
+    const available = getOwnerListingActions(item.status, lifecycleTransitions);
     return (
       <View style={styles.card}>
         <View style={styles.cardImageContainer}>
