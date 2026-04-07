@@ -8,6 +8,8 @@ import {
   Image,
   Alert,
   ActivityIndicator,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -48,6 +50,8 @@ export default function MyListingsScreen() {
   const [listings, setListings] = useState<Boarding[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [lifecycleTransitions, setLifecycleTransitions] = useState<Record<string, { allowedFrom: BoardingStatus[]; actorRoles: string[] }> | undefined>(undefined);
+  const [isActionDrawerVisible, setIsActionDrawerVisible] = useState(false);
+  const [selectedListing, setSelectedListing] = useState<Boarding | null>(null);
 
   const loadListings = useCallback(async () => {
     setIsLoading(true);
@@ -151,6 +155,38 @@ export default function MyListingsScreen() {
     ]);
   };
 
+  const closeActionDrawer = () => {
+    setIsActionDrawerVisible(false);
+    setSelectedListing(null);
+  };
+
+  const openActionDrawer = (boarding: Boarding) => {
+    setSelectedListing(boarding);
+    setIsActionDrawerVisible(true);
+  };
+
+  const getListingMenuActions = (boarding: Boarding): { key: string; text: string; destructive?: boolean; onPress: () => void }[] => {
+    const available = getOwnerListingActions(boarding.status, lifecycleTransitions);
+    const actions: { key: string; text: string; destructive?: boolean; onPress: () => void }[] = [];
+    if (boarding.isDeleted) {
+      actions.push({ key: 'restore', text: 'Restore', onPress: () => handleRestore(boarding) });
+      return actions;
+    }
+    if (available.canDeactivate) {
+      actions.push({ key: 'deactivate', text: 'Deactivate', destructive: true, onPress: () => handleDeactivate(boarding) });
+    }
+    if (available.canActivate) {
+      actions.push({ key: 'activate', text: 'Activate', onPress: () => handleActivate(boarding) });
+    }
+    if (available.canEdit) {
+      actions.push({ key: 'edit', text: 'Edit', onPress: () => router.push(`/my-listings/${boarding.id}/edit` as never) });
+    }
+    if (available.canArchive) {
+      actions.push({ key: 'archive', text: 'Archive', destructive: true, onPress: () => handleArchive(boarding) });
+    }
+    return actions;
+  };
+
   const renderItem = ({ item }: { item: Boarding }) => {
     const primaryImage = item.images[0];
     const available = getOwnerListingActions(item.status, lifecycleTransitions);
@@ -175,26 +211,7 @@ export default function MyListingsScreen() {
             <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
             <TouchableOpacity
               style={styles.menuBtn}
-              onPress={() => {
-                const actions: { text: string; style?: 'cancel' | 'default' | 'destructive'; onPress?: () => void }[] = [];
-                if (item.isDeleted) {
-                  actions.push({ text: 'Restore', onPress: () => handleRestore(item) });
-                }
-                if (!item.isDeleted && available.canDeactivate) {
-                  actions.push({ text: 'Deactivate', style: 'destructive', onPress: () => handleDeactivate(item) });
-                }
-                if (!item.isDeleted && available.canActivate) {
-                  actions.push({ text: 'Activate', onPress: () => handleActivate(item) });
-                }
-                if (!item.isDeleted && available.canEdit) {
-                  actions.push({ text: 'Edit', onPress: () => router.push(`/my-listings/${item.id}/edit` as never) });
-                }
-                if (!item.isDeleted && available.canArchive) {
-                  actions.push({ text: 'Archive', style: 'destructive', onPress: () => handleArchive(item) });
-                }
-                actions.push({ text: 'Cancel', style: 'cancel' });
-                Alert.alert(item.title, 'Choose an action', actions);
-              }}
+              onPress={() => openActionDrawer(item)}
             >
               <Ionicons name="ellipsis-vertical" size={18} color={COLORS.gray} />
             </TouchableOpacity>
@@ -290,6 +307,42 @@ export default function MyListingsScreen() {
           }
         />
       )}
+
+      <Modal
+        visible={isActionDrawerVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={closeActionDrawer}
+      >
+        <Pressable style={styles.drawerBackdrop} onPress={closeActionDrawer}>
+          <Pressable style={styles.drawer} onPress={() => {}}>
+            <View style={styles.drawerHandle} />
+            <Text style={styles.drawerTitle}>{selectedListing?.title ?? 'Listing Actions'}</Text>
+            {(selectedListing ? getListingMenuActions(selectedListing) : []).map((action) => (
+              <TouchableOpacity
+                key={action.key}
+                style={styles.drawerActionBtn}
+                onPress={() => {
+                  closeActionDrawer();
+                  action.onPress();
+                }}
+              >
+                <Text
+                  style={[
+                    styles.drawerActionText,
+                    action.destructive && styles.drawerActionTextDestructive,
+                  ]}
+                >
+                  {action.text}
+                </Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity style={styles.drawerCancelBtn} onPress={closeActionDrawer}>
+              <Text style={styles.drawerCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* FAB */}
       <TouchableOpacity
@@ -393,6 +446,59 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   restoreBtnText: { fontSize: 12, color: COLORS.white, fontWeight: '600' },
+  drawerBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  drawer: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 20,
+  },
+  drawerHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: COLORS.grayBorder,
+    alignSelf: 'center',
+    marginBottom: 10,
+  },
+  drawerTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginBottom: 8,
+  },
+  drawerActionBtn: {
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.grayLight,
+  },
+  drawerActionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  drawerActionTextDestructive: {
+    color: COLORS.red,
+  },
+  drawerCancelBtn: {
+    marginTop: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.grayBorder,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  drawerCancelText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+  },
   emptyState: { alignItems: 'center', paddingTop: 80, gap: 12 },
   emptyTitle: { fontSize: 17, fontWeight: '700', color: COLORS.text },
   emptySub: { fontSize: 14, color: COLORS.textSecondary, textAlign: 'center' },
