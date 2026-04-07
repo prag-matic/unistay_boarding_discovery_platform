@@ -196,7 +196,7 @@ export default function MyListingsScreen() {
     return actions;
   };
 
-  const preventDrawerClose = () => undefined;
+  const handleDrawerPress = () => undefined;
 
   const renderItem = ({ item }: { item: Boarding }) => {
     const primaryImage = item.images[0];
@@ -326,7 +326,7 @@ export default function MyListingsScreen() {
         onRequestClose={closeActionDrawer}
       >
         <Pressable style={styles.drawerBackdrop} onPress={closeActionDrawer}>
-          <Pressable style={styles.drawer} onPress={preventDrawerClose}>
+          <Pressable style={styles.drawer} onPress={handleDrawerPress}>
             <View style={styles.drawerHandle} />
             <Text style={styles.drawerTitle}>{selectedListing?.title ?? 'Listing Actions'}</Text>
             {(selectedListing ? getListingMenuActions(selectedListing) : []).map((action) => (
