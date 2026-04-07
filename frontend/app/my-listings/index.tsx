@@ -12,18 +12,19 @@ import {
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getMyListings, deactivateBoarding, activateBoarding, archiveBoarding, getBoardingLifecycleSpec } from '@/lib/boarding';
+import { getMyListings, deactivateBoarding, activateBoarding, archiveBoarding, restoreBoarding, getBoardingLifecycleSpec } from '@/lib/boarding';
 import { COLORS } from '@/lib/constants';
 import type { Boarding, BoardingStatus } from '@/types/boarding.types';
 import { getOwnerListingActions } from '@/lib/boarding-lifecycle';
 
-const TABS: { label: string; value: BoardingStatus | 'ALL' }[] = [
+const TABS: { label: string; value: BoardingStatus | 'ALL' | 'ARCHIVED' }[] = [
   { label: 'All', value: 'ALL' },
   { label: 'Active', value: 'ACTIVE' },
   { label: 'Draft', value: 'DRAFT' },
   { label: 'Inactive', value: 'INACTIVE' },
   { label: 'Pending', value: 'PENDING_APPROVAL' },
   { label: 'Rejected', value: 'REJECTED' },
+  { label: 'Archived', value: 'ARCHIVED' },
 ];
 
 const STATUS_COLORS: Record<BoardingStatus, string> = {
@@ -43,7 +44,7 @@ const STATUS_TEXT_COLORS: Record<BoardingStatus, string> = {
 };
 
 export default function MyListingsScreen() {
-  const [activeTab, setActiveTab] = useState<BoardingStatus | 'ALL'>('ALL');
+  const [activeTab, setActiveTab] = useState<BoardingStatus | 'ALL' | 'ARCHIVED'>('ALL');
   const [listings, setListings] = useState<Boarding[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [lifecycleTransitions, setLifecycleTransitions] = useState<Record<string, { allowedFrom: BoardingStatus[]; actorRoles: string[] }> | undefined>(undefined);
@@ -55,7 +56,7 @@ export default function MyListingsScreen() {
       if (spec) {
         setLifecycleTransitions(spec.data.transitions as Record<string, { allowedFrom: BoardingStatus[]; actorRoles: string[] }>);
       }
-      const result = await getMyListings();
+      const result = await getMyListings({ includeArchived: true });
       setListings(result.data.boardings);
     } catch {
       Alert.alert('Error', 'Failed to load your listings. Please try again.');
@@ -66,7 +67,11 @@ export default function MyListingsScreen() {
 
   useFocusEffect(useCallback(() => { loadListings(); }, [loadListings]));
 
-  const filtered = activeTab === 'ALL' ? listings : listings.filter((b) => b.status === activeTab);
+  const filtered = listings.filter((b) => {
+    if (activeTab === 'ARCHIVED') return b.isDeleted;
+    if (activeTab === 'ALL') return !b.isDeleted;
+    return !b.isDeleted && b.status === activeTab;
+  });
 
   const handleDeactivate = (boarding: Boarding) => {
     Alert.alert('Deactivate Listing', `Deactivate "${boarding.title}"?`, [
@@ -116,9 +121,30 @@ export default function MyListingsScreen() {
         onPress: async () => {
           try {
             await archiveBoarding(boarding.id);
-            setListings((prev) => prev.filter((b) => b.id !== boarding.id));
+            setListings((prev) =>
+              prev.map((b) => (b.id === boarding.id ? { ...b, isDeleted: true } : b)),
+            );
           } catch {
             Alert.alert('Error', 'Failed to archive the listing. Please try again.');
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleRestore = (boarding: Boarding) => {
+    Alert.alert('Restore Listing', `Restore "${boarding.title}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Restore',
+        onPress: async () => {
+          try {
+            await restoreBoarding(boarding.id);
+            setListings((prev) =>
+              prev.map((b) => (b.id === boarding.id ? { ...b, isDeleted: false } : b)),
+            );
+          } catch {
+            Alert.alert('Error', 'Failed to restore the listing. Please try again.');
           }
         },
       },
@@ -151,16 +177,19 @@ export default function MyListingsScreen() {
               style={styles.menuBtn}
               onPress={() => {
                 const actions: { text: string; style?: 'cancel' | 'default' | 'destructive'; onPress?: () => void }[] = [];
-                if (available.canDeactivate) {
+                if (item.isDeleted) {
+                  actions.push({ text: 'Restore', onPress: () => handleRestore(item) });
+                }
+                if (!item.isDeleted && available.canDeactivate) {
                   actions.push({ text: 'Deactivate', style: 'destructive', onPress: () => handleDeactivate(item) });
                 }
-                if (available.canActivate) {
+                if (!item.isDeleted && available.canActivate) {
                   actions.push({ text: 'Activate', onPress: () => handleActivate(item) });
                 }
-                if (available.canEdit) {
+                if (!item.isDeleted && available.canEdit) {
                   actions.push({ text: 'Edit', onPress: () => router.push(`/my-listings/${item.id}/edit` as never) });
                 }
-                if (available.canArchive) {
+                if (!item.isDeleted && available.canArchive) {
                   actions.push({ text: 'Archive', style: 'destructive', onPress: () => handleArchive(item) });
                 }
                 actions.push({ text: 'Cancel', style: 'cancel' });
@@ -177,7 +206,7 @@ export default function MyListingsScreen() {
             {item.monthlyRent ? `LKR ${item.monthlyRent.toLocaleString()}/mo` : '—'}
           </Text>
           <View style={styles.cardActions}>
-            {available.canEdit && (
+            {!item.isDeleted && available.canEdit && (
               <TouchableOpacity
                 style={styles.editBtn}
                 onPress={() => router.push(`/my-listings/${item.id}/edit` as never)}
@@ -186,13 +215,24 @@ export default function MyListingsScreen() {
                 <Text style={styles.editBtnText}>Edit</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity
-              style={styles.analyticsBtn}
-              onPress={() => router.push(`/my-listings/${item.id}/analytics` as never)}
-            >
-              <Ionicons name="bar-chart-outline" size={14} color={COLORS.white} />
-              <Text style={styles.analyticsBtnText}>Analytics</Text>
-            </TouchableOpacity>
+            {!item.isDeleted && (
+              <TouchableOpacity
+                style={styles.analyticsBtn}
+                onPress={() => router.push(`/my-listings/${item.id}/analytics` as never)}
+              >
+                <Ionicons name="bar-chart-outline" size={14} color={COLORS.white} />
+                <Text style={styles.analyticsBtnText}>Analytics</Text>
+              </TouchableOpacity>
+            )}
+            {item.isDeleted && (
+              <TouchableOpacity
+                style={styles.restoreBtn}
+                onPress={() => handleRestore(item)}
+              >
+                <Ionicons name="refresh-outline" size={14} color={COLORS.white} />
+                <Text style={styles.restoreBtnText}>Restore</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>
@@ -343,6 +383,16 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   analyticsBtnText: { fontSize: 12, color: COLORS.white, fontWeight: '600' },
+  restoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 8,
+    backgroundColor: COLORS.green,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  restoreBtnText: { fontSize: 12, color: COLORS.white, fontWeight: '600' },
   emptyState: { alignItems: 'center', paddingTop: 80, gap: 12 },
   emptyTitle: { fontSize: 17, fontWeight: '700', color: COLORS.text },
   emptySub: { fontSize: 14, color: COLORS.textSecondary, textAlign: 'center' },

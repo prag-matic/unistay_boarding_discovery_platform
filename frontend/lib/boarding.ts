@@ -101,10 +101,12 @@ export async function getBoardingBySlug(slug: string) {
   return response.data;
 }
 
-export async function getMyListings() {
-  logger.boarding.debug('getMyListings');
+export async function getMyListings(options?: { includeArchived?: boolean }) {
+  logger.boarding.debug('getMyListings', options);
+  const params = options?.includeArchived ? { includeArchived: 'true' } : undefined;
   const response = await api.get<UniStayApiResponse<{ boardings: Boarding[] }>>(
     '/boardings/my-listings',
+    { params },
   );
   return response.data;
 }

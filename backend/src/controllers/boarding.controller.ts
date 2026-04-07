@@ -219,8 +219,12 @@ export async function getMyListings(
 			throw new ForbiddenError("User is not authenticated");
 		}
 		const ownerId = req.user.userId;
+		const includeArchived = req.query.includeArchived === "true";
 
-		const boardings = await Boarding.find({ ownerId, isDeleted: false })
+		const boardings = await Boarding.find({
+			ownerId,
+			...(includeArchived ? {} : { isDeleted: false }),
+		})
 			.populate("ownerId", "firstName lastName phone")
 			.populate({
 				path: "images",
