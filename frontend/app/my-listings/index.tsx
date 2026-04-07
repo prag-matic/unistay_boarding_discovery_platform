@@ -45,11 +45,13 @@ const STATUS_TEXT_COLORS: Record<BoardingStatus, string> = {
   REJECTED: COLORS.red,
 };
 
+type LifecycleTransitions = Record<string, { allowedFrom: BoardingStatus[]; actorRoles: string[] }>;
+
 export default function MyListingsScreen() {
   const [activeTab, setActiveTab] = useState<BoardingStatus | 'ALL' | 'ARCHIVED'>('ALL');
   const [listings, setListings] = useState<Boarding[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [lifecycleTransitions, setLifecycleTransitions] = useState<Record<string, { allowedFrom: BoardingStatus[]; actorRoles: string[] }> | undefined>(undefined);
+  const [lifecycleTransitions, setLifecycleTransitions] = useState<LifecycleTransitions | undefined>(undefined);
   const [isActionDrawerVisible, setIsActionDrawerVisible] = useState(false);
   const [selectedListing, setSelectedListing] = useState<Boarding | null>(null);
 
@@ -58,7 +60,7 @@ export default function MyListingsScreen() {
     try {
       const spec = await getBoardingLifecycleSpec().catch(() => null);
       if (spec) {
-        setLifecycleTransitions(spec.data.transitions as Record<string, { allowedFrom: BoardingStatus[]; actorRoles: string[] }>);
+        setLifecycleTransitions(spec.data.transitions as LifecycleTransitions);
       }
       const result = await getMyListings({ includeArchived: true });
       setListings(result.data.boardings);
@@ -186,6 +188,8 @@ export default function MyListingsScreen() {
     }
     return actions;
   };
+
+  const absorbDrawerContentPress = () => undefined;
 
   const renderItem = ({ item }: { item: Boarding }) => {
     const primaryImage = item.images[0];
@@ -315,7 +319,7 @@ export default function MyListingsScreen() {
         onRequestClose={closeActionDrawer}
       >
         <Pressable style={styles.drawerBackdrop} onPress={closeActionDrawer}>
-          <Pressable style={styles.drawer} onPress={() => {}}>
+          <Pressable style={styles.drawer} onPress={absorbDrawerContentPress}>
             <View style={styles.drawerHandle} />
             <Text style={styles.drawerTitle}>{selectedListing?.title ?? 'Listing Actions'}</Text>
             {(selectedListing ? getListingMenuActions(selectedListing) : []).map((action) => (
