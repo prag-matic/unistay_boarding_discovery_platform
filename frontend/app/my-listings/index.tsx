@@ -46,6 +46,13 @@ const STATUS_TEXT_COLORS: Record<BoardingStatus, string> = {
 };
 
 type LifecycleTransitions = Record<string, { allowedFrom: BoardingStatus[]; actorRoles: string[] }>;
+type ListingMenuAction = {
+  key: string;
+  text: string;
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  destructive?: boolean;
+  onPress: () => void;
+};
 
 export default function MyListingsScreen() {
   const [activeTab, setActiveTab] = useState<BoardingStatus | 'ALL' | 'ARCHIVED'>('ALL');
@@ -167,24 +174,24 @@ export default function MyListingsScreen() {
     setIsActionDrawerVisible(true);
   };
 
-  const getListingMenuActions = (boarding: Boarding): { key: string; text: string; destructive?: boolean; onPress: () => void }[] => {
+  const getListingMenuActions = (boarding: Boarding): ListingMenuAction[] => {
     const available = getOwnerListingActions(boarding.status, lifecycleTransitions);
-    const actions: { key: string; text: string; destructive?: boolean; onPress: () => void }[] = [];
+    const actions: ListingMenuAction[] = [];
     if (boarding.isDeleted) {
-      actions.push({ key: 'restore', text: 'Restore', onPress: () => handleRestore(boarding) });
+      actions.push({ key: 'restore', text: 'Restore', icon: 'refresh-outline', onPress: () => handleRestore(boarding) });
       return actions;
     }
-    if (available.canDeactivate) {
-      actions.push({ key: 'deactivate', text: 'Deactivate', destructive: true, onPress: () => handleDeactivate(boarding) });
+    if (available.canEdit) {
+      actions.push({ key: 'edit', text: 'Edit', icon: 'create-outline', onPress: () => router.push(`/my-listings/${boarding.id}/edit` as never) });
     }
     if (available.canActivate) {
-      actions.push({ key: 'activate', text: 'Activate', onPress: () => handleActivate(boarding) });
+      actions.push({ key: 'activate', text: 'Activate', icon: 'checkmark-circle-outline', onPress: () => handleActivate(boarding) });
     }
-    if (available.canEdit) {
-      actions.push({ key: 'edit', text: 'Edit', onPress: () => router.push(`/my-listings/${boarding.id}/edit` as never) });
+    if (available.canDeactivate) {
+      actions.push({ key: 'deactivate', text: 'Deactivate', icon: 'pause-circle-outline', destructive: true, onPress: () => handleDeactivate(boarding) });
     }
     if (available.canArchive) {
-      actions.push({ key: 'archive', text: 'Archive', destructive: true, onPress: () => handleArchive(boarding) });
+      actions.push({ key: 'archive', text: 'Archive', icon: 'archive-outline', destructive: true, onPress: () => handleArchive(boarding) });
     }
     return actions;
   };
@@ -331,14 +338,24 @@ export default function MyListingsScreen() {
                   action.onPress();
                 }}
               >
-                <Text
-                  style={[
-                    styles.drawerActionText,
-                    action.destructive && styles.drawerActionTextDestructive,
-                  ]}
-                >
-                  {action.text}
-                </Text>
+                <View style={styles.drawerActionContent}>
+                  <View style={styles.drawerActionLeft}>
+                    <Ionicons
+                      name={action.icon}
+                      size={18}
+                      color={action.destructive ? COLORS.red : COLORS.textSecondary}
+                    />
+                    <Text
+                      style={[
+                        styles.drawerActionText,
+                        action.destructive && styles.drawerActionTextDestructive,
+                      ]}
+                    >
+                      {action.text}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={COLORS.gray} />
+                </View>
               </TouchableOpacity>
             ))}
             <TouchableOpacity style={styles.drawerCancelBtn} onPress={closeActionDrawer}>
@@ -414,7 +431,7 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 10, fontWeight: '700' },
   cardBody: { flex: 1, padding: 12 },
   cardTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  cardTitle: { flex: 1, fontSize: 14, fontWeight: '700', color: COLORS.text, marginRight: 8 },
+  cardTitle: { flex: 1, fontSize: 16, fontWeight: '700', color: COLORS.text, marginRight: 8 },
   menuBtn: { padding: 2 },
   cardOccupancy: { fontSize: 12, color: COLORS.textSecondary, marginTop: 4 },
   cardPrice: { fontSize: 15, fontWeight: '800', color: COLORS.primary, marginTop: 4 },
@@ -481,6 +498,16 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.grayLight,
+  },
+  drawerActionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  drawerActionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   drawerActionText: {
     fontSize: 16,
