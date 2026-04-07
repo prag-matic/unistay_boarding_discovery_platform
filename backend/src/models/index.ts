@@ -1,4 +1,8 @@
 export { Boarding, type IBoarding } from "./Boarding.js";
+export {
+	BoardingStatusHistory,
+	type IBoardingStatusHistory,
+} from "./BoardingStatusHistory.js";
 export { BoardingAmenity, type IBoardingAmenity } from "./BoardingAmenity.js";
 export { BoardingImage, type IBoardingImage } from "./BoardingImage.js";
 export { BoardingRule, type IBoardingRule } from "./BoardingRule.js";
