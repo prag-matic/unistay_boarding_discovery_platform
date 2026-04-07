@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react';
 import { cn } from '../lib/utils';
-import type { Boarding } from '../services/api';
+import { formatDistanceToNow } from 'date-fns';
+import type { Boarding, BoardingStatusHistoryEntry } from '../services/api';
 
 interface Props {
   boarding: Boarding | null;
+  history: BoardingStatusHistoryEntry[];
   onClose: () => void;
   onApprove: () => void;
   onReject: (reason: string) => void;
 }
 
-export default function BoardingDetailDrawer({ boarding, onClose, onApprove, onReject }: Props) {
+export default function BoardingDetailDrawer({ boarding, history, onClose, onApprove, onReject }: Props) {
   const [isRejecting, setIsRejecting] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [activeImageIndex, setActiveImageIndex] = useState<number | null>(null);
@@ -223,6 +225,29 @@ export default function BoardingDetailDrawer({ boarding, onClose, onApprove, onR
               </ul>
             </section>
           )}
+
+          <section>
+            <h4 className="font-label text-xs uppercase tracking-wider font-bold text-on-surface-variant mb-3">Status History</h4>
+            {history.length === 0 ? (
+              <p className="text-sm text-on-surface-variant">No lifecycle events recorded yet.</p>
+            ) : (
+              <ul className="space-y-2 text-sm">
+                {history.slice(0, 8).map((entry) => (
+                  <li key={entry.id} className="bg-surface-container-low rounded-md p-2">
+                    <div className="font-medium">{entry.fromStatus} → {entry.toStatus}</div>
+                    <div className="text-on-surface-variant text-xs">
+                      {entry.action} · {entry.actorRole} · {formatDistanceToNow(new Date(entry.createdAt), { addSuffix: true })}
+                    </div>
+                    {(entry.reason || entry.note) && (
+                      <div className="text-xs mt-1 text-on-surface-variant">
+                        {[entry.reason, entry.note].filter(Boolean).join(' · ')}
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         </div>
 
         <div className="p-6 bg-surface-container-low/50 border-t border-outline-variant/10 flex flex-col gap-4 shrink-0">
