@@ -2,11 +2,9 @@ import type { NextFunction, Request, Response } from "express";
 import {
 	BoardingNotFoundError,
 	ForbiddenError,
-	InvalidStateTransitionError,
 	ValidationError,
 } from "@/errors/AppError.js";
 import { deleteBoardingImage, uploadBoardingImage } from "@/lib/cloudinary.js";
-import { withMongoTransaction } from "@/lib/mongodb.js";
 import { sendSuccess } from "@/lib/response.js";
 import { MAX_BOARDING_IMAGES } from "@/middleware/upload.js";
 import {
@@ -20,9 +18,47 @@ import type {
 	SearchBoardingsQuery,
 	UpdateBoardingInput,
 } from "@/schemas/boarding.validators.js";
-import { BoardingStatus } from "@/types/enums.js";
-import { transformBoardingDoc } from "@/utils/index.js";
+import { BoardingStatus, Role } from "@/types/enums.js";
+import { addId, transformBoardingDoc } from "@/utils/index.js";
 import { generateUniqueSlug } from "@/utils/slug.js";
+import { boardingWorkflowService } from "@/services/boardingWorkflow.service.js";
+import {
+	BOARDING_LIFECYCLE_POLICY,
+	BOARDING_TRANSITIONS,
+	BOARDING_VISIBILITY,
+	LIFECYCLE_SPEC_VERSION,
+} from "@/domain/boardingLifecycle.js";
+
+async function getPopulatedBoardingById(id: string) {
+	return Boarding.findById(id)
+		.populate("ownerId", "firstName lastName phone")
+		.populate({
+			path: "images",
+			select: "id url publicId createdAt",
+		})
+		.populate({
+			path: "amenities",
+			select: "id name createdAt",
+		})
+		.populate({
+			path: "rules",
+			select: "id rule",
+		})
+		.lean({ virtuals: true });
+}
+
+// GET /api/boardings/lifecycle/spec
+export async function getBoardingLifecycleSpec(
+	_req: Request,
+	res: Response,
+): Promise<void> {
+	sendSuccess(res, {
+		version: LIFECYCLE_SPEC_VERSION,
+		policy: BOARDING_LIFECYCLE_POLICY,
+		visibility: BOARDING_VISIBILITY,
+		transitions: BOARDING_TRANSITIONS,
+	});
+}
 
 // GET /api/boardings  (public)
 export async function searchBoardings(
@@ -172,7 +208,7 @@ export async function getBoardingBySlug(
 	}
 }
 
-// GET /api/v1/boardings/my-listings  (owner)
+// GET /api/boardings/my-listings  (owner)
 export async function getMyListings(
 	req: Request,
 	res: Response,
@@ -284,7 +320,7 @@ export async function createBoarding(
 	}
 }
 
-// PUT /api/v1/boardings/:id  (owner)
+// PUT /api/boardings/:id  (owner)
 export async function updateBoarding(
 	req: Request,
 	res: Response,
@@ -298,125 +334,15 @@ export async function updateBoarding(
 		const ownerId = req.user.userId;
 		const body = req.body as UpdateBoardingInput;
 
-		const existing = await Boarding.findById(id);
-
-		if (!existing || existing.isDeleted) throw new BoardingNotFoundError();
-
-		if (existing.ownerId.toString() !== ownerId)
-			throw new ForbiddenError("You do not own this listing");
-
-		const shouldSetPendingApprovalAfterEdit =
-			existing.status === BoardingStatus.ACTIVE;
-
-		if (
-			existing.status === BoardingStatus.ACTIVE ||
-			existing.status === BoardingStatus.PENDING_APPROVAL
-		) {
-			throw new InvalidStateTransitionError(
-				"Cannot edit an active or pending listing. Deactivate first.",
-			);
-		}
-
-		const maxOccupants = body.maxOccupants ?? existing.maxOccupants;
-		const currentOccupants = body.currentOccupants ?? existing.currentOccupants;
-
-		if (currentOccupants > maxOccupants) {
-			throw new ValidationError("currentOccupants cannot exceed maxOccupants");
-		}
-
-		const { rules, title, amenities, ...rest } = body;
-
-		let slug = existing.slug;
-
-		if (title && title !== existing.title) {
-			slug = await generateUniqueSlug(title, id);
-		}
-
-		await withMongoTransaction(async (session) => {
-			// Delete existing rules if rules array is provided
-			if (rules !== undefined) {
-				await BoardingRule.deleteMany(
-					{ boardingId: id },
-					session ? { session } : {},
-				);
-			}
-
-			// Delete existing amenities if amenities array is provided
-			if (amenities !== undefined) {
-				await BoardingAmenity.deleteMany(
-					{ boardingId: id },
-					session ? { session } : {},
-				);
-			}
-
-			// Update boarding
-			const _boarding = await Boarding.findByIdAndUpdate(
-				id,
-				{
-					...rest,
-					...(title && { title }),
-					slug,
-				},
-				{ new: true, ...(session ? { session } : {}) },
-			)
-				.populate("ownerId", "firstName lastName phone")
-				.populate({
-					path: "images",
-					select: "id url publicId createdAt",
-				})
-				.populate({
-					path: "amenities",
-					select: "id name createdAt",
-				})
-				.populate({
-					path: "rules",
-					select: "id rule",
-				})
-				.lean({ virtuals: true });
-
-			// Create new rules if provided
-			if (rules && rules.length > 0) {
-				await BoardingRule.insertMany(
-					rules.map((rule) => ({ boardingId: id, rule })),
-					session ? { session } : {},
-				);
-			}
-
-			// Create new amenities if provided
-			if (amenities && amenities.length > 0) {
-				await BoardingAmenity.insertMany(
-					amenities.map((name) => ({ boardingId: id, name })),
-					session ? { session } : {},
-				);
-			}
-
-			// Re-fetch to get updated populated data
-			const updatedBoarding = await Boarding.findById(id)
-				.populate("ownerId", "firstName lastName phone")
-				.populate({
-					path: "images",
-					select: "id url publicId createdAt",
-				})
-				.populate({
-					path: "amenities",
-					select: "id name createdAt",
-				})
-				.populate({
-					path: "rules",
-					select: "id rule",
-				})
-				.lean({ virtuals: true });
-
-			sendSuccess(
-				res,
-				{
-					boarding: transformBoardingDoc(
-						updatedBoarding as Record<string, unknown>,
-					),
-				},
-				"Boarding updated successfully",
-			);
-		});
+		await boardingWorkflowService.updateBoarding(id, ownerId, body);
+		const updatedBoarding = await getPopulatedBoardingById(id);
+		sendSuccess(
+			res,
+			{
+				boarding: transformBoardingDoc(updatedBoarding as Record<string, unknown>),
+			},
+			"Boarding updated successfully",
+		);
 	} catch (err) {
 		next(err);
 	}
@@ -434,67 +360,8 @@ export async function submitBoarding(
 		}
 		const { id } = req.params as { id: string };
 		const ownerId = req.user.userId;
-
-		const existing = await Boarding.findById(id).populate({
-			path: "images",
-			select: "id url publicId",
-		});
-
-		if (!existing) throw new BoardingNotFoundError();
-
-		if (existing.ownerId.toString() !== ownerId)
-			throw new ForbiddenError("You do not own this Listing");
-
-		if (
-			existing.status !== BoardingStatus.DRAFT &&
-			existing.status !== BoardingStatus.REJECTED
-		) {
-			throw new InvalidStateTransitionError(
-				"Only DRAFT or REJECTED listings can be submitted for approval",
-			);
-		}
-
-		if (
-			existing.status !== BoardingStatus.DRAFT &&
-			existing.status !== BoardingStatus.REJECTED &&
-			existing.status !== BoardingStatus.INACTIVE
-		) {
-			throw new InvalidStateTransitionError(
-				"Only DRAFT, REJECTED, or INACTIVE listings can be submitted for approval",
-			);
-		}
-
-		if (
-			(existing as typeof existing & { images?: unknown[] }).images?.length ===
-			0
-		) {
-			throw new ValidationError(
-				"At least 1 image is required to submit for approval",
-			);
-		}
-
-		const boarding = await Boarding.findByIdAndUpdate(
-			id,
-			{
-				status: BoardingStatus.PENDING_APPROVAL,
-				rejectionReason: null,
-			},
-			{ new: true },
-		)
-			.populate("ownerId", "firstName lastName phone")
-			.populate({
-				path: "images",
-				select: "id url publicId createdAt",
-			})
-			.populate({
-				path: "amenities",
-				select: "id name createdAt",
-			})
-			.populate({
-				path: "rules",
-				select: "id rule",
-			})
-			.lean({ virtuals: true });
+		await boardingWorkflowService.submitForReview(id, ownerId);
+		const boarding = await getPopulatedBoardingById(id);
 
 		sendSuccess(
 			res,
@@ -506,7 +373,7 @@ export async function submitBoarding(
 	}
 }
 
-// PATCH /api/v1/boardings/:id/deactivate  (owner)
+// PATCH /api/boardings/:id/deactivate  (owner)
 export async function deactivateBoarding(
 	req: Request,
 	res: Response,
@@ -519,38 +386,8 @@ export async function deactivateBoarding(
 		const { id } = req.params as { id: string };
 		const ownerId = req.user.userId;
 
-		const existing = await Boarding.findById(id);
-
-		if (!existing || existing.isDeleted) throw new BoardingNotFoundError();
-
-		if (existing.ownerId.toString() !== ownerId)
-			throw new ForbiddenError("You do not own this listing");
-
-		if (existing.status !== BoardingStatus.ACTIVE) {
-			throw new InvalidStateTransitionError(
-				"Only ACTIVE listings can be deactivated",
-			);
-		}
-
-		const boarding = await Boarding.findByIdAndUpdate(
-			id,
-			{ status: BoardingStatus.INACTIVE },
-			{ new: true },
-		)
-			.populate("ownerId", "firstName lastName phone")
-			.populate({
-				path: "images",
-				select: "id url publicId createdAt",
-			})
-			.populate({
-				path: "amenities",
-				select: "id name createdAt",
-			})
-			.populate({
-				path: "rules",
-				select: "id rule",
-			})
-			.lean({ virtuals: true });
+		await boardingWorkflowService.deactivate(id, ownerId);
+		const boarding = await getPopulatedBoardingById(id);
 
 		sendSuccess(
 			res,
@@ -574,39 +411,8 @@ export async function activateBoarding(
 		}
 		const { id } = req.params as { id: string };
 		const ownerId = req.user.userId;
-
-		const existing = await Boarding.findById(id);
-
-		if (!existing || existing.isDeleted) throw new BoardingNotFoundError();
-
-		if (existing.ownerId.toString() !== ownerId)
-			throw new ForbiddenError("You do not own this listing");
-
-		if (existing.status !== BoardingStatus.INACTIVE) {
-			throw new InvalidStateTransitionError(
-				"Only INACTIVE listings can be activated",
-			);
-		}
-
-		const boarding = await Boarding.findByIdAndUpdate(
-			id,
-			{ status: BoardingStatus.ACTIVE },
-			{ new: true },
-		)
-			.populate("ownerId", "firstName lastName phone")
-			.populate({
-				path: "images",
-				select: "id url publicId createdAt",
-			})
-			.populate({
-				path: "amenities",
-				select: "id name createdAt",
-			})
-			.populate({
-				path: "rules",
-				select: "id rule",
-			})
-			.lean({ virtuals: true });
+		await boardingWorkflowService.reactivate(id, ownerId);
+		const boarding = await getPopulatedBoardingById(id);
 
 		sendSuccess(
 			res,
@@ -615,6 +421,66 @@ export async function activateBoarding(
 		);
 	} catch (err) {
 		next(err);
+	}
+}
+
+// PATCH /api/boardings/:id/archive  (owner)
+export async function archiveBoarding(
+	req: Request,
+	res: Response,
+	next: NextFunction,
+): Promise<void> {
+	try {
+		if (!req.user?.userId) {
+			throw new ForbiddenError("User is not authenticated");
+		}
+		const { id } = req.params as { id: string };
+		await boardingWorkflowService.archive(id, req.user.userId);
+		sendSuccess(res, { id, isDeleted: true }, "Boarding archived successfully");
+	} catch (error) {
+		next(error);
+	}
+}
+
+// PATCH /api/boardings/:id/restore  (owner)
+export async function restoreBoarding(
+	req: Request,
+	res: Response,
+	next: NextFunction,
+): Promise<void> {
+	try {
+		if (!req.user?.userId) {
+			throw new ForbiddenError("User is not authenticated");
+		}
+		const { id } = req.params as { id: string };
+		await boardingWorkflowService.restore(id, req.user.userId);
+		sendSuccess(res, { id, isDeleted: false }, "Boarding restored successfully");
+	} catch (error) {
+		next(error);
+	}
+}
+
+// GET /api/boardings/:id/status-history
+export async function getBoardingStatusHistory(
+	req: Request,
+	res: Response,
+	next: NextFunction,
+): Promise<void> {
+	try {
+		if (!req.user?.userId || !req.user?.role) {
+			throw new ForbiddenError("User is not authenticated");
+		}
+		const { id } = req.params as { id: string };
+		const history = await boardingWorkflowService.getHistory(
+			id,
+			req.user.userId,
+			req.user.role as Role,
+		);
+		sendSuccess(res, {
+			history: (history as Record<string, unknown>[]).map(addId),
+		});
+	} catch (error) {
+		next(error);
 	}
 }
 

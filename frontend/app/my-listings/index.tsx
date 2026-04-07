@@ -12,9 +12,10 @@ import {
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getMyListings, deactivateBoarding, activateBoarding } from '@/lib/boarding';
+import { getMyListings, deactivateBoarding, activateBoarding, archiveBoarding } from '@/lib/boarding';
 import { COLORS } from '@/lib/constants';
 import type { Boarding, BoardingStatus } from '@/types/boarding.types';
+import { getOwnerListingActions } from '@/lib/boarding-lifecycle';
 
 const TABS: { label: string; value: BoardingStatus | 'ALL' }[] = [
   { label: 'All', value: 'ALL' },
@@ -101,8 +102,27 @@ export default function MyListingsScreen() {
     ]);
   };
 
+  const handleArchive = (boarding: Boarding) => {
+    Alert.alert('Archive Listing', `Archive "${boarding.title}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Archive',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await archiveBoarding(boarding.id);
+            setListings((prev) => prev.filter((b) => b.id !== boarding.id));
+          } catch {
+            Alert.alert('Error', 'Failed to archive the listing. Please try again.');
+          }
+        },
+      },
+    ]);
+  };
+
   const renderItem = ({ item }: { item: Boarding }) => {
     const primaryImage = item.images[0];
+    const available = getOwnerListingActions(item.status);
     return (
       <View style={styles.card}>
         <View style={styles.cardImageContainer}>
@@ -126,13 +146,18 @@ export default function MyListingsScreen() {
               style={styles.menuBtn}
               onPress={() => {
                 const actions: { text: string; style?: 'cancel' | 'default' | 'destructive'; onPress?: () => void }[] = [];
-                if (item.status === 'ACTIVE') {
+                if (available.canDeactivate) {
                   actions.push({ text: 'Deactivate', style: 'destructive', onPress: () => handleDeactivate(item) });
                 }
-                if (item.status === 'INACTIVE') {
+                if (available.canActivate) {
                   actions.push({ text: 'Activate', onPress: () => handleActivate(item) });
                 }
-                actions.push({ text: 'Edit', onPress: () => router.push(`/my-listings/${item.id}/edit` as never) });
+                if (available.canEdit) {
+                  actions.push({ text: 'Edit', onPress: () => router.push(`/my-listings/${item.id}/edit` as never) });
+                }
+                if (available.canArchive) {
+                  actions.push({ text: 'Archive', style: 'destructive', onPress: () => handleArchive(item) });
+                }
                 actions.push({ text: 'Cancel', style: 'cancel' });
                 Alert.alert(item.title, 'Choose an action', actions);
               }}
@@ -147,13 +172,15 @@ export default function MyListingsScreen() {
             {item.monthlyRent ? `LKR ${item.monthlyRent.toLocaleString()}/mo` : '—'}
           </Text>
           <View style={styles.cardActions}>
-            <TouchableOpacity
-              style={styles.editBtn}
-              onPress={() => router.push(`/my-listings/${item.id}/edit` as never)}
-            >
-              <Ionicons name="pencil-outline" size={14} color={COLORS.primary} />
-              <Text style={styles.editBtnText}>Edit</Text>
-            </TouchableOpacity>
+            {available.canEdit && (
+              <TouchableOpacity
+                style={styles.editBtn}
+                onPress={() => router.push(`/my-listings/${item.id}/edit` as never)}
+              >
+                <Ionicons name="pencil-outline" size={14} color={COLORS.primary} />
+                <Text style={styles.editBtnText}>Edit</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={styles.analyticsBtn}
               onPress={() => router.push(`/my-listings/${item.id}/analytics` as never)}

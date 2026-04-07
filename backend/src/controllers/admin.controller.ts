@@ -2,15 +2,18 @@ import type { NextFunction, Request, Response } from "express";
 import mongoose from "mongoose";
 import {
 	BoardingNotFoundError,
-	InvalidStateTransitionError,
 	UserNotFoundError,
 } from "@/errors/AppError.js";
 import { sendSuccess } from "@/lib/response.js";
 import { Boarding, User } from "@/models/index.js";
-import type { RejectBoardingInput } from "@/schemas/boarding.validators.js";
+import type {
+	ModerationNoteInput,
+	RejectBoardingInput,
+} from "@/schemas/boarding.validators.js";
 import type { AdminListUsersQuery } from "@/schemas/user.validators.js";
 import { BoardingStatus } from "@/types/enums.js";
 import { addId, transformBoardingDoc } from "@/utils/index.js";
+import { boardingWorkflowService } from "@/services/boardingWorkflow.service.js";
 
 // GET /api/admin/users
 export async function listUsers(
@@ -197,25 +200,17 @@ export async function approveBoarding(
 	next: NextFunction,
 ): Promise<void> {
 	try {
-		const { id } = req.params as { id: string };
-
-		const existing = await Boarding.findById(id);
-
-		if (!existing || existing.isDeleted) throw new BoardingNotFoundError();
-
-		if (existing.status !== BoardingStatus.PENDING_APPROVAL) {
-			throw new InvalidStateTransitionError(
-				"Only PENDING_APPROVAL listings can be approved",
-			);
+		if (!req.user?.userId) {
+			throw new UserNotFoundError("Admin user context missing");
 		}
+		const { id } = req.params as { id: string };
+		const note = (req.body as ModerationNoteInput | undefined)?.note;
 
-		const boarding = await Boarding.findByIdAndUpdate(
-			id,
-			{ status: BoardingStatus.ACTIVE, rejectionReason: null },
-			{ new: true },
-		)
+		await boardingWorkflowService.approve(id, req.user.userId, note);
+		const boarding = await Boarding.findById(id)
 			.select("id status title updatedAt")
 			.lean();
+		if (!boarding) throw new BoardingNotFoundError();
 
 		sendSuccess(
 			res,
@@ -234,34 +229,53 @@ export async function rejectBoarding(
 	next: NextFunction,
 ): Promise<void> {
 	try {
-		const { id } = req.params as { id: string };
-		const { reason } = req.body as RejectBoardingInput;
-
-		const existing = await Boarding.findById(id);
-
-		if (!existing || existing.isDeleted) throw new BoardingNotFoundError();
-
-		if (existing.status !== BoardingStatus.PENDING_APPROVAL) {
-			throw new InvalidStateTransitionError(
-				"Only PENDING_APPROVAL listings can be rejected",
-			);
+		if (!req.user?.userId) {
+			throw new UserNotFoundError("Admin user context missing");
 		}
+		const { id } = req.params as { id: string };
+		const { reason, note } = req.body as RejectBoardingInput & ModerationNoteInput;
 
-		const boarding = await Boarding.findByIdAndUpdate(
-			id,
-			{
-				status: BoardingStatus.REJECTED,
-				rejectionReason: reason,
-			},
-			{ new: true },
-		)
+		await boardingWorkflowService.reject(id, req.user.userId, reason, note);
+
+		const boarding = await Boarding.findById(id)
 			.select("id status title rejectionReason updatedAt")
 			.lean();
+		if (!boarding) throw new BoardingNotFoundError();
 
 		sendSuccess(
 			res,
 			{ boarding: addId(boarding as Record<string, unknown>) },
 			"Boarding rejected successfully",
+		);
+	} catch (err) {
+		next(err);
+	}
+}
+
+// PATCH /api/admin/boardings/:id/reopen
+export async function reopenBoarding(
+	req: Request,
+	res: Response,
+	next: NextFunction,
+): Promise<void> {
+	try {
+		if (!req.user?.userId) {
+			throw new UserNotFoundError("Admin user context missing");
+		}
+		const { id } = req.params as { id: string };
+		const { note } = req.body as ModerationNoteInput;
+
+		await boardingWorkflowService.reopen(id, req.user.userId, note);
+
+		const boarding = await Boarding.findById(id)
+			.select("id status title updatedAt")
+			.lean();
+		if (!boarding) throw new BoardingNotFoundError();
+
+		sendSuccess(
+			res,
+			{ boarding: addId(boarding as Record<string, unknown>) },
+			"Boarding reopened successfully",
 		);
 	} catch (err) {
 		next(err);

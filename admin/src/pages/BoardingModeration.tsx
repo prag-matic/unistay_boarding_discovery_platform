@@ -2,7 +2,7 @@ import type { MouseEvent } from 'react';
 import { useEffect, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import BoardingDetailDrawer from '../components/BoardingDetailDrawer';
-import { api, type ApiClientError, type Boarding } from '../services/api';
+import { api, type ApiClientError, type Boarding, type BoardingStatusHistoryEntry } from '../services/api';
 
 export default function BoardingModeration() {
   const [boardings, setBoardings] = useState<Boarding[]>([]);
@@ -10,6 +10,7 @@ export default function BoardingModeration() {
   const [selectedBoarding, setSelectedBoarding] = useState<Boarding | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState('');
+  const [history, setHistory] = useState<BoardingStatusHistoryEntry[]>([]);
 
   const fetchBoardings = async () => {
     setLoading(true);
@@ -35,6 +36,7 @@ export default function BoardingModeration() {
     try {
       await api.approveBoarding(id);
       await fetchBoardings();
+      setHistory([]);
       if (selectedBoarding?.id === id) {
         setSelectedBoarding(null);
       }
@@ -50,6 +52,7 @@ export default function BoardingModeration() {
     try {
       await api.rejectBoarding(id, reason);
       await fetchBoardings();
+      setHistory([]);
       if (selectedBoarding?.id === id) {
         setSelectedBoarding(null);
       }
@@ -66,6 +69,16 @@ export default function BoardingModeration() {
     `${boarding.owner?.firstName ?? ''} ${boarding.owner?.lastName ?? ''}`.toLowerCase().includes(normalizedQuery) ||
     boarding.id.toLowerCase().includes(normalizedQuery),
   );
+
+  useEffect(() => {
+    if (!selectedBoarding) {
+      setHistory([]);
+      return;
+    }
+    api.getBoardingStatusHistory(selectedBoarding.id)
+      .then((response) => setHistory(response.history))
+      .catch(() => setHistory([]));
+  }, [selectedBoarding]);
 
   return (
     <div className="h-full flex flex-col p-8 gap-8 overflow-y-auto thin-scrollbar">
@@ -169,6 +182,7 @@ export default function BoardingModeration() {
 
       <BoardingDetailDrawer
         boarding={selectedBoarding}
+        history={history}
         onClose={() => setSelectedBoarding(null)}
         onApprove={() => selectedBoarding && void handleApprove(selectedBoarding.id)}
         onReject={(reason) => selectedBoarding && void handleReject(selectedBoarding.id, reason)}

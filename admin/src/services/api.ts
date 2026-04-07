@@ -1,5 +1,18 @@
 export type UserRole = 'STUDENT' | 'OWNER' | 'ADMIN';
-export type BoardingStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'ACTIVE' | 'REJECTED';
+export type BoardingStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'ACTIVE' | 'INACTIVE' | 'REJECTED';
+
+export interface BoardingStatusHistoryEntry {
+  id: string;
+  boardingId: string;
+  fromStatus: BoardingStatus;
+  toStatus: BoardingStatus;
+  action: string;
+  actorRole: UserRole | 'SYSTEM';
+  actorId?: string;
+  reason?: string;
+  note?: string;
+  createdAt: string;
+}
 
 export interface AuthUser {
   id: string;
@@ -197,14 +210,26 @@ export const api = {
   async approveBoarding(id: string): Promise<{ boarding: Boarding }> {
     return request<{ boarding: Boarding }>(`/admin/boardings/${id}/approve`, {
       method: 'PATCH',
+      body: JSON.stringify({}),
     });
   },
 
-  async rejectBoarding(id: string, reason: string): Promise<{ boarding: Boarding }> {
+  async rejectBoarding(id: string, reason: string, note?: string): Promise<{ boarding: Boarding }> {
     return request<{ boarding: Boarding }>(`/admin/boardings/${id}/reject`, {
       method: 'PATCH',
-      body: JSON.stringify({ reason }),
+      body: JSON.stringify({ reason, note }),
     });
+  },
+
+  async reopenBoarding(id: string, note?: string): Promise<{ boarding: Boarding }> {
+    return request<{ boarding: Boarding }>(`/admin/boardings/${id}/reopen`, {
+      method: 'PATCH',
+      body: JSON.stringify({ note }),
+    });
+  },
+
+  async getBoardingStatusHistory(id: string): Promise<{ history: BoardingStatusHistoryEntry[] }> {
+    return request<{ history: BoardingStatusHistoryEntry[] }>(`/boardings/${id}/status-history`);
   },
 
   async getUsers(params: {
