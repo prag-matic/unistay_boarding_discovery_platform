@@ -40,6 +40,41 @@ interface TransitionInput {
 }
 
 export class BoardingWorkflowService {
+	private getSessionOptions(session?: ClientSession): { session: ClientSession } {
+		if (!session) {
+			throw new ValidationError("Missing required database session");
+		}
+		return { session };
+	}
+
+	private async insertRules(
+		boardingId: string,
+		rules: string[],
+		session?: ClientSession,
+	): Promise<void> {
+		if (rules.length === 0) return;
+		const docs = rules.map((rule) => ({ boardingId, rule }));
+		if (session) {
+			await BoardingRule.insertMany(docs, this.getSessionOptions(session));
+			return;
+		}
+		await BoardingRule.insertMany(docs);
+	}
+
+	private async insertAmenities(
+		boardingId: string,
+		amenities: string[],
+		session?: ClientSession,
+	): Promise<void> {
+		if (amenities.length === 0) return;
+		const docs = amenities.map((name) => ({ boardingId, name }));
+		if (session) {
+			await BoardingAmenity.insertMany(docs, this.getSessionOptions(session));
+			return;
+		}
+		await BoardingAmenity.insertMany(docs);
+	}
+
 	private async getBoardingOrThrow(
 		boardingId: string,
 		session?: ClientSession,
@@ -230,16 +265,24 @@ export class BoardingWorkflowService {
 			}
 
 			if (rules !== undefined) {
-				await BoardingRule.deleteMany(
-					{ boardingId },
-					session ? { session } : undefined,
-				);
+				if (session) {
+					await BoardingRule.deleteMany(
+						{ boardingId },
+						this.getSessionOptions(session),
+					);
+				} else {
+					await BoardingRule.deleteMany({ boardingId });
+				}
 			}
 			if (amenities !== undefined) {
-				await BoardingAmenity.deleteMany(
-					{ boardingId },
-					session ? { session } : undefined,
-				);
+				if (session) {
+					await BoardingAmenity.deleteMany(
+						{ boardingId },
+						this.getSessionOptions(session),
+					);
+				} else {
+					await BoardingAmenity.deleteMany({ boardingId });
+				}
 			}
 
 			await this.executeTransition({
@@ -256,30 +299,8 @@ export class BoardingWorkflowService {
 				session,
 			});
 
-			if (rules && rules.length > 0) {
-				if (session) {
-					await BoardingRule.insertMany(
-						rules.map((rule) => ({ boardingId, rule })),
-						{ session },
-					);
-				} else {
-					await BoardingRule.insertMany(
-						rules.map((rule) => ({ boardingId, rule })),
-					);
-				}
-			}
-			if (amenities && amenities.length > 0) {
-				if (session) {
-					await BoardingAmenity.insertMany(
-						amenities.map((name) => ({ boardingId, name })),
-						{ session },
-					);
-				} else {
-					await BoardingAmenity.insertMany(
-						amenities.map((name) => ({ boardingId, name })),
-					);
-				}
-			}
+			await this.insertRules(boardingId, rules ?? [], session);
+			await this.insertAmenities(boardingId, amenities ?? [], session);
 		});
 	}
 
