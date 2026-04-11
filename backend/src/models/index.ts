@@ -1,4 +1,5 @@
 export { Boarding, type IBoarding } from "./Boarding.js";
+export { AdminAction, type IAdminAction } from "./AdminAction.js";
 export { BoardingAmenity, type IBoardingAmenity } from "./BoardingAmenity.js";
 export { BoardingImage, type IBoardingImage } from "./BoardingImage.js";
 export { BoardingRule, type IBoardingRule } from "./BoardingRule.js";
@@ -12,6 +13,15 @@ export {
 	PasswordResetToken,
 } from "./PasswordResetToken.js";
 export { type IPayment, Payment } from "./Payment.js";
+export {
+	type IMarketplaceItem,
+	MarketplaceItem,
+	type IMarketplaceImage,
+} from "./MarketplaceItem.js";
+export {
+	type IMarketplaceReport,
+	MarketplaceReport,
+} from "./MarketplaceReport.js";
 export { type IRefreshToken, RefreshToken } from "./RefreshToken.js";
 export { type IRentalPeriod, RentalPeriod } from "./RentalPeriod.js";
 export { type IReservation, Reservation } from "./Reservation.js";

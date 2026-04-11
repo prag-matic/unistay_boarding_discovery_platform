@@ -5,6 +5,7 @@ import authRoutes from "@/routes/auth.routes.js";
 import boardingRoutes from "@/routes/boarding.routes.js";
 import chatRoutes from "@/routes/chat.routes.js";
 import issueRoutes from "@/routes/issue.routes.js";
+import marketplaceRoutes from "@/routes/marketplace.routes.js";
 import paymentRoutes from "@/routes/payment.routes.js";
 import reservationRouter from "@/routes/reservation.routes.js";
 import reviewRoutes from "@/routes/review.routes.js";
@@ -64,5 +65,8 @@ router.use("/chat", chatRoutes);
 
 // Issue Routes
 router.use("/issues", issueRoutes);
+
+// Marketplace routes
+router.use("/marketplace", marketplaceRoutes);
 
 export default router;

@@ -20,3 +20,12 @@ View your app in AI Studio: https://ai.studio/apps/32e53ee5-60f0-4b97-9008-f1462
    - `VITE_API_BASE_URL` (optional; defaults to same-origin `/api`)
 3. Run the app:
    `npm run dev`
+
+## Admin UX Conventions
+
+- Keep the admin shell consistent: sidebar navigation stays visible across all protected admin routes.
+- Use shared table primitives for data-heavy pages: `DataTable`, `PaginationControls`, and `BulkActionBar`.
+- Use `StatusChip` for all status badges; do not hard-code status background/text color combinations in pages.
+- Use `ConfirmationDialog` for destructive actions and reason capture; avoid `window.confirm` and `window.prompt`.
+- Use semantic color tokens from `src/index.css` (`bg-surface-*`, `text-on-*`, `border-outline-*`) instead of ad hoc colors.
+- Use `focus-ring-control` for inputs/selects/textarea to keep keyboard focus visibility consistent.
