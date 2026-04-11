@@ -3,6 +3,7 @@ import rateLimit from "express-rate-limit";
 export const apiLimiter = rateLimit({
 	windowMs: 15 * 60 * 1000, // 15 minutes
 	max: 100, // Limit each IP to 100 requests per windowMs
+	skip: (req) => req.originalUrl.startsWith("/api/admin"),
 	message: {
 		success: false,
 		error: "TooManyRequests",
@@ -54,19 +55,6 @@ export const refreshLimiter = rateLimit({
 export const userLimiter = rateLimit({
 	windowMs: 15 * 60 * 1000, // 15 minutes
 	max: 100,
-	standardHeaders: true,
-	legacyHeaders: false,
-	message: {
-		success: false,
-		error: "TooManyRequests",
-		message: "Too many requests. Please try again later.",
-		timestamp: new Date().toISOString(),
-	},
-});
-
-export const adminLimiter = rateLimit({
-	windowMs: 15 * 60 * 1000, // 15 minutes
-	max: 200,
 	standardHeaders: true,
 	legacyHeaders: false,
 	message: {
