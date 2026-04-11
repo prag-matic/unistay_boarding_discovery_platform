@@ -3,16 +3,26 @@ import type { FileFilterCallback, Options, StorageEngine } from "multer";
 import multer from "multer";
 import { AppError } from "@/errors/AppError.js";
 
-const ALLOWED_IMAGE_MIME_TYPES = ["image/jpeg", "image/jpg", "image/png"];
+const ALLOWED_IMAGE_MIME_TYPES = [
+	"image/jpeg",
+	"image/jpg",
+	"image/png",
+	"image/webp",
+	"image/heic",
+	"image/heif",
+];
 const ALLOWED_VIDEO_MIME_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
 const BOARDING_ALLOWED_MIME_TYPES = [
 	"image/jpeg",
 	"image/jpg",
 	"image/png",
 	"image/webp",
+	"image/heic",
+	"image/heif",
 ];
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 export const MAX_BOARDING_IMAGES = 8;
+export const MAX_MARKETPLACE_IMAGES = 4;
 
 // Configure multer for memory storage (files stored in Buffer)
 const storage = multer.memoryStorage();
@@ -87,6 +97,12 @@ export const uploadBoardingImageMiddleware = multer({
 	fileFilter: boardingFileFilter,
 	limits: { fileSize: MAX_FILE_SIZE },
 }).array("images", MAX_BOARDING_IMAGES);
+
+export const uploadMarketplaceImageMiddleware = multer({
+	storage,
+	fileFilter: boardingFileFilter,
+	limits: { fileSize: MAX_FILE_SIZE },
+}).array("images", MAX_MARKETPLACE_IMAGES);
 
 export const uploadPaymentProofMiddleware = multer({
 	storage,
