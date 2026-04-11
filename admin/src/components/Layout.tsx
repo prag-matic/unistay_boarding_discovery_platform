@@ -59,6 +59,18 @@ export default function Layout() {
               <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 0" }}>security</span>
               <span>Boarding Moderation</span>
             </Link>
+            <Link
+              to="/marketplace-moderation"
+              className={cn(
+                "flex items-center gap-3 px-3 py-2 transition-colors rounded-lg",
+                location.pathname === '/marketplace-moderation'
+                  ? "text-primary font-semibold border-r-2 border-primary bg-primary-container/40 rounded-r-none"
+                  : "text-on-surface-variant hover:text-primary hover:bg-primary-container/30"
+              )}
+            >
+              <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 0" }}>storefront</span>
+              <span>Marketplace Moderation</span>
+            </Link>
           </nav>
           <div className="p-4 mt-auto space-y-1 border-t border-slate-200/50">
             <button

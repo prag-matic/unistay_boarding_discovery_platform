@@ -1,5 +1,13 @@
 export type UserRole = 'STUDENT' | 'OWNER' | 'ADMIN';
 export type BoardingStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'ACTIVE' | 'REJECTED';
+export type MarketplaceStatus = 'ACTIVE' | 'TAKEN_DOWN' | 'REMOVED';
+export type MarketplaceReportReason =
+  | 'SPAM'
+  | 'SCAM'
+  | 'PROHIBITED_ITEM'
+  | 'HARASSMENT'
+  | 'OTHER';
+export type MarketplaceReportStatus = 'OPEN' | 'RESOLVED' | 'DISMISSED';
 
 export interface AuthUser {
   id: string;
@@ -60,6 +68,56 @@ export interface Boarding {
   amenities?: Array<{ id: string; name: string }>;
   rules?: Array<{ id: string; rule: string }>;
   images?: Array<{ id: string; url: string }>;
+}
+
+export interface MarketplaceSeller {
+  id: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+}
+
+export interface MarketplaceItem {
+  id: string;
+  sellerId: string;
+  seller?: MarketplaceSeller;
+  title: string;
+  description: string;
+  adType: 'SELL' | 'GIVEAWAY';
+  category: string;
+  itemCondition: 'NEW' | 'LIKE_NEW' | 'GOOD' | 'FAIR' | 'POOR';
+  price?: number;
+  city: string;
+  district: string;
+  status: MarketplaceStatus;
+  takedownReason?: string;
+  reportCount: number;
+  images?: Array<{
+    id: string;
+    url: string;
+    publicId?: string;
+    createdAt?: string;
+  }>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MarketplaceReport {
+  id: string;
+  itemId: MarketplaceItem;
+  reporterId:
+    | string
+    | {
+        id: string;
+        firstName?: string;
+        lastName?: string;
+        email?: string;
+      };
+  reason: MarketplaceReportReason;
+  details?: string;
+  status: MarketplaceReportStatus;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface ApiSuccess<T> {
@@ -235,6 +293,37 @@ export const api = {
   async deactivateUser(id: string): Promise<{ id: string; isActive: boolean }> {
     return request<{ id: string; isActive: boolean }>(`/admin/users/${id}/deactivate`, {
       method: 'PATCH',
+    });
+  },
+
+  async getOpenMarketplaceReports(): Promise<{ reports: MarketplaceReport[] }> {
+    return request<{ reports: MarketplaceReport[] }>('/marketplace/reports/open');
+  },
+
+  async takedownMarketplaceItem(
+    id: string,
+    reason?: string,
+  ): Promise<{ item: MarketplaceItem }> {
+    return request<{ item: MarketplaceItem }>(`/marketplace/${id}/takedown`, {
+      method: 'PATCH',
+      body: JSON.stringify({ reason }),
+    });
+  },
+
+  async reinstateMarketplaceItem(id: string): Promise<{ item: MarketplaceItem }> {
+    return request<{ item: MarketplaceItem }>(`/marketplace/${id}/reinstate`, {
+      method: 'PATCH',
+    });
+  },
+
+  async resolveMarketplaceReport(
+    reportId: string,
+    status: Exclude<MarketplaceReportStatus, 'OPEN'>,
+    notes?: string,
+  ): Promise<{ report: MarketplaceReport }> {
+    return request<{ report: MarketplaceReport }>(`/marketplace/reports/${reportId}/resolve`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status, notes }),
     });
   },
 };
