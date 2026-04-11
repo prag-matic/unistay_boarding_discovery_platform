@@ -38,7 +38,7 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-surface flex items-center justify-center p-6">
       <div className="w-full max-w-md bg-surface-container-lowest rounded-xl p-8 border border-outline-variant/20 shadow-[0px_20px_40px_rgba(42,52,57,0.06)]">
-        <p className="font-label text-xs uppercase tracking-[0.15em] text-primary mb-2">UniStay Admin</p>
+        <p className="font-label text-xs uppercase tracking-[0.15em] text-on-surface-variant mb-2">UniStay Admin</p>
         <h1 className="font-headline text-3xl font-extrabold text-on-surface mb-6">Sign in</h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -48,7 +48,7 @@ export default function Login() {
               required
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              className="w-full px-3 py-2 bg-surface border border-outline-variant/40 rounded-md outline-none focus:ring-1 focus:ring-primary"
+              className="focus-ring-control w-full px-3 py-2 bg-surface border border-outline-variant/40 rounded-md text-on-surface"
             />
           </div>
           <div>
@@ -58,14 +58,14 @@ export default function Login() {
               required
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              className="w-full px-3 py-2 bg-surface border border-outline-variant/40 rounded-md outline-none focus:ring-1 focus:ring-primary"
+              className="focus-ring-control w-full px-3 py-2 bg-surface border border-outline-variant/40 rounded-md text-on-surface"
             />
           </div>
           {error && <p className="text-sm text-error">{error}</p>}
           <button
             type="submit"
             disabled={submitting}
-            className="w-full py-2.5 rounded-md bg-primary text-on-primary font-bold disabled:opacity-50"
+            className="w-full py-2.5 rounded-md bg-primary text-on-primary font-bold disabled:bg-surface-container-low disabled:text-on-surface-variant disabled:cursor-not-allowed"
           >
             {submitting ? 'Signing in…' : 'Sign In'}
           </button>

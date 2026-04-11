@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
+import ConfirmationDialog from '../components/admin/ConfirmationDialog';
+import DataTable from '../components/admin/DataTable';
+import PaginationControls from '../components/admin/PaginationControls';
 import { formatDistanceToNow } from 'date-fns';
+import StatusChip from '../components/admin/StatusChip';
 import {
   api,
   type ApiClientError,
@@ -7,13 +11,18 @@ import {
   type MarketplaceReportStatus,
 } from '../services/api';
 
+const PAGE_SIZE = 10;
+
 export default function MarketplaceModeration() {
   const [reports, setReports] = useState<MarketplaceReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [selectedReport, setSelectedReport] = useState<MarketplaceReport | null>(null);
+  const [takedownDialogReport, setTakedownDialogReport] = useState<MarketplaceReport | null>(null);
+  const hasActiveFilters = search.trim().length > 0;
 
   const fetchReports = async () => {
     setLoading(true);
@@ -59,6 +68,18 @@ export default function MarketplaceModeration() {
         .includes(q);
     });
   }, [reports, search]);
+  const totalPages = Math.max(1, Math.ceil(filteredReports.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const startIndex = (currentPage - 1) * PAGE_SIZE;
+  const pagedReports = filteredReports.slice(startIndex, startIndex + PAGE_SIZE);
+
+  const clearFilters = () => {
+    setSearch('');
+  };
+
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
 
   const resolveReport = async (
     reportId: string,
@@ -78,10 +99,7 @@ export default function MarketplaceModeration() {
     }
   };
 
-  const handleTakedown = async (report: MarketplaceReport) => {
-    const reason = window.prompt('Enter takedown reason:', report.details || 'Policy violation');
-    if (reason === null) return;
-
+  const handleTakedown = async (report: MarketplaceReport, reason: string) => {
     setActionLoadingId(report.id);
     setError('');
     try {
@@ -116,65 +134,63 @@ export default function MarketplaceModeration() {
 
   return (
     <div className="h-full flex flex-col p-8 gap-8 overflow-y-auto thin-scrollbar">
-      <section className="shrink-0 flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <p className="font-label text-xs uppercase tracking-[0.15em] text-primary mb-1">Queue Management</p>
-          <div className="flex items-baseline gap-4">
-            <h2 className="font-headline text-3xl font-extrabold text-on-surface">Marketplace Moderation</h2>
-            <span className="text-sm font-medium bg-primary-container text-on-primary-container px-3 py-1 rounded-full">
-              {filteredReports.length} open reports
-            </span>
-          </div>
-        </div>
-        <div className="relative">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
-          <input
-            type="text"
-            placeholder="Search reports..."
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            className="pl-10 pr-4 py-2 bg-surface-container-lowest border border-outline-variant/30 rounded-full text-sm focus:ring-1 focus:ring-primary w-full md:w-64 outline-none shadow-sm"
-          />
+      <section className="shrink-0">
+        <p className="font-label text-xs uppercase tracking-[0.15em] text-on-surface-variant mb-1">Moderation Queues</p>
+        <div className="flex items-baseline gap-4">
+          <h2 className="font-headline text-3xl font-extrabold text-on-surface">Marketplace Moderation Queue</h2>
+          <span className="text-sm font-medium bg-primary-container text-on-primary-container px-3 py-1 rounded-full">
+            {filteredReports.length} open reports
+          </span>
         </div>
       </section>
 
+      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-outline-variant/30 bg-surface-container-low p-3">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.12em] text-on-surface-variant mb-1">Search</p>
+          <div className="relative">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg">search</span>
+            <input
+              type="text"
+              placeholder="Listing, reporter, reason, location"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              className="focus-ring-control pl-10 pr-4 py-2.5 bg-surface-container-lowest border border-outline-variant/40 rounded-md text-sm text-on-surface placeholder:text-on-surface-variant/80 w-full md:w-72"
+            />
+          </div>
+        </div>
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="px-3 py-2.5 text-xs font-medium border border-outline-variant/40 text-on-surface rounded-md hover:bg-surface-container-high transition-colors"
+          >
+            Clear filters
+          </button>
+        )}
+      </div>
+
       {error && <p className="text-sm text-error">{error}</p>}
 
-      <section className="bg-surface-container-lowest rounded-xl overflow-hidden flex-1 shadow-[0px_20px_40px_rgba(42,52,57,0.04)] flex flex-col min-h-0">
-        <div className="overflow-x-auto flex-1">
-          <table className="w-full text-left border-collapse">
-            <thead className="sticky top-0 bg-surface-container-low z-10">
-              <tr className="border-b border-outline-variant/15 font-label text-[10px] uppercase tracking-wider text-on-surface-variant">
-                <th className="px-6 py-4 font-bold">Report</th>
-                <th className="px-6 py-4 font-bold">Listing</th>
-                <th className="px-6 py-4 font-bold">Reason</th>
-                <th className="px-6 py-4 font-bold">Reporter</th>
-                <th className="px-6 py-4 font-bold">Status</th>
-                <th className="px-6 py-4 font-bold text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-outline-variant/10">
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-on-surface-variant">Loading...</td>
-                </tr>
-              ) : filteredReports.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-on-surface-variant">No open marketplace reports found.</td>
-                </tr>
-              ) : (
-                filteredReports.map((report) => {
+      <DataTable
+        columns={['Report', 'Listing', 'Reason', 'Reporter', 'Status', 'Actions']}
+        loading={loading}
+        emptyText="No open marketplace reports found."
+        colSpan={6}
+      >
+        {pagedReports.map((report) => {
                   const item = report.itemId;
+                  const itemStatus = item?.status ?? 'ACTIVE';
                   const reporter =
                     typeof report.reporterId === 'object'
                       ? `${report.reporterId.firstName ?? ''} ${report.reporterId.lastName ?? ''}`.trim() ||
                         report.reporterId.email ||
                         'Unknown'
                       : report.reporterId;
+                  const isLoading = actionLoadingId === report.id;
 
                   return (
                     <tr key={report.id} className="transition-colors hover:bg-surface-container-high">
-                      <td className="px-6 py-5 font-mono text-xs text-on-surface-variant">
+                      <td className="px-6 py-5 font-mono text-sm text-on-surface-variant">
                         <div>{report.id}</div>
                         <div className="mt-1 text-[11px]">
                           {formatDistanceToNow(new Date(report.createdAt), { addSuffix: true })}
@@ -199,59 +215,66 @@ export default function MarketplaceModeration() {
                       </td>
                       <td className="px-6 py-5 text-sm">{reporter}</td>
                       <td className="px-6 py-5">
-                        <span className="bg-error-container/20 text-on-error-container text-[10px] font-bold px-2 py-1 rounded-sm">
-                          {item?.status ?? 'ACTIVE'}
-                        </span>
+                        <StatusChip value={item?.status ?? 'ACTIVE'} />
                       </td>
                       <td className="px-6 py-5">
                         <div className="flex justify-center gap-2">
                           <button
                             onClick={() => setSelectedReport(report)}
-                            className="px-3 py-1.5 text-xs font-semibold rounded-md bg-primary-container text-on-primary-container"
+                            className="px-3.5 py-2 text-xs font-semibold rounded-md bg-primary-container text-on-primary-container border border-outline-variant/25 hover:brightness-105 transition-colors"
                             title="View reported listing details"
                           >
                             View
                           </button>
-                          <button
-                            onClick={() => void handleTakedown(report)}
-                            disabled={actionLoadingId === report.id}
-                            className="px-3 py-1.5 text-xs font-semibold rounded-md bg-error text-white disabled:opacity-60"
-                            title="Take down listing and resolve report"
-                          >
-                            Take Down
-                          </button>
+                          {itemStatus !== 'TAKEN_DOWN' && (
+                            <button
+                              onClick={() => setTakedownDialogReport(report)}
+                              disabled={isLoading}
+                              className="px-3.5 py-2 text-xs font-semibold rounded-md bg-error text-on-error border border-transparent hover:brightness-110 transition-colors disabled:bg-surface-container-low disabled:text-on-surface-variant disabled:border-outline-variant/30 disabled:cursor-not-allowed"
+                              title="Take down listing and resolve report"
+                            >
+                              {isLoading ? 'Processing...' : 'Take down'}
+                            </button>
+                          )}
                           <button
                             onClick={() => void handleDismiss(report)}
-                            disabled={actionLoadingId === report.id}
-                            className="px-3 py-1.5 text-xs font-semibold rounded-md bg-surface-variant text-on-surface disabled:opacity-60"
+                            disabled={isLoading}
+                            className="px-3.5 py-2 text-xs font-semibold rounded-md bg-surface-container-high text-on-surface border border-outline-variant/30 hover:bg-surface-container-highest transition-colors disabled:bg-surface-container-low disabled:text-on-surface-variant disabled:border-outline-variant/30 disabled:cursor-not-allowed"
                             title="Dismiss report"
                           >
-                            Dismiss
+                            {isLoading ? 'Processing...' : 'Dismiss'}
                           </button>
-                          {item?.status === 'TAKEN_DOWN' && (
+                          {itemStatus === 'TAKEN_DOWN' && (
                             <button
                               onClick={() => void handleReinstate(report)}
-                              disabled={actionLoadingId === report.id}
-                              className="px-3 py-1.5 text-xs font-semibold rounded-md bg-primary text-white disabled:opacity-60"
+                              disabled={isLoading}
+                              className="px-3.5 py-2 text-xs font-semibold rounded-md bg-primary text-on-primary border border-transparent hover:brightness-110 transition-colors disabled:bg-surface-container-low disabled:text-on-surface-variant disabled:border-outline-variant/30 disabled:cursor-not-allowed"
                               title="Reinstate listing"
                             >
-                              Reinstate
+                              {isLoading ? 'Processing...' : 'Reinstate'}
                             </button>
                           )}
                         </div>
                       </td>
                     </tr>
                   );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+                })}
+      </DataTable>
+
+      <div className="p-4 border border-outline-variant/15 border-t-0 rounded-b-xl flex items-center justify-between bg-surface-container-low/50 shrink-0">
+        <p className="text-xs text-on-surface-variant">Page {currentPage} of {totalPages}</p>
+        <PaginationControls
+          page={currentPage}
+          totalPages={totalPages}
+          loading={loading}
+          onPrev={() => setPage(Math.max(currentPage - 1, 1))}
+          onNext={() => setPage(Math.min(currentPage + 1, totalPages))}
+        />
+      </div>
 
       {selectedReport && (
         <div
-          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-inverse-surface/45 flex items-center justify-center p-4"
           onClick={() => setSelectedReport(null)}
         >
           <div
@@ -260,7 +283,7 @@ export default function MarketplaceModeration() {
           >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="font-label text-xs uppercase tracking-[0.12em] text-primary">Reported Listing</p>
+                <p className="font-label text-xs uppercase tracking-[0.12em] text-on-surface-variant">Reported Listing</p>
                 <h3 className="text-xl font-extrabold text-on-surface mt-1">{selectedReport.itemId?.title ?? 'Unknown listing'}</h3>
                 <p className="text-sm text-on-surface-variant mt-1">
                   {selectedReport.itemId?.city}, {selectedReport.itemId?.district} · {selectedReport.itemId?.adType}
@@ -322,6 +345,24 @@ export default function MarketplaceModeration() {
           </div>
         </div>
       )}
+
+      <ConfirmationDialog
+        open={takedownDialogReport !== null}
+        title="Take down reported listing"
+        description="Provide a takedown reason before resolving this report."
+        confirmLabel="Take down"
+        variant="danger"
+        requireReason
+        reasonLabel="Takedown Reason"
+        reasonPlaceholder="Enter takedown reason"
+        initialReason={takedownDialogReport?.details || 'Policy violation'}
+        onCancel={() => setTakedownDialogReport(null)}
+        onConfirm={(reason) => {
+          if (!takedownDialogReport || !reason) return;
+          void handleTakedown(takedownDialogReport, reason);
+          setTakedownDialogReport(null);
+        }}
+      />
     </div>
   );
 }
