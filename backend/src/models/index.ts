@@ -1,4 +1,5 @@
 export { Boarding, type IBoarding } from "./Boarding.js";
+export { AdminAction, type IAdminAction } from "./AdminAction.js";
 export { BoardingAmenity, type IBoardingAmenity } from "./BoardingAmenity.js";
 export { BoardingImage, type IBoardingImage } from "./BoardingImage.js";
 export { BoardingRule, type IBoardingRule } from "./BoardingRule.js";
