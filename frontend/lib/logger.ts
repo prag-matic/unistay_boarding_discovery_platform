@@ -97,6 +97,8 @@ const logger = {
   auth: createNamespacedLogger('AUTH'),
   /** Logs related to boarding operations. */
   boarding: createNamespacedLogger('BOARDING'),
+  /** Logs related to marketplace operations. */
+  marketplace: createNamespacedLogger('MARKETPLACE'),
   /** Logs related to payment operations. */
   payment: createNamespacedLogger('PAYMENT'),
   /** Logs related to reservation operations. */
