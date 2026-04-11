@@ -1,63 +1,59 @@
-import type { Request, Response, NextFunction } from 'express';
-import prisma from '@/lib/prisma.js';
-import { sendSuccess } from '@/lib/response.js';
-import { ForbiddenError, NotFoundError } from '@/errors/AppError.js';
+import type { NextFunction, Request, Response } from "express";
+import mongoose from "mongoose";
+import { ForbiddenError, NotFoundError } from "@/errors/AppError.js";
+import { sendSuccess } from "@/lib/response.js";
+import { RentalPeriod, Reservation } from "@/models/index.js";
+import { transformRentalPeriodDoc } from "@/utils/index.js";
 
 // GET /api/reservations/:resId/rental-periods  (participant)
-export async function getRentalPeriods(req: Request, res: Response, next: NextFunction): Promise<void> {
-    
-    try {
-        
-        const { resId } = req.params as { resId: string };
-        const userId = req.user!.userId;
-        const role = req.user!.role;
+export async function getRentalPeriods(
+	req: Request,
+	res: Response,
+	next: NextFunction,
+): Promise<void> {
+	try {
+		if (!req.user?.userId) {
+			throw new ForbiddenError("User is not authenticated");
+		}
+		const { resId } = req.params as { resId: string };
+		const userId = req.user.userId;
+		const role = req.user.role;
 
-        const reservation = await prisma.reservation.findUnique({
-            where: { id: resId },
-            include: { boarding: true },
-        });
+		const reservation = await Reservation.findById(resId)
+			.populate("boardingId", "ownerId")
+			.lean();
 
-    
-        if (!reservation) throw new NotFoundError('Reservation not found');
+		if (!reservation) throw new NotFoundError("Reservation not found");
 
-        // Only participant or admin
-        if (role !== 'ADMIN') {
-            const isStudent = reservation.studentId === userId;
-            const isOwner = reservation.boarding.ownerId === userId;
-            
-            if (!isStudent && !isOwner) {
-                throw new ForbiddenError('Access denied');
-            }
-        }
+		if (role !== "ADMIN") {
+			const isStudent = reservation.studentId.toString() === userId;
+			const boarding =
+				reservation.boardingId as typeof reservation.boardingId & {
+					ownerId?: mongoose.Types.ObjectId;
+				};
+			const isOwner = boarding?.ownerId?.toString() === userId;
 
-        const rentalPeriods = await prisma.rentalPeriod.findMany({
-            where: { reservationId: resId },
-            orderBy: { dueDate: 'asc' },
-            select: {
-                id: true,
-                reservationId: true,
-                periodLabel: true,
-                dueDate: true,
-                amountDue: true,
-                status: true,
-                createdAt: true,
-                updatedAt: true,
-                payments: {
-                    select: {
-                        id: true,
-                        amount: true,
-                        paymentMethod: true,
-                        status: true,
-                        paidAt: true,
-                        confirmedAt: true,
-                    },
-                },
-            },
-        });
+			if (!isStudent && !isOwner) {
+				throw new ForbiddenError("Access denied");
+			}
+		}
 
-        sendSuccess(res, { rentalPeriods });
-  
-    } catch (err) {
-        next(err);
-    }
+		const rentalPeriods = await RentalPeriod.find({
+			reservationId: new mongoose.Types.ObjectId(resId),
+		})
+			.populate({
+				path: "payments",
+				select: "id amount paymentMethod status paidAt confirmedAt",
+			})
+			.sort({ dueDate: 1 })
+			.lean({ virtuals: true });
+
+		sendSuccess(res, {
+			rentalPeriods: (rentalPeriods as Record<string, unknown>[]).map(
+				transformRentalPeriodDoc,
+			),
+		});
+	} catch (err) {
+		next(err);
+	}
 }
