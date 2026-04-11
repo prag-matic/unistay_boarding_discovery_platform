@@ -29,7 +29,7 @@ import {
 
 const router: Router = createRouter();
 
-router.use(boardingLimiter);
+// router.use(boardingLimiter);
 
 // Public routes
 router.get("/", validateQuery(searchBoardingsQuerySchema), searchBoardings);
