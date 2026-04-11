@@ -83,3 +83,36 @@ export enum ReactionType {
 	LIKE = "LIKE",
 	DISLIKE = "DISLIKE",
 }
+
+export enum MarketplaceAdType {
+	SELL = "SELL",
+	GIVEAWAY = "GIVEAWAY",
+}
+
+export enum MarketplaceCondition {
+	NEW = "NEW",
+	LIKE_NEW = "LIKE_NEW",
+	GOOD = "GOOD",
+	FAIR = "FAIR",
+	POOR = "POOR",
+}
+
+export enum MarketplaceStatus {
+	ACTIVE = "ACTIVE",
+	TAKEN_DOWN = "TAKEN_DOWN",
+	REMOVED = "REMOVED",
+}
+
+export enum MarketplaceReportReason {
+	SPAM = "SPAM",
+	SCAM = "SCAM",
+	PROHIBITED_ITEM = "PROHIBITED_ITEM",
+	HARASSMENT = "HARASSMENT",
+	OTHER = "OTHER",
+}
+
+export enum MarketplaceReportStatus {
+	OPEN = "OPEN",
+	RESOLVED = "RESOLVED",
+	DISMISSED = "DISMISSED",
+}
