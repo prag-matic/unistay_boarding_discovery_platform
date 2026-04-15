@@ -73,7 +73,7 @@ services:
     image: openinary/openinary:latest
     container_name: unistay_openinary
     ports:
-      - "3001:3000"
+      - "3001:3001"
     environment:
       - STORAGE_REGION=${MINIO_REGION}
       - STORAGE_ACCESS_KEY_ID=${MINIO_ROOT_USER}
