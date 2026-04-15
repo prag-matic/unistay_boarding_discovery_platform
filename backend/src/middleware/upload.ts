@@ -1,21 +1,37 @@
+import type { Request, RequestHandler, Response } from "express";
+import type { FileFilterCallback, Options, StorageEngine } from "multer";
 import multer from "multer";
-import type { Request, Response } from "express";
 import { AppError } from "@/errors/AppError.js";
 
-const ALLOWED_IMAGE_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png'];
+const ALLOWED_IMAGE_MIME_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+];
 const ALLOWED_VIDEO_MIME_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
-const BOARDING_ALLOWED_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+const BOARDING_ALLOWED_MIME_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+];
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 export const MAX_BOARDING_IMAGES = 8;
+export const MAX_MARKETPLACE_IMAGES = 4;
 
 // Configure multer for memory storage (files stored in Buffer)
 const storage = multer.memoryStorage();
 
 // File filter for images
 const imageFilter = (
-  req: Request,
+  _req: Request,
   file: Express.Multer.File,
-  cb: multer.FileFilterCallback,
+  cb: FileFilterCallback,
 ) => {
   if (ALLOWED_IMAGE_MIME_TYPES.includes(file.mimetype)) {
     cb(null, true);
@@ -30,11 +46,10 @@ const imageFilter = (
 
 // File filter for videos
 const videoFilter = (
-  req: Request,
+  _req: Request,
   file: Express.Multer.File,
-  cb: multer.FileFilterCallback,
+  cb: FileFilterCallback,
 ) => {
-
   if (ALLOWED_VIDEO_MIME_TYPES.includes(file.mimetype)) {
     cb(null, true);
   } else {
@@ -45,22 +60,22 @@ const videoFilter = (
 function boardingFileFilter(
   _req: Request,
   file: Express.Multer.File,
-  cb: multer.FileFilterCallback,
+  cb: FileFilterCallback,
 ): void {
   if (BOARDING_ALLOWED_MIME_TYPES.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new AppError('Only JPEG/PNG/WebP images are allowed', 400));
+    cb(new AppError("Only JPEG/PNG/WebP images are allowed", 400));
   }
 }
 
 // Upload limits
-const limits = {
+const limits: Options["limits"] = {
   fileSize: 10 * 1024 * 1024, // 10MB per file
 };
 
 // Combined middleware for review uploads (handles both images and video)
-export const uploadReviewMedia = multer({
+export const uploadReviewMedia: RequestHandler = multer({
   storage,
   limits: {
     ...limits,
@@ -71,31 +86,35 @@ export const uploadReviewMedia = multer({
   { name: "video", maxCount: 1 },
 ]);
 
-
-export const uploadProfileImageMiddleware = multer({
+export const uploadProfileImageMiddleware: RequestHandler = multer({
   storage,
   fileFilter: imageFilter,
   limits: { fileSize: MAX_FILE_SIZE },
-}).single('profileImage');
+}).single("profileImage");
 
-export const uploadBoardingImageMiddleware = multer({
+export const uploadBoardingImageMiddleware: RequestHandler = multer({
   storage,
   fileFilter: boardingFileFilter,
   limits: { fileSize: MAX_FILE_SIZE },
-}).array('images', MAX_BOARDING_IMAGES);
+}).array("images", MAX_BOARDING_IMAGES);
 
-export const uploadPaymentProofMiddleware = multer({
+export const uploadMarketplaceImageMiddleware: RequestHandler = multer({
+  storage,
+  fileFilter: boardingFileFilter,
+  limits: { fileSize: MAX_FILE_SIZE },
+}).array("images", MAX_MARKETPLACE_IMAGES);
+
+export const uploadPaymentProofMiddleware: RequestHandler = multer({
   storage,
   fileFilter: imageFilter,
   limits: { fileSize: MAX_FILE_SIZE },
-}).single('proofImage');
-
+}).single("proofImage");
 
 // Custom middleware to validate files
 export const validateReviewFiles = (
   req: Request,
   res: Response,
-  next: Function,
+  next: (...args: unknown[]) => unknown,
 ) => {
   const files = req.files as { [fieldname: string]: Express.Multer.File[] };
 
@@ -117,7 +136,7 @@ export const validateReviewFiles = (
   if (files.video && files.video.length > 0) {
     const allowedMimes = ["video/mp4", "video/webm", "video/quicktime"];
     const video = files.video[0];
-    const fileExt = "." + video.originalname.split(".").pop()?.toLowerCase();
+    const fileExt = `.${video.originalname.split(".").pop()?.toLowerCase()}`;
     const videoExtensions = [".mp4", ".webm", ".mov", ".mkv", ".avi"];
 
     // Allow octet-stream if file has video extension (curl sometimes doesn't detect MIME correctly)
@@ -139,9 +158,22 @@ export const validateReviewFiles = (
   next();
 };
 
-
-
-export default {
+const uploadMiddleware: {
+  uploadReviewMedia: RequestHandler;
+  validateReviewFiles: RequestHandler;
+  storage: StorageEngine;
+  imageFilter: (
+    req: Request,
+    file: Express.Multer.File,
+    cb: FileFilterCallback,
+  ) => void;
+  videoFilter: (
+    req: Request,
+    file: Express.Multer.File,
+    cb: FileFilterCallback,
+  ) => void;
+  limits: Options["limits"];
+} = {
   uploadReviewMedia,
   validateReviewFiles,
   storage,
@@ -149,3 +181,5 @@ export default {
   videoFilter,
   limits,
 };
+
+export default uploadMiddleware;

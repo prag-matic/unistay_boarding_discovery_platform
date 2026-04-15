@@ -1,28 +1,7 @@
-import { PrismaClient } from "@prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
-import { config } from '@/config/env.js';
+// Legacy compatibility shim for tests that still mock '@/lib/prisma.js'.
+// The application now uses Mongoose models directly.
 
-
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
-};
-
-const adapter = new PrismaPg({
-  connectionString: process.env.DATABASE_URL!,
-});
-
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log:
-      config.nodeEnv === "development"
-        ? ["query", "error", "warn"]
-        : ["error"],
-    adapter,
-  });
-
-if (config.nodeEnv !== "production") {
-  globalForPrisma.prisma = prisma;
-}
+const prisma = {} as const;
 
 export default prisma;
+export { prisma };

@@ -1,13 +1,12 @@
-import express from "express";
-import type { Request, Response } from "express";
 import cors from "cors";
+import type { Application, Request, Response } from "express";
+import express from "express";
 import helmet from "helmet";
-import rateLimit from "express-rate-limit";
-import router from "./routes/index.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { apiLimiter } from "./middleware/rateLimit.js";
+import router from "./routes/index.js";
 
-const app = express();
+const app: Application = express();
 
 // Security middleware
 app.use(helmet());
@@ -25,12 +24,12 @@ app.use("/api", router);
 
 // 404 handler
 app.use((_req: Request, res: Response) => {
-  res.status(404).json({
-    success: false,
-    error: "NotFound",
-    message: "The requested resource was not found",
-    timestamp: new Date().toISOString(),
-  });
+	res.status(404).json({
+		success: false,
+		error: "NotFound",
+		message: "The requested resource was not found",
+		timestamp: new Date().toISOString(),
+	});
 });
 
 // Global error handler
