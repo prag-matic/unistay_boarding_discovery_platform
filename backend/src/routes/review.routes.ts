@@ -1,89 +1,109 @@
-import { Router } from "express";
+import type { Router } from "express";
+import { Router as createRouter } from "express";
 import {
-  createReview,
-  getReview,
-  updateReview,
-  deleteReview,
-  addReviewReaction,
-  getReviewsByBoarding,
-  getReviewStats,
-  createReviewComment,
-  updateReviewComment,
-  deleteReviewComment,
-  addReviewCommentReaction,
+	addReviewCommentReaction,
+	addReviewReaction,
+	createReview,
+	createReviewComment,
+	deleteReview,
+	deleteReviewComment,
+	getMyBoardingReviews,
+	getMyReviews,
+	getReview,
+	getReviewStats,
+	getReviewsByBoarding,
+	updateReview,
+	updateReviewComment,
 } from "../controllers/review.controller.js";
-import {
-  uploadReviewMedia,
-  validateReviewFiles,
-} from "../middleware/upload.js";
-import { validate } from "../middleware/validate.js";
-import {
-  updateReviewCommentSchema,
-  reactionSchema,
-} from "../schemas/index.js";
+import { authenticate, requireRole } from "../middleware/auth.js";
 
-const router = Router();
+import {
+	uploadReviewMedia,
+	validateReviewFiles,
+} from "../middleware/upload.js";
+
+import { validate } from "../middleware/validate.js";
+
+import { reactionSchema, updateReviewCommentSchema } from "../schemas/index.js";
+
+const router: Router = createRouter();
 
 /**
  * Review Routes
  *
- * All routes require user authentication (user ID passed via x-user-id header)
- * In production, use the auth middleware instead
+ * All routes require user authentication
  */
 
-// Create review (with file upload)
+// Create review (with file upload) - requires STUDENT role
 router.post(
-  "/",
-  uploadReviewMedia,
-  validateReviewFiles,
-  createReview,
+	"/",
+	authenticate,
+	requireRole("STUDENT"),
+	uploadReviewMedia,
+	validateReviewFiles,
+	createReview,
 );
+
+// Get reviews written by the authenticated student (must be before /:id)
+router.get("/my", authenticate, getMyReviews);
+
+// Get reviews for boardings owned by the authenticated user (must be before /:id)
+router.get("/my-boardings", authenticate, getMyBoardingReviews);
+
+// Get reviews by boarding (must be before /:id)
+router.get("/boarding/:boardingId", getReviewsByBoarding);
+
+// Get review statistics for boarding (must be before /:id)
+router.get("/boarding/:boardingId/stats", getReviewStats);
 
 // Get review by ID
 router.get("/:id", getReview);
 
-// Update review (with file upload)
+// Update review (with file upload) - only the student who created it
 router.put(
-  "/:id",
-  uploadReviewMedia,
-  validateReviewFiles,
-  updateReview,
+	"/:id",
+	authenticate,
+	requireRole("STUDENT"),
+	uploadReviewMedia,
+	validateReviewFiles,
+	updateReview,
 );
 
 // Delete review
-router.delete("/:id", deleteReview);
+router.delete("/:id", authenticate, deleteReview);
 
-// Add reaction to review
+// Add reaction to review - requires authentication
 router.post(
-  "/:id/reactions",
-  validate(reactionSchema, "body"),
-  addReviewReaction,
+	"/:id/reactions",
+	authenticate,
+	requireRole("STUDENT"),
+	validate(reactionSchema, "body"),
+	addReviewReaction,
 );
 
 // Get reviews by boarding (separate route for boarding-specific queries)
-router.get("/boarding/:boardingId", getReviewsByBoarding);
-
-// Get review statistics for boarding
-router.get("/boarding/:boardingId/stats", getReviewStats);
+// Note: already registered before /:id above
 
 // Create comment on review (validation done in controller with commentBodySchema)
-router.post("/:id/comments", createReviewComment);
+router.post("/:id/comments", authenticate, createReviewComment);
 
 // Update comment
 router.put(
-  "/comments/:id",
-  validate(updateReviewCommentSchema, "body"),
-  updateReviewComment,
+	"/comments/:id",
+	authenticate,
+	requireRole("STUDENT"),
+	validate(updateReviewCommentSchema, "body"),
+	updateReviewComment,
 );
 
-// Delete comment
-router.delete("/comments/:id", deleteReviewComment);
+// Delete comment - only the user who created it
+router.delete("/comments/:id", authenticate, deleteReviewComment);
 
-// Add reaction to comment
+// Add reaction to comment - requires authentication
 router.post(
-  "/comments/:id/reactions",
-  validate(reactionSchema, "body"),
-  addReviewCommentReaction,
+	"/comments/:id/reactions",
+	validate(reactionSchema, "body"),
+	addReviewCommentReaction,
 );
 
 export default router;
