@@ -1,464 +1,552 @@
-import type { Request, Response, NextFunction } from 'express';
-import prisma from '@/lib/prisma.js';
-import { sendSuccess } from '@/lib/response.js';
-
-import type { 
-    CreateReservationInput,
-    RejectReservationInput,
-} from "@/schemas/reservation.validators.js"
-
-import { 
-    BadRequestError, 
-    BoardingNotFoundError,
-    ConflictError,
-    NotFoundError,
-    ForbiddenError,
+import type { NextFunction, Request, Response } from "express";
+import mongoose from "mongoose";
+import {
+	BadRequestError,
+	BoardingNotFoundError,
+	ConflictError,
+	ForbiddenError,
+	NotFoundError,
 } from "@/errors/AppError.js";
+import { withMongoTransaction } from "@/lib/mongodb.js";
+import { sendSuccess } from "@/lib/response.js";
+import { Boarding, RentalPeriod, Reservation } from "@/models/index.js";
 
-import { Prisma, BoardingStatus, ReservationStatus } from '@prisma/client'; 
+import type {
+	CreateReservationInput,
+	RejectReservationInput,
+} from "@/schemas/reservation.validators.js";
+import { BoardingStatus, ReservationStatus } from "@/types/enums.js";
+import { transformReservationDoc } from "@/utils/index.js";
 
 const RESERVATION_EXPIRY_HOURS = 72;
 
-function reservationSelect() {
-    return {
-        id: true,
-        studentId: true,
-        boardingId: true,
-        status: true,
-        moveInDate: true,
-        specialRequests: true,
-        rentSnapshot: true,
-        boardingSnapshot: true,
-        rejectionReason: true,
-        expiresAt: true,
-        createdAt: true,
-        updatedAt: true,
-
-        student: { 
-            select: {
-                id: true, 
-                firstName: true, 
-                lastName: true, 
-                email: true 
-            }
-        },
-
-        boarding: { 
-            select: { 
-                id: true, 
-                title: true, 
-                slug: true, 
-                city: true, 
-                district: true 
-            }
-        },
-
-    } as const;
-}
-
 // Helper: generate rental periods for an active reservation
 async function generateRentalPeriods(
-    tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
-    reservationId: string,
-    moveInDate: Date,
-    monthlyRent: number,
+	reservationId: string,
+	moveInDate: Date,
+	monthlyRent: number,
 ): Promise<void> {
+	const firstDue = new Date(moveInDate);
+	firstDue.setUTCHours(0, 0, 0, 0);
 
-    // First period: due_date = move_in_date (formatted YYYY-MM-DD label)
-    const firstDue = new Date(moveInDate);
-    firstDue.setUTCHours(0, 0, 0, 0);
+	const formatPeriodLabel = (d: Date) =>
+		`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 
-    const formatPeriodLabel = (d: Date) =>
-        `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+	const periods = [];
 
-    // Generate 12 months of upcoming rental periods
-    const periods = [];
-    
-    for (let i = 0; i < 12; i++) {
-        let dueDate: Date;
-        
-        if (i === 0) {
-            dueDate = new Date(firstDue);
-        } else {
-            dueDate = new Date(firstDue);
-            dueDate.setUTCMonth(firstDue.getUTCMonth() + i);
-            dueDate.setUTCDate(1);
-    }
+	for (let i = 0; i < 12; i++) {
+		let dueDate: Date;
 
-        periods.push({
-            reservationId,
-            periodLabel: formatPeriodLabel(dueDate),
-            dueDate,
-            amountDue: monthlyRent,
-        });
-    }
+		if (i === 0) {
+			dueDate = new Date(firstDue);
+		} else {
+			dueDate = new Date(firstDue);
+			dueDate.setUTCMonth(firstDue.getUTCMonth() + i);
+			dueDate.setUTCDate(1);
+		}
 
-    await tx.rentalPeriod.createMany({ data: periods });
+		periods.push({
+			reservationId: new mongoose.Types.ObjectId(reservationId),
+			periodLabel: formatPeriodLabel(dueDate),
+			dueDate,
+			amountDue: monthlyRent,
+		});
+	}
+
+	await RentalPeriod.insertMany(periods);
 }
 
 // POST /api/reservations
-export async function createReservation(req: Request, res: Response, next: NextFunction): Promise<void> {
-    try {
-        
-        const studentId = req.user!.userId;
-        const body = req.body as CreateReservationInput;
+export async function createReservation(
+	req: Request,
+	res: Response,
+	next: NextFunction,
+): Promise<void> {
+	try {
+		if (!req.user?.userId) {
+			throw new ForbiddenError("User is not authenticated");
+		}
+		const studentId = req.user.userId;
+		const body = req.body as CreateReservationInput;
 
-        // Validate move-in date >= today + 1 day
-        const today = new Date();
-        
-        today.setUTCHours(0, 0, 0, 0);
-        
-        const minMoveIn = new Date(today);
-        
-        minMoveIn.setUTCDate(minMoveIn.getUTCDate() + 1);
+		const today = new Date();
+		today.setUTCHours(0, 0, 0, 0);
 
-        const moveInDate = new Date(body.moveInDate);
-        
-        moveInDate.setUTCHours(0, 0, 0, 0);
-    
-        if (moveInDate < minMoveIn) {
-            throw new BadRequestError('Move-in date must be at least 1 day in the future');
-        }
+		const minMoveIn = new Date(today);
+		minMoveIn.setUTCDate(minMoveIn.getUTCDate() + 1);
 
-        const reservation = await prisma.$transaction(async (tx) => {
-      
-        // Lock boarding row
-        const boarding = await tx.boarding.findUnique({ where: { id: body.boardingId } });
-        
-        if (!boarding || boarding.isDeleted) throw new BoardingNotFoundError();
-        
-        if (boarding.status !== BoardingStatus.ACTIVE) {
-            throw new BadRequestError('Boarding is not available for reservation');
-        }
+		const moveInDate = new Date(body.moveInDate);
+		moveInDate.setUTCHours(0, 0, 0, 0);
 
-        // Occupancy check
-        if (boarding.currentOccupants >= boarding.maxOccupants) {
-            throw new ConflictError('Boarding is full');
-        }
+		if (moveInDate < minMoveIn) {
+			throw new BadRequestError(
+				"Move-in date must be at least 1 day in the future",
+			);
+		}
 
-        // Student already has active reservation globally
-        const activeReservation = await tx.reservation.findFirst({
-            where: { studentId, status: ReservationStatus.ACTIVE },
-        });
+		const boarding = await Boarding.findById(body.boardingId);
 
-        if (activeReservation) {
-            throw new ConflictError('You already have an active reservation');
-        }
+		if (!boarding || boarding.isDeleted) throw new BoardingNotFoundError();
 
-        // Student already has pending/active for this boarding
-        const existingForBoarding = await tx.reservation.findFirst({
-            where: {
-                studentId,
-                boardingId: body.boardingId,
-                status: { in: [ReservationStatus.PENDING, ReservationStatus.ACTIVE] },
-            },
-        });
+		if (boarding.status !== BoardingStatus.ACTIVE) {
+			throw new BadRequestError("Boarding is not available for reservation");
+		}
 
-        if (existingForBoarding) {
-            throw new ConflictError('You already have a pending or active reservation for this boarding');
-        }
+		if (boarding.currentOccupants >= boarding.maxOccupants) {
+			throw new ConflictError("Boarding is full");
+		}
 
-        const expiresAt = new Date();
-        expiresAt.setHours(expiresAt.getHours() + RESERVATION_EXPIRY_HOURS);
+		const activeReservation = await Reservation.findOne({
+			studentId: new mongoose.Types.ObjectId(studentId),
+			status: ReservationStatus.ACTIVE,
+		});
 
-        const boardingSnapshot = {
-            id: boarding.id,
-            title: boarding.title,
-            slug: boarding.slug,
-            city: boarding.city,
-            district: boarding.district,
-            address: boarding.address,
-            boardingType: boarding.boardingType,
-            genderPref: boarding.genderPref,
-            monthlyRent: boarding.monthlyRent,
-            maxOccupants: boarding.maxOccupants,
-            nearUniversity: boarding.nearUniversity,
-        };
+		if (activeReservation) {
+			throw new ConflictError("You already have an active reservation");
+		}
 
-        return tx.reservation.create({
-            data: {
-                studentId,
-                boardingId: body.boardingId,
-                moveInDate,
-                specialRequests: body.specialRequests,
-                rentSnapshot: boarding.monthlyRent,
-                boardingSnapshot,
-                expiresAt,
-            },
+		const existingForBoarding = await Reservation.findOne({
+			studentId: new mongoose.Types.ObjectId(studentId),
+			boardingId: new mongoose.Types.ObjectId(body.boardingId),
+			status: { $in: [ReservationStatus.PENDING, ReservationStatus.ACTIVE] },
+		});
 
-            select: reservationSelect(),
+		if (existingForBoarding) {
+			throw new ConflictError(
+				"You already have a pending or active reservation for this boarding",
+			);
+		}
 
-        });
+		const expiresAt = new Date();
+		expiresAt.setHours(expiresAt.getHours() + RESERVATION_EXPIRY_HOURS);
 
-    });
+		const boardingSnapshot = {
+			id: boarding._id.toString(),
+			title: boarding.title,
+			slug: boarding.slug,
+			city: boarding.city,
+			district: boarding.district,
+			address: boarding.address,
+			boardingType: boarding.boardingType,
+			genderPref: boarding.genderPref,
+			monthlyRent: boarding.monthlyRent,
+			maxOccupants: boarding.maxOccupants,
+			nearUniversity: boarding.nearUniversity,
+		};
 
-    sendSuccess(res, { reservation }, 'Reservation request created successfully', 201);
+		const reservation = await Reservation.create({
+			studentId: new mongoose.Types.ObjectId(studentId),
+			boardingId: new mongoose.Types.ObjectId(body.boardingId),
+			moveInDate,
+			specialRequests: body.specialRequests,
+			rentSnapshot: boarding.monthlyRent,
+			boardingSnapshot,
+			expiresAt,
+		});
 
-  } catch (err) {
-    next(err);
-  }
+		const populatedReservation = await Reservation.findById(reservation._id)
+			.populate("studentId", "id firstName lastName email")
+			.populate("boardingId", "id title slug city district")
+			.lean();
+
+		sendSuccess(
+			res,
+			{
+				reservation: transformReservationDoc(
+					populatedReservation as Record<string, unknown>,
+				),
+			},
+			"Reservation request created successfully",
+			201,
+		);
+	} catch (err) {
+		next(err);
+	}
 }
 
 // GET /api/reservations/my-requests  (student)
-export async function getMyRequests(req: Request, res: Response, next: NextFunction): Promise<void> {
-    
-    try {
-        const studentId = req.user!.userId;
+export async function getMyRequests(
+	req: Request,
+	res: Response,
+	next: NextFunction,
+): Promise<void> {
+	try {
+		if (!req.user?.userId) {
+			throw new ForbiddenError("User is not authenticated");
+		}
+		const studentId = req.user.userId;
 
-        const reservations = await prisma.reservation.findMany({
-            where: { studentId },
-            orderBy: { createdAt: 'desc' },
-            select: reservationSelect(),
-        });
+		const reservations = await Reservation.find({
+			studentId: new mongoose.Types.ObjectId(studentId),
+		})
+			.populate("studentId", "firstName lastName email")
+			.populate("boardingId", "title slug city district")
+			.sort({ createdAt: -1 })
+			.lean();
 
-        sendSuccess(res, { reservations });
-
-    } catch (err) {
-        next(err);
-    }
+		sendSuccess(res, {
+			reservations: (reservations as Record<string, unknown>[]).map(
+				transformReservationDoc,
+			),
+		});
+	} catch (err) {
+		next(err);
+	}
 }
 
 // GET /api/reservations/my-boardings  (owner)
-export async function getMyBoardingRequests(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function getMyBoardingRequests(
+	req: Request,
+	res: Response,
+	next: NextFunction,
+): Promise<void> {
+	try {
+		if (!req.user?.userId) {
+			throw new ForbiddenError("User is not authenticated");
+		}
+		const ownerId = req.user.userId;
 
-    try {
-        const ownerId = req.user!.userId;
+		// First, find all boardings owned by the current user
+		const ownerBoardings = await Boarding.find({
+			ownerId: new mongoose.Types.ObjectId(ownerId),
+		})
+			.select("_id")
+			.lean();
 
-        const reservations = await prisma.reservation.findMany({
-            where: { boarding: { ownerId } },
-            orderBy: { createdAt: 'desc' },
-            select: reservationSelect(),
-        });
+		const boardingIds = ownerBoardings.map((b) => b._id);
 
-        sendSuccess(res, { reservations });
+		if (boardingIds.length === 0) {
+			sendSuccess(res, { reservations: [] });
+			return;
+		}
 
-    } catch (err) {
-        next(err);
-    }
+		// Then find reservations for those boardings
+		const reservations = await Reservation.find({
+			boardingId: { $in: boardingIds },
+		})
+			.populate("studentId", "firstName lastName email")
+			.populate("boardingId", "title slug city district")
+			.sort({ createdAt: -1 })
+			.lean();
+
+		sendSuccess(res, {
+			reservations: (reservations as Record<string, unknown>[]).map(
+				transformReservationDoc,
+			),
+		});
+	} catch (err) {
+		next(err);
+	}
 }
 
 // GET /api/reservations/:id
-export async function getReservationById(req: Request, res: Response, next: NextFunction): Promise<void> {
-    
-    try {
-        const { id } = req.params as { id: string };
-        const userId = req.user!.userId;
-        const role = req.user!.role;
+export async function getReservationById(
+	req: Request,
+	res: Response,
+	next: NextFunction,
+): Promise<void> {
+	try {
+		if (!req.user?.userId) {
+			throw new ForbiddenError("User is not authenticated");
+		}
+		const { id } = req.params as { id: string };
+		const userId = req.user.userId;
+		const role = req.user.role;
 
-        const reservation = await prisma.reservation.findUnique({
-            where: { id },
-            select: reservationSelect(),
-        });
+		const reservation = await Reservation.findById(id)
+			.populate("studentId", "firstName lastName email")
+			.populate("boardingId", "title slug city district")
+			.lean();
 
-        if (!reservation) throw new NotFoundError('Reservation not found');
+		if (!reservation) throw new NotFoundError("Reservation not found");
 
-        // Only participant (student or owner) can access
-        if (role !== 'ADMIN') {
-            const isStudent = reservation.studentId === userId;
-            
-            if (!isStudent) {
-                const boarding = await prisma.boarding.findUnique({ where: { id: reservation.boardingId } });
-                
-                if (!boarding || boarding.ownerId !== userId) {
-                        throw new ForbiddenError('Access denied');
-                }
-            }
-        }
+		if (role !== "ADMIN") {
+			const isStudent = reservation.studentId._id.toString() === userId;
 
-        sendSuccess(res, { reservation });
+			if (!isStudent) {
+				const boarding = await Boarding.findById(reservation.boardingId._id);
 
-    } catch (err) {
-        next(err);
-    }
+				if (!boarding || boarding.ownerId.toString() !== userId) {
+					throw new ForbiddenError("Access denied");
+				}
+			}
+		}
+
+		sendSuccess(res, {
+			reservation: transformReservationDoc(
+				reservation as Record<string, unknown>,
+			),
+		});
+	} catch (err) {
+		next(err);
+	}
 }
 
 // PATCH /api/reservations/:id/approve  (owner)
-export async function approveReservation(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function approveReservation(
+	req: Request,
+	res: Response,
+	next: NextFunction,
+): Promise<void> {
+	try {
+		if (!req.user?.userId) {
+			throw new ForbiddenError("User is not authenticated");
+		}
+		const { id } = req.params as { id: string };
+		const ownerId = req.user.userId;
 
-    try {
+		const reservation = await Reservation.findById(id).populate({
+			path: "boardingId",
+			select: "ownerId currentOccupants maxOccupants",
+		});
 
-        const { id } = req.params as { id: string };
-        const ownerId = req.user!.userId;
+		if (!reservation) throw new NotFoundError("Reservation not found");
 
-        const reservation = await prisma.$transaction(async (tx) => {
-        
-            const res = await tx.reservation.findUnique({
-                where: { id },
-                include: { boarding: true },
-            });
+		const boardingInfo =
+			reservation.boardingId as typeof reservation.boardingId & {
+				ownerId?: mongoose.Types.ObjectId;
+			};
+		if (!boardingInfo || boardingInfo.ownerId?.toString() !== ownerId) {
+			throw new ForbiddenError("You do not own this boarding");
+		}
 
-            if (!res) throw new NotFoundError('Reservation not found');
-            
-            if (res.boarding.ownerId !== ownerId) {
-                throw new ForbiddenError('You do not own this boarding');
-            }
-        
-            if (res.status !== ReservationStatus.PENDING) {
-                throw new BadRequestError('Only PENDING reservations can be approved');
-            }
+		if (reservation.status !== ReservationStatus.PENDING) {
+			throw new BadRequestError("Only PENDING reservations can be approved");
+		}
 
-            // Check if expired
-            if (new Date() > res.expiresAt) {
-                await tx.reservation.update({ where: { id }, data: { status: ReservationStatus.EXPIRED } });
-                throw new BadRequestError('Reservation has expired');
-            }
+		if (new Date() > reservation.expiresAt) {
+			await Reservation.findByIdAndUpdate(id, {
+				status: ReservationStatus.EXPIRED,
+			});
+			throw new BadRequestError("Reservation has expired");
+		}
 
-            // Re-check occupancy
-            if (res.boarding.currentOccupants >= res.boarding.maxOccupants) {
-                throw new ConflictError('Boarding is full');
-            }
+		const boarding = reservation.boardingId as unknown as {
+			_id: string;
+			currentOccupants: number;
+			maxOccupants: number;
+		};
+		if (boarding.currentOccupants >= boarding.maxOccupants) {
+			throw new ConflictError("Boarding is full");
+		}
 
-            // Increment occupants
-            await tx.boarding.update({
-                where: { id: res.boardingId },
-                data: { currentOccupants: { increment: 1 } },
-            });
+		await Boarding.findByIdAndUpdate(boarding._id, {
+			$inc: { currentOccupants: 1 },
+		});
 
-            const updated = await tx.reservation.update({
-                where: { id },
-                data: { status: ReservationStatus.ACTIVE },
-                select: reservationSelect(),
-            });
+		await Reservation.findByIdAndUpdate(id, {
+			status: ReservationStatus.ACTIVE,
+		});
 
-            // Generate rental periods
-            await generateRentalPeriods(tx, id, res.moveInDate, res.rentSnapshot);
+		await generateRentalPeriods(
+			id,
+			reservation.moveInDate,
+			reservation.rentSnapshot,
+		);
 
-            return updated;
-        });
+		const updatedReservation = await Reservation.findById(id, undefined, {
+			populate: [
+				{ path: "studentId", select: "firstName lastName email" },
+				{ path: "boardingId", select: "title slug city district" },
+			],
+			lean: true,
+		});
 
-        sendSuccess(res, { reservation }, 'Reservation approved');
-
-    } catch (err) {
-        next(err);
-    }
+		res.status(200).json({
+			success: true,
+			message: "Reservation approved",
+			data: {
+				reservation: transformReservationDoc(
+					updatedReservation as Record<string, unknown>,
+				),
+			},
+			timestamp: new Date().toISOString(),
+		});
+	} catch (err) {
+		next(err);
+	}
 }
 
 // PATCH /api/reservations/:id/reject  (owner)
-export async function rejectReservation(req: Request, res: Response, next: NextFunction): Promise<void> {
-    
-    try {
-        
-        const { id } = req.params as { id: string };
-        const ownerId = req.user!.userId;
-        const { reason } = req.body as RejectReservationInput;
+export async function rejectReservation(
+	req: Request,
+	res: Response,
+	next: NextFunction,
+): Promise<void> {
+	try {
+		if (!req.user?.userId) {
+			throw new ForbiddenError("User is not authenticated");
+		}
+		const { id } = req.params as { id: string };
+		const ownerId = req.user.userId;
+		const { reason } = req.body as RejectReservationInput;
 
-        const existing = await prisma.reservation.findUnique({
-            where: { id },
-            include: { boarding: true },
-        });
+		const existing = await Reservation.findById(id).populate(
+			"boardingId",
+			"ownerId",
+		);
 
-        if (!existing) throw new NotFoundError('Reservation not found');
-    
-        if (existing.boarding.ownerId !== ownerId) throw new ForbiddenError('You do not own this boarding');
-    
-        if (existing.status !== ReservationStatus.PENDING) {
-            throw new BadRequestError('Only PENDING reservations can be rejected');
-        }
+		if (!existing) throw new NotFoundError("Reservation not found");
 
-        const reservation = await prisma.reservation.update({
-            where: { id },
-            data: { 
-                status: ReservationStatus.REJECTED, 
-                rejectionReason: reason },
-            select: reservationSelect(),
-        });
+		const boarding = existing.boardingId as typeof existing.boardingId & {
+			ownerId?: mongoose.Types.ObjectId;
+		};
+		if (!boarding || boarding.ownerId?.toString() !== ownerId) {
+			throw new ForbiddenError("You do not own this boarding");
+		}
 
-        sendSuccess(res, { reservation }, 'Reservation rejected');
+		if (existing.status !== ReservationStatus.PENDING) {
+			throw new BadRequestError("Only PENDING reservations can be rejected");
+		}
 
-    } catch (err) {
-        next(err);
-    }
+		const reservation = await Reservation.findByIdAndUpdate(
+			id,
+			{ status: ReservationStatus.REJECTED, rejectionReason: reason },
+			{ new: true },
+		)
+			.populate("studentId", "firstName lastName email")
+			.populate("boardingId", "title slug city district")
+			.lean();
+
+		sendSuccess(
+			res,
+			{
+				reservation: transformReservationDoc(
+					reservation as Record<string, unknown>,
+				),
+			},
+			"Reservation rejected",
+		);
+	} catch (err) {
+		next(err);
+	}
 }
 
 // PATCH /api/v1/reservations/:id/cancel  (student)
-export async function cancelReservation(req: Request, res: Response, next: NextFunction): Promise<void> {
-    
-    try {
-        
-        const { id } = req.params as { id: string };
-        const studentId = req.user!.userId;
+export async function cancelReservation(
+	req: Request,
+	res: Response,
+	next: NextFunction,
+): Promise<void> {
+	try {
+		if (!req.user?.userId) {
+			throw new ForbiddenError("User is not authenticated");
+		}
+		const { id } = req.params as { id: string };
+		const studentId = req.user.userId;
 
-        const existing = await prisma.reservation.findUnique({ where: { id } });
-        
-        if (!existing) throw new NotFoundError('Reservation not found');
-        
-        if (existing.studentId !== studentId) throw new ForbiddenError('This is not your reservation');
-        
-        if (
-            existing.status !== ReservationStatus.PENDING &&
-            existing.status !== ReservationStatus.ACTIVE
-        ) {
-            throw new BadRequestError('Only PENDING or ACTIVE reservations can be cancelled');
-        }
+		const existing = await Reservation.findById(id);
 
-        const reservation = await prisma.$transaction(async (tx) => {
+		if (!existing) throw new NotFoundError("Reservation not found");
 
-            const updated = await tx.reservation.update({
-                where: { id },
-                data: { status: ReservationStatus.CANCELLED },
-                select: reservationSelect(),
-            });
+		if (existing.studentId.toString() !== studentId) {
+			throw new ForbiddenError("This is not your reservation");
+		}
 
-            // Decrement occupants if was ACTIVE
-            if (existing.status === ReservationStatus.ACTIVE) {
-                await tx.boarding.update({
-                    where: { id: existing.boardingId },
-                    data: { currentOccupants: { decrement: 1 } },
-                });
-            }
+		if (
+			existing.status !== ReservationStatus.PENDING &&
+			existing.status !== ReservationStatus.ACTIVE
+		) {
+			throw new BadRequestError(
+				"Only PENDING or ACTIVE reservations can be cancelled",
+			);
+		}
 
-            return updated;
+		await withMongoTransaction(async (session) => {
+			const updated = await Reservation.findByIdAndUpdate(
+				id,
+				{ status: ReservationStatus.CANCELLED },
+				{ new: true, ...(session ? { session } : {}) },
+			)
+				.populate("studentId", "firstName lastName email")
+				.populate("boardingId", "title slug city district")
+				.lean();
 
-        });
+			if (existing.status === ReservationStatus.ACTIVE) {
+				await Boarding.findByIdAndUpdate(
+					existing.boardingId,
+					{
+						$inc: { currentOccupants: -1 },
+					},
+					session ? { session } : {},
+				);
+			}
 
-        sendSuccess(res, { reservation }, 'Reservation cancelled');
-    
-    } catch (err) {
-        next(err);
-    }
+			sendSuccess(
+				res,
+				{
+					reservation: transformReservationDoc(
+						updated as Record<string, unknown>,
+					),
+				},
+				"Reservation cancelled",
+			);
+		});
+	} catch (err) {
+		next(err);
+	}
 }
 
 // PATCH /api/reservations/:id/complete  (owner)
-export async function completeReservation(req: Request, res: Response, next: NextFunction): Promise<void> {
-    
-    try {
+export async function completeReservation(
+	req: Request,
+	res: Response,
+	next: NextFunction,
+): Promise<void> {
+	try {
+		if (!req.user?.userId) {
+			throw new ForbiddenError("User is not authenticated");
+		}
+		const { id } = req.params as { id: string };
+		const ownerId = req.user.userId;
 
-        const { id } = req.params as { id: string };
-        const ownerId = req.user!.userId;
+		const existing = await Reservation.findById(id).populate(
+			"boardingId",
+			"ownerId",
+		);
 
-        const existing = await prisma.reservation.findUnique({
-            where: { id },
-            include: { boarding: true },
-        });
-    
-        if (!existing) throw new NotFoundError('Reservation not found');
-    
-        if (existing.boarding.ownerId !== ownerId) throw new ForbiddenError('You do not own this boarding');
-    
-        if (existing.status !== ReservationStatus.ACTIVE) {
-            throw new BadRequestError('Only ACTIVE reservations can be completed');
-        }
+		if (!existing) throw new NotFoundError("Reservation not found");
 
-        const reservation = await prisma.$transaction(async (tx) => {
-            const updated = await tx.reservation.update({
-                where: { id },
-                data: { status: ReservationStatus.COMPLETED },
-                select: reservationSelect(),
-            });
+		const boarding = existing.boardingId as typeof existing.boardingId & {
+			ownerId?: mongoose.Types.ObjectId;
+		};
+		if (!boarding || boarding.ownerId?.toString() !== ownerId) {
+			throw new ForbiddenError("You do not own this boarding");
+		}
 
-            await tx.boarding.update({
-                where: { id: existing.boardingId },
-                data: { 
-                    currentOccupants: { decrement: 1 } },
-            });
+		if (existing.status !== ReservationStatus.ACTIVE) {
+			throw new BadRequestError("Only ACTIVE reservations can be completed");
+		}
 
-        return updated;
+		await withMongoTransaction(async (session) => {
+			const updated = await Reservation.findByIdAndUpdate(
+				id,
+				{ status: ReservationStatus.COMPLETED },
+				{ new: true, ...(session ? { session } : {}) },
+			)
+				.populate("studentId", "firstName lastName email")
+				.populate("boardingId", "title slug city district")
+				.lean();
 
-    });
+			await Boarding.findByIdAndUpdate(
+				existing.boardingId,
+				{
+					$inc: { currentOccupants: -1 },
+				},
+				session ? { session } : {},
+			);
 
-    sendSuccess(res, { reservation }, 'Reservation completed');
-
-    } catch (err) {
-        next(err);
-    }
+			sendSuccess(
+				res,
+				{
+					reservation: transformReservationDoc(
+						updated as Record<string, unknown>,
+					),
+				},
+				"Reservation completed",
+			);
+		});
+	} catch (err) {
+		next(err);
+	}
 }
