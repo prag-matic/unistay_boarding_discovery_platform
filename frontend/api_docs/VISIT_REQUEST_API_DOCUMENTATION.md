@@ -33,6 +33,7 @@ The Visit Request API allows students to request in-person visits to active boar
 | `POST /api/visit-requests` | STUDENT | Create a new visit request |
 | `GET /api/visit-requests/my-requests` | STUDENT | List student's own visit requests |
 | `GET /api/visit-requests/my-boardings` | OWNER | List visit requests for owner's boardings |
+| `GET /api/visit-requests/availability` | STUDENT | Get reserved approved slots for a boarding and date range |
 | `GET /api/visit-requests/:id` | Any authenticated user (with ownership checks) | Get request by ID |
 | `PATCH /api/visit-requests/:id/approve` | OWNER | Approve visit request |
 | `PATCH /api/visit-requests/:id/reject` | OWNER | Reject visit request |
@@ -92,6 +93,7 @@ VISIT_EXPIRY_HOURS = 72  // Visit request expires 72 hours after creation
 | Visit request not found | 404 | `Visit request not found` |
 | Boarding not active | 400 | `Boarding is not available for visit requests` |
 | Duplicate pending request | 409 | `You already have a pending visit request for this boarding` |
+| Time slot already reserved | 409 | `Requested time slot is already reserved for this boarding` |
 | Invalid time range | 400 | `requestedStartAt must be in the future` / `requestedEndAt must be after requestedStartAt` |
 | Non-owner approval/rejection attempt | 403 | `You do not own this boarding` |
 | Non-student cancel attempt | 403 | `This is not your visit request` |
@@ -181,8 +183,49 @@ Content-Type: application/json
 - `requestedStartAt` must be later than current time.
 - `requestedEndAt` must be later than `requestedStartAt`.
 - One student cannot have multiple `PENDING` requests for the same boarding.
+- Slot overlaps with existing `APPROVED` visit requests for the same boarding are blocked.
 - `expiresAt` is set to current time + 72 hours.
 - Initial status is `PENDING`.
+
+---
+
+### 4. Get Reserved Visit Slots (Availability)
+
+**Endpoint:** `GET /api/visit-requests/availability`
+
+**Description:** Returns reserved time slots (approved visits) for a boarding within a date range. Intended for student slot pickers to show unavailable slots.
+
+**Authentication:** ✅ Required
+
+**Authorization:** `STUDENT` role
+
+**Query Parameters:**
+
+| Field | Type | Required | Constraints |
+|-------|------|----------|-------------|
+| `boardingId` | string | ✅ | Valid non-empty MongoDB ObjectId string |
+| `from` | string | ✅ | ISO datetime (range start) |
+| `to` | string | ✅ | ISO datetime (range end, must be after `from`) |
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "reservedSlots": [
+      {
+        "requestedStartAt": "2026-04-09T09:00:00.000Z",
+        "requestedEndAt": "2026-04-09T10:00:00.000Z"
+      }
+    ]
+  }
+}
+```
+
+**Business Logic:**
+- Only `APPROVED` visit requests are treated as reserved slots.
+- Overlap is calculated using interval logic (`start < existingEnd && end > existingStart`).
+- Boarding must exist, be non-deleted, and `ACTIVE`.
 
 **Validation/Error Examples:**
 

@@ -42,3 +42,8 @@ export interface RejectVisitPayload {
   reason: string;
 }
 
+export interface ReservedVisitSlot {
+  requestedStartAt: string;
+  requestedEndAt: string;
+}
+

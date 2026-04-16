@@ -4,6 +4,7 @@ import {
 	approveVisitRequest,
 	cancelVisitRequest,
 	createVisitRequest,
+	getVisitRequestAvailability,
 	getMyBoardingVisitRequests,
 	getMyVisitRequests,
 	getVisitRequestById,
@@ -11,11 +12,12 @@ import {
 } from "@/controllers/visitRequest.controller.js";
 import { authenticate, requireRole } from "@/middleware/auth.js";
 import { visitRequestLimiter } from "@/middleware/rateLimit.js";
-import { validateBody } from "@/middleware/validate.js";
+import { validateBody, validateQuery } from "@/middleware/validate.js";
 
 import {
 	createVisitRequestSchema,
 	rejectVisitRequestSchema,
+	visitRequestAvailabilityQuerySchema,
 } from "@/schemas/visitRequest.validators.js";
 
 const router: Router = createRouter();
@@ -40,6 +42,13 @@ router.get(
 	authenticate,
 	requireRole("OWNER"),
 	getMyBoardingVisitRequests,
+);
+router.get(
+	"/availability",
+	authenticate,
+	requireRole("STUDENT"),
+	validateQuery(visitRequestAvailabilityQuerySchema),
+	getVisitRequestAvailability,
 );
 router.get("/:id", authenticate, getVisitRequestById);
 router.patch(

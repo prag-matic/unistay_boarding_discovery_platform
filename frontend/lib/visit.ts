@@ -5,6 +5,7 @@ import type {
   VisitRequest,
   CreateVisitRequestPayload,
   RejectVisitPayload,
+  ReservedVisitSlot,
 } from '@/types/visit.types';
 
 export async function createVisitRequest(payload: CreateVisitRequestPayload) {
@@ -62,6 +63,26 @@ export async function cancelVisitRequest(id: string) {
   const response = await api.patch<UniStayApiResponse<{ visitRequest: VisitRequest }>>(
     `/visit-requests/${id}/cancel`,
   );
+  return response.data;
+}
+
+export async function getVisitRequestAvailability(payload: {
+  boardingId: string;
+  from: string;
+  to: string;
+}) {
+  logger.visit.debug('getVisitRequestAvailability', {
+    boardingId: payload.boardingId,
+    from: payload.from,
+    to: payload.to,
+  });
+
+  const response = await api.get<
+    UniStayApiResponse<{ reservedSlots: ReservedVisitSlot[] }>
+  >('/visit-requests/availability', {
+    params: payload,
+  });
+
   return response.data;
 }
 

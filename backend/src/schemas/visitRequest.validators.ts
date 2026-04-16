@@ -17,5 +17,20 @@ export const rejectVisitRequestSchema = z.object({
 	reason: z.string().min(1, "Rejection reason is required"),
 });
 
+export const visitRequestAvailabilityQuerySchema = z.object({
+	boardingId: z.string().min(1, "boardingId is required"),
+	from: z
+		.string()
+		.datetime({ offset: true })
+		.or(z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)),
+	to: z
+		.string()
+		.datetime({ offset: true })
+		.or(z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)),
+});
+
 export type CreateVisitRequestInput = z.infer<typeof createVisitRequestSchema>;
 export type RejectVisitRequestInput = z.infer<typeof rejectVisitRequestSchema>;
+export type VisitRequestAvailabilityQueryInput = z.infer<
+	typeof visitRequestAvailabilityQuerySchema
+>;
