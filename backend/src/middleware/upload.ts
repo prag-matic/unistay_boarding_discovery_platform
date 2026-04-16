@@ -4,21 +4,21 @@ import multer from "multer";
 import { AppError } from "@/errors/AppError.js";
 
 const ALLOWED_IMAGE_MIME_TYPES = [
-	"image/jpeg",
-	"image/jpg",
-	"image/png",
-	"image/webp",
-	"image/heic",
-	"image/heif",
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
 ];
 const ALLOWED_VIDEO_MIME_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
 const BOARDING_ALLOWED_MIME_TYPES = [
-	"image/jpeg",
-	"image/jpg",
-	"image/png",
-	"image/webp",
-	"image/heic",
-	"image/heif",
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
 ];
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 export const MAX_BOARDING_IMAGES = 8;
@@ -29,157 +29,157 @@ const storage = multer.memoryStorage();
 
 // File filter for images
 const imageFilter = (
-	_req: Request,
-	file: Express.Multer.File,
-	cb: FileFilterCallback,
+  _req: Request,
+  file: Express.Multer.File,
+  cb: FileFilterCallback,
 ) => {
-	if (ALLOWED_IMAGE_MIME_TYPES.includes(file.mimetype)) {
-		cb(null, true);
-	} else {
-		cb(
-			new Error(
-				"Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed.",
-			),
-		);
-	}
+  if (ALLOWED_IMAGE_MIME_TYPES.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(
+      new Error(
+        "Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed.",
+      ),
+    );
+  }
 };
 
 // File filter for videos
 const videoFilter = (
-	_req: Request,
-	file: Express.Multer.File,
-	cb: FileFilterCallback,
+  _req: Request,
+  file: Express.Multer.File,
+  cb: FileFilterCallback,
 ) => {
-	if (ALLOWED_VIDEO_MIME_TYPES.includes(file.mimetype)) {
-		cb(null, true);
-	} else {
-		cb(new Error("Invalid file type. Only MP4, WebM, and MOV are allowed."));
-	}
+  if (ALLOWED_VIDEO_MIME_TYPES.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error("Invalid file type. Only MP4, WebM, and MOV are allowed."));
+  }
 };
 
 function boardingFileFilter(
-	_req: Request,
-	file: Express.Multer.File,
-	cb: FileFilterCallback,
+  _req: Request,
+  file: Express.Multer.File,
+  cb: FileFilterCallback,
 ): void {
-	if (BOARDING_ALLOWED_MIME_TYPES.includes(file.mimetype)) {
-		cb(null, true);
-	} else {
-		cb(new AppError("Only JPEG/PNG/WebP images are allowed", 400));
-	}
+  if (BOARDING_ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new AppError("Only JPEG/PNG/WebP images are allowed", 400));
+  }
 }
 
 // Upload limits
 const limits: Options["limits"] = {
-	fileSize: 10 * 1024 * 1024, // 10MB per file
+  fileSize: 10 * 1024 * 1024, // 10MB per file
 };
 
 // Combined middleware for review uploads (handles both images and video)
 export const uploadReviewMedia: RequestHandler = multer({
-	storage,
-	limits: {
-		...limits,
-		files: 6, // Max 5 images + 1 video
-	},
+  storage,
+  limits: {
+    ...limits,
+    files: 6, // Max 5 images + 1 video
+  },
 }).fields([
-	{ name: "images", maxCount: 5 },
-	{ name: "video", maxCount: 1 },
+  { name: "images", maxCount: 5 },
+  { name: "video", maxCount: 1 },
 ]);
 
 export const uploadProfileImageMiddleware: RequestHandler = multer({
-	storage,
-	fileFilter: imageFilter,
-	limits: { fileSize: MAX_FILE_SIZE },
+  storage,
+  fileFilter: imageFilter,
+  limits: { fileSize: MAX_FILE_SIZE },
 }).single("profileImage");
 
-export const uploadBoardingImageMiddleware = multer({
-	storage,
-	fileFilter: boardingFileFilter,
-	limits: { fileSize: MAX_FILE_SIZE },
+export const uploadBoardingImageMiddleware: RequestHandler = multer({
+  storage,
+  fileFilter: boardingFileFilter,
+  limits: { fileSize: MAX_FILE_SIZE },
 }).array("images", MAX_BOARDING_IMAGES);
 
-export const uploadMarketplaceImageMiddleware = multer({
-	storage,
-	fileFilter: boardingFileFilter,
-	limits: { fileSize: MAX_FILE_SIZE },
+export const uploadMarketplaceImageMiddleware: RequestHandler = multer({
+  storage,
+  fileFilter: boardingFileFilter,
+  limits: { fileSize: MAX_FILE_SIZE },
 }).array("images", MAX_MARKETPLACE_IMAGES);
 
-export const uploadPaymentProofMiddleware = multer({
-	storage,
-	fileFilter: imageFilter,
-	limits: { fileSize: MAX_FILE_SIZE },
+export const uploadPaymentProofMiddleware: RequestHandler = multer({
+  storage,
+  fileFilter: imageFilter,
+  limits: { fileSize: MAX_FILE_SIZE },
 }).single("proofImage");
 
 // Custom middleware to validate files
 export const validateReviewFiles = (
-	req: Request,
-	res: Response,
-	next: (...args: unknown[]) => unknown,
+  req: Request,
+  res: Response,
+  next: (...args: unknown[]) => unknown,
 ) => {
-	const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+  const files = req.files as { [fieldname: string]: Express.Multer.File[] };
 
-	// Validate images
-	if (files.images) {
-		const allowedMimes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-		for (const image of files.images) {
-			if (!allowedMimes.includes(image.mimetype)) {
-				return res.status(400).json({
-					success: false,
-					error: "UploadError",
-					message: `Invalid image type: ${image.originalname} (${image.mimetype}). Only JPEG, PNG, GIF, and WebP are allowed.`,
-				});
-			}
-		}
-	}
+  // Validate images
+  if (files.images) {
+    const allowedMimes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    for (const image of files.images) {
+      if (!allowedMimes.includes(image.mimetype)) {
+        return res.status(400).json({
+          success: false,
+          error: "UploadError",
+          message: `Invalid image type: ${image.originalname} (${image.mimetype}). Only JPEG, PNG, GIF, and WebP are allowed.`,
+        });
+      }
+    }
+  }
 
-	// Validate video
-	if (files.video && files.video.length > 0) {
-		const allowedMimes = ["video/mp4", "video/webm", "video/quicktime"];
-		const video = files.video[0];
-		const fileExt = `.${video.originalname.split(".").pop()?.toLowerCase()}`;
-		const videoExtensions = [".mp4", ".webm", ".mov", ".mkv", ".avi"];
+  // Validate video
+  if (files.video && files.video.length > 0) {
+    const allowedMimes = ["video/mp4", "video/webm", "video/quicktime"];
+    const video = files.video[0];
+    const fileExt = `.${video.originalname.split(".").pop()?.toLowerCase()}`;
+    const videoExtensions = [".mp4", ".webm", ".mov", ".mkv", ".avi"];
 
-		// Allow octet-stream if file has video extension (curl sometimes doesn't detect MIME correctly)
-		if (
-			!allowedMimes.includes(video.mimetype) &&
-			!(
-				video.mimetype === "application/octet-stream" &&
-				videoExtensions.includes(fileExt)
-			)
-		) {
-			return res.status(400).json({
-				success: false,
-				error: "UploadError",
-				message: `Invalid video type: ${video.originalname} (${video.mimetype}). Only MP4, WebM, and MOV are allowed.`,
-			});
-		}
-	}
+    // Allow octet-stream if file has video extension (curl sometimes doesn't detect MIME correctly)
+    if (
+      !allowedMimes.includes(video.mimetype) &&
+      !(
+        video.mimetype === "application/octet-stream" &&
+        videoExtensions.includes(fileExt)
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: "UploadError",
+        message: `Invalid video type: ${video.originalname} (${video.mimetype}). Only MP4, WebM, and MOV are allowed.`,
+      });
+    }
+  }
 
-	next();
+  next();
 };
 
 const uploadMiddleware: {
-	uploadReviewMedia: RequestHandler;
-	validateReviewFiles: RequestHandler;
-	storage: StorageEngine;
-	imageFilter: (
-		req: Request,
-		file: Express.Multer.File,
-		cb: FileFilterCallback,
-	) => void;
-	videoFilter: (
-		req: Request,
-		file: Express.Multer.File,
-		cb: FileFilterCallback,
-	) => void;
-	limits: Options["limits"];
+  uploadReviewMedia: RequestHandler;
+  validateReviewFiles: RequestHandler;
+  storage: StorageEngine;
+  imageFilter: (
+    req: Request,
+    file: Express.Multer.File,
+    cb: FileFilterCallback,
+  ) => void;
+  videoFilter: (
+    req: Request,
+    file: Express.Multer.File,
+    cb: FileFilterCallback,
+  ) => void;
+  limits: Options["limits"];
 } = {
-	uploadReviewMedia,
-	validateReviewFiles,
-	storage,
-	imageFilter,
-	videoFilter,
-	limits,
+  uploadReviewMedia,
+  validateReviewFiles,
+  storage,
+  imageFilter,
+  videoFilter,
+  limits,
 };
 
 export default uploadMiddleware;
