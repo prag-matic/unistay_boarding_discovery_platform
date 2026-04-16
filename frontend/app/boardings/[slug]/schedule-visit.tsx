@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -12,8 +12,9 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { createVisitRequest } from '@/lib/visit';
+import { createVisitRequest, getVisitRequestAvailability } from '@/lib/visit';
 import { COLORS } from '@/lib/constants';
+import type { ReservedVisitSlot } from '@/types/visit.types';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 function getDaysFromToday(count: number): Date[] {
@@ -62,12 +63,14 @@ export default function ScheduleVisitScreen() {
     boardingTitle: string;
   }>();
 
-  const availableDays = getDaysFromToday(14);
+  const availableDays = useMemo(() => getDaysFromToday(14), []);
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedStartHour, setSelectedStartHour] = useState<number | null>(null);
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
+  const [reservedSlots, setReservedSlots] = useState<ReservedVisitSlot[]>([]);
 
   const formatDateISO = (d: Date) => {
     const year = d.getFullYear();
@@ -77,6 +80,73 @@ export default function ScheduleVisitScreen() {
   };
 
   const isReady = selectedDate !== null && selectedStartHour !== null;
+
+  const isSlotReserved = (date: Date, hour: number): boolean => {
+    const slotStart = new Date(date);
+    slotStart.setHours(hour, 0, 0, 0);
+    const slotEnd = new Date(slotStart);
+    slotEnd.setHours(slotStart.getHours() + 1);
+
+    return reservedSlots.some((slot) => {
+      const reservedStart = new Date(slot.requestedStartAt);
+      const reservedEnd = new Date(slot.requestedEndAt);
+      return slotStart < reservedEnd && slotEnd > reservedStart;
+    });
+  };
+
+  useEffect(() => {
+    if (!boardingId || availableDays.length === 0) {
+      return;
+    }
+
+    const firstDay = new Date(availableDays[0]);
+    firstDay.setHours(0, 0, 0, 0);
+
+    const lastDay = new Date(availableDays[availableDays.length - 1]);
+    lastDay.setDate(lastDay.getDate() + 1);
+    lastDay.setHours(0, 0, 0, 0);
+
+    let isMounted = true;
+
+    const fetchAvailability = async () => {
+      setIsLoadingAvailability(true);
+      try {
+        const response = await getVisitRequestAvailability({
+          boardingId,
+          from: firstDay.toISOString(),
+          to: lastDay.toISOString(),
+        });
+
+        if (isMounted) {
+          setReservedSlots(response.data.reservedSlots ?? []);
+        }
+      } catch {
+        if (isMounted) {
+          setReservedSlots([]);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingAvailability(false);
+        }
+      }
+    };
+
+    fetchAvailability();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [boardingId, availableDays]);
+
+  useEffect(() => {
+    if (selectedDate === null || selectedStartHour === null) {
+      return;
+    }
+
+    if (isSlotReserved(selectedDate, selectedStartHour)) {
+      setSelectedStartHour(null);
+    }
+  }, [reservedSlots, selectedDate, selectedStartHour]);
 
   const handleSubmit = async () => {
     if (!isReady) {
@@ -172,16 +242,39 @@ export default function ScheduleVisitScreen() {
 
         {/* Time slot picker */}
         <Text style={styles.sectionTitle}>Select Start Time (1-hour visit)</Text>
+        {isLoadingAvailability ? (
+          <View style={styles.availabilityLoader}>
+            <ActivityIndicator size="small" color={COLORS.primary} />
+            <Text style={styles.availabilityLoaderText}>Checking reserved slots...</Text>
+          </View>
+        ) : null}
         <View style={styles.timeslotGrid}>
           {HOUR_SLOTS.map((h) => {
+            const isReserved = selectedDate ? isSlotReserved(selectedDate, h) : false;
             const isSelected = selectedStartHour === h;
             return (
               <TouchableOpacity
                 key={h}
-                style={[styles.timeslotCard, isSelected && styles.timeslotCardSelected]}
-                onPress={() => setSelectedStartHour(h)}
+                style={[
+                  styles.timeslotCard,
+                  isSelected && styles.timeslotCardSelected,
+                  isReserved && styles.timeslotCardReserved,
+                ]}
+                onPress={() => {
+                  if (isReserved || isLoadingAvailability) {
+                    return;
+                  }
+                  setSelectedStartHour(h);
+                }}
+                disabled={isReserved || isLoadingAvailability}
               >
-                <Text style={[styles.timeslotText, isSelected && styles.timeslotTextSelected]}>
+                <Text
+                  style={[
+                    styles.timeslotText,
+                    isSelected && styles.timeslotTextSelected,
+                    isReserved && styles.timeslotTextReserved,
+                  ]}
+                >
                   {formatHour(h)}
                 </Text>
               </TouchableOpacity>
@@ -333,8 +426,18 @@ const styles = StyleSheet.create({
     borderColor: COLORS.grayBorder,
   },
   timeslotCardSelected: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  timeslotCardReserved: { backgroundColor: COLORS.grayLight, borderColor: COLORS.grayBorder },
   timeslotText: { fontSize: 13, fontWeight: '600', color: COLORS.textSecondary },
   timeslotTextSelected: { color: COLORS.white },
+  timeslotTextReserved: { color: COLORS.gray },
+
+  availabilityLoader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  availabilityLoaderText: { fontSize: 13, color: COLORS.textSecondary },
 
   messageInput: {
     borderWidth: 1,
