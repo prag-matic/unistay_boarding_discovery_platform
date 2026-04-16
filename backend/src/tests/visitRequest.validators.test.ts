@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	createVisitRequestSchema,
 	rejectVisitRequestSchema,
+	visitRequestAvailabilityQuerySchema,
 } from "@/schemas/visitRequest.validators.js";
 
 const valid = {
@@ -58,4 +59,32 @@ describe("rejectVisitRequestSchema", () => {
 		expect(() => rejectVisitRequestSchema.parse({ reason: "" })).toThrow());
 	it("rejects missing reason", () =>
 		expect(() => rejectVisitRequestSchema.parse({})).toThrow());
+});
+
+describe("visitRequestAvailabilityQuerySchema", () => {
+	it("accepts valid query input", () =>
+		expect(() =>
+			visitRequestAvailabilityQuerySchema.parse({
+				boardingId: "b-1",
+				from: "2025-04-01T09:00:00Z",
+				to: "2025-04-01T18:00:00Z",
+			}),
+		).not.toThrow());
+
+	it("rejects missing boardingId", () =>
+		expect(() =>
+			visitRequestAvailabilityQuerySchema.parse({
+				from: "2025-04-01T09:00:00Z",
+				to: "2025-04-01T18:00:00Z",
+			}),
+		).toThrow());
+
+	it("rejects malformed from/to values", () =>
+		expect(() =>
+			visitRequestAvailabilityQuerySchema.parse({
+				boardingId: "b-1",
+				from: "today",
+				to: "tomorrow",
+			}),
+		).toThrow());
 });
