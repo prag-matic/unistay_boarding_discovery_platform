@@ -118,7 +118,7 @@ export default function ProfileScreen() {
       label: 'My Marketplace Items',
       sublabel: 'Items for sale',
       icon: <Ionicons name="grid-outline" size={20} color={COLORS.primary} />,
-      onPress: () => {},
+      onPress: () => router.push('/marketplace/my-items' as never),
     },
   ];
 
