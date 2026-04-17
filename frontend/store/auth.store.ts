@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import api from '@/lib/api';
+import api, { uploadMyProfileImage } from '@/lib/api';
 import logger from '@/lib/logger';
 import { storage } from '@/lib/storage';
 import { getErrorMessage } from '@/utils/helpers';
@@ -92,8 +92,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     logger.store.debug('updateProfile');
     set({ isLoading: true });
     try {
-      const response = await api.put<UniStayApiResponse<User>>('/users/me', data);
+      const { profileImageUrl, ...profilePayload } = data;
+      const response = await api.put<UniStayApiResponse<User>>('/users/me', profilePayload);
       const updatedUser = response.data.data;
+
+      if (profileImageUrl && !/^https?:\/\//i.test(profileImageUrl)) {
+        const uploadedImageUrl = await uploadMyProfileImage(profileImageUrl);
+        updatedUser.profileImageUrl = uploadedImageUrl;
+      }
+
       await storage.setUser(updatedUser);
       set({ user: updatedUser });
     } finally {
