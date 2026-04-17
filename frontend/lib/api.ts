@@ -18,6 +18,34 @@ const api = axios.create({
   timeout: 15000,
 });
 
+export async function uploadMyProfileImage(uri: string): Promise<string> {
+  logger.api.debug('uploadMyProfileImage');
+
+  const filename = uri.split('/').pop()?.split('?')[0] ?? 'profile.jpg';
+  const ext = filename.split('.').pop()?.toLowerCase() ?? 'jpg';
+  const type =
+    ext === 'png'
+      ? 'image/png'
+      : ext === 'webp'
+        ? 'image/webp'
+        : ext === 'heic'
+          ? 'image/heic'
+          : ext === 'heif'
+            ? 'image/heif'
+            : 'image/jpeg';
+
+  const formData = new FormData();
+  formData.append('profileImage', { uri, name: filename, type } as unknown as Blob);
+
+  const response = await api.put<UniStayApiResponse<{ profileImageUrl: string }>>(
+    '/users/me/profile-image',
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } },
+  );
+
+  return response.data.data.profileImageUrl;
+}
+
 // ── Logging interceptor – request ──────────────────────────────────────────────
 api.interceptors.request.use(
   (config) => {
