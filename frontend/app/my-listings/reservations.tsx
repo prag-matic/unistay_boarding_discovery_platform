@@ -19,6 +19,7 @@ import {
   rejectReservation,
 } from '@/lib/reservation';
 import { COLORS } from '@/lib/constants';
+import { getErrorMessage } from '@/utils/helpers';
 import type { Reservation, ReservationStatus } from '@/types/reservation.types';
 
 const STATUS_COLORS: Record<ReservationStatus, string> = {
@@ -87,10 +88,7 @@ export default function ManageReservationsScreen() {
                 prev.map((r) => (r.id === id ? result.data.reservation : r)),
               );
             } catch (err: unknown) {
-              const message =
-                (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-                'Failed to approve reservation.';
-              Alert.alert('Error', message);
+              Alert.alert('Error', getErrorMessage(err));
             } finally {
               setIsActing(false);
             }
@@ -122,10 +120,7 @@ export default function ManageReservationsScreen() {
       );
       setRejectModalVisible(false);
     } catch (err: unknown) {
-      const message =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        'Failed to reject reservation.';
-      Alert.alert('Error', message);
+      Alert.alert('Error', getErrorMessage(err));
     } finally {
       setIsActing(false);
     }

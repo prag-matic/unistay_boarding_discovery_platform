@@ -1,3 +1,5 @@
+import axios from 'axios';
+
 export function formatCurrency(amount: number, currency = 'LKR'): string {
   return `${currency} ${amount.toLocaleString()}`;
 }
@@ -28,22 +30,65 @@ export function formatCountdown(seconds: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-export function getErrorMessage(error: unknown): string {
-  if (error && typeof error === 'object' && 'response' in error) {
-    const axiosError = error as {
-      response?: {
-        data?: {
-          message?: string;
-          details?: Array<{ field?: string; message: string }>;
-        };
-      };
-    };
-    const data = axiosError.response?.data;
-    if (data?.details && data.details.length > 0) {
-      return data.details.map((d) => d.message).join('\n');
+type ErrorDetails = Array<{ field?: string; message?: string }>;
+
+function extractErrorMessageFromResponseData(data: unknown): string | null {
+  if (!data || typeof data !== 'object') return null;
+
+  const payload = data as {
+    message?: unknown;
+    error?: unknown;
+    details?: unknown;
+  };
+
+  if (Array.isArray(payload.details) && payload.details.length > 0) {
+    const messages = (payload.details as ErrorDetails)
+      .map((detail) => detail?.message)
+      .filter((message): message is string => typeof message === 'string' && message.trim().length > 0);
+
+    if (messages.length > 0) {
+      return messages.join('\n');
     }
-    return data?.message ?? 'An error occurred';
   }
+
+  if (typeof payload.message === 'string' && payload.message.trim().length > 0) {
+    return payload.message;
+  }
+
+  if (typeof payload.error === 'string' && payload.error.trim().length > 0) {
+    return payload.error;
+  }
+
+  return null;
+}
+
+export function getErrorMessage(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    const responseMessage = extractErrorMessageFromResponseData(error.response?.data);
+    if (responseMessage) {
+      return responseMessage;
+    }
+
+    if (error.code === 'ECONNABORTED') {
+      return 'Request timed out. Please try again.';
+    }
+
+    if (!error.response) {
+      return 'Unable to reach the server. Please check your connection.';
+    }
+
+    return `Request failed with status ${error.response.status}`;
+  }
+
+  if (error && typeof error === 'object' && 'message' in error) {
+    const maybeError = error as { message?: unknown };
+    if (typeof maybeError.message === 'string' && maybeError.message.trim().length > 0) {
+      return maybeError.message;
+    }
+  }
+
+  if (typeof error === 'string' && error.trim().length > 0) return error;
+
   if (error instanceof Error) return error.message;
   return 'An unexpected error occurred';
 }

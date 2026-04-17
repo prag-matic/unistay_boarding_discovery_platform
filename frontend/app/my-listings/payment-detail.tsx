@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { confirmPayment, rejectPayment } from '@/lib/payment';
 import { COLORS } from '@/lib/constants';
+import { getErrorMessage } from '@/utils/helpers';
 import type { DetailedPayment } from '@/types/payment.types';
 import type { PaymentStatus } from '@/types/reservation.types';
 
@@ -91,10 +92,7 @@ export default function PaymentDetailScreen() {
               const res = await confirmPayment(payment.id);
               setPayment(res.data.payment);
             } catch (err: unknown) {
-              const msg =
-                (err as { response?: { data?: { message?: string } } })
-                  ?.response?.data?.message ?? 'Failed to confirm payment.';
-              Alert.alert('Error', msg);
+              Alert.alert('Error', getErrorMessage(err));
             } finally {
               setIsActing(false);
             }
@@ -115,10 +113,7 @@ export default function PaymentDetailScreen() {
       setPayment(res.data.payment);
       setRejectModalVisible(false);
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })
-          ?.response?.data?.message ?? 'Failed to reject payment.';
-      Alert.alert('Error', msg);
+      Alert.alert('Error', getErrorMessage(err));
     } finally {
       setIsActing(false);
     }

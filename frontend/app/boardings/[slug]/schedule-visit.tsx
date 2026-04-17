@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { createVisitRequest, getVisitRequestAvailability } from '@/lib/visit';
 import { COLORS } from '@/lib/constants';
+import { getErrorMessage } from '@/utils/helpers';
 import type { ReservedVisitSlot } from '@/types/visit.types';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -171,10 +172,7 @@ export default function ScheduleVisitScreen() {
         [{ text: 'OK', onPress: () => router.back() }],
       );
     } catch (err: unknown) {
-      const apiMessage =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        'Failed to submit visit request. Please try again.';
-      Alert.alert('Error', apiMessage);
+      Alert.alert('Error', getErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }

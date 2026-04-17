@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getReceivedVisitRequests, approveVisitRequest, rejectVisitRequest } from '@/lib/visit';
 import { COLORS } from '@/lib/constants';
+import { getErrorMessage } from '@/utils/helpers';
 import type { VisitRequest, VisitStatus } from '@/types/visit.types';
 
 const STATUS_COLORS: Record<VisitStatus, string> = {
@@ -90,10 +91,7 @@ export default function ManageVisitsScreen() {
               prev.map((v) => (v.id === id ? result.data.visitRequest : v)),
             );
           } catch (err: unknown) {
-            const message =
-              (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-              'Failed to approve visit request.';
-            Alert.alert('Error', message);
+            Alert.alert('Error', getErrorMessage(err));
           } finally {
             setIsActing(false);
           }
@@ -124,10 +122,7 @@ export default function ManageVisitsScreen() {
       );
       setRejectModalVisible(false);
     } catch (err: unknown) {
-      const message =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        'Failed to reject visit request.';
-      Alert.alert('Error', message);
+      Alert.alert('Error', getErrorMessage(err));
     } finally {
       setIsActing(false);
     }
