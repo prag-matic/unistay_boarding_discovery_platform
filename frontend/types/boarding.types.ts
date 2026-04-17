@@ -71,6 +71,20 @@ export interface Boarding {
   updatedAt: string;
 }
 
+export interface BoardingStatusHistoryEntry {
+  id: string;
+  boardingId: string;
+  fromStatus: BoardingStatus;
+  toStatus: BoardingStatus;
+  action: string;
+  actorRole: 'OWNER' | 'ADMIN' | 'STUDENT' | 'SYSTEM';
+  actorId?: string;
+  reason?: string;
+  note?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface SavedBoarding {
   id: string;
   boardingId: string;
