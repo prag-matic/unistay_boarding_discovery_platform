@@ -2,11 +2,15 @@ import type { Router } from "express";
 import { Router as createRouter } from "express";
 import {
 	activateBoarding,
+	archiveBoarding,
 	createBoarding,
 	deactivateBoarding,
 	deleteImage,
+	getBoardingStatusHistory,
 	getBoardingBySlug,
+	getBoardingLifecycleSpec,
 	getMyListings,
+	restoreBoarding,
 	searchBoardings,
 	submitBoarding,
 	updateBoarding,
@@ -33,6 +37,7 @@ const router: Router = createRouter();
 
 // Public routes
 router.get("/", validateQuery(searchBoardingsQuerySchema), searchBoardings);
+router.get("/lifecycle/spec", getBoardingLifecycleSpec);
 
 // Owner-only routes
 router.get("/my-listings", authenticate, requireRole("OWNER"), getMyListings);
@@ -54,12 +59,19 @@ router.put(
 	updateBoarding,
 );
 
-router.patch("/:id/submit", authenticate, requireRole("OWNER"), submitBoarding);
+router.patch(
+	"/:id/submit",
+	authenticate,
+	requireRole("OWNER"),
+	validateParams(boardingIdParamSchema),
+	submitBoarding,
+);
 
 router.patch(
 	"/:id/deactivate",
 	authenticate,
 	requireRole("OWNER"),
+	validateParams(boardingIdParamSchema),
 	deactivateBoarding,
 );
 
@@ -67,7 +79,32 @@ router.patch(
 	"/:id/activate",
 	authenticate,
 	requireRole("OWNER"),
+	validateParams(boardingIdParamSchema),
 	activateBoarding,
+);
+
+router.patch(
+	"/:id/archive",
+	authenticate,
+	requireRole("OWNER"),
+	validateParams(boardingIdParamSchema),
+	archiveBoarding,
+);
+
+router.patch(
+	"/:id/restore",
+	authenticate,
+	requireRole("OWNER"),
+	validateParams(boardingIdParamSchema),
+	restoreBoarding,
+);
+
+router.get(
+	"/:id/status-history",
+	authenticate,
+	requireRole("OWNER", "ADMIN"),
+	validateParams(boardingIdParamSchema),
+	getBoardingStatusHistory,
 );
 
 router.post(

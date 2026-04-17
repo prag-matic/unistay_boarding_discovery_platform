@@ -7,6 +7,7 @@ import type {
   GenderPreference,
   AmenityName,
   BoardingImage,
+  BoardingStatusHistoryEntry,
 } from '@/types/boarding.types';
 
 export interface SearchBoardingsParams {
@@ -33,6 +34,20 @@ export interface SearchBoardingsResponse {
     size: number;
     totalPages: number;
   };
+}
+
+export interface BoardingLifecycleSpec {
+  version: string;
+  policy: {
+    activeEditPolicy: string;
+    description: string;
+  };
+  visibility: {
+    publicDiscovery: string[];
+    reservationEligible: string[];
+    moderationQueue: string[];
+  };
+  transitions: Record<string, { allowedFrom: string[]; toStatus?: string; actorRoles: string[] }>;
 }
 
 export interface CreateBoardingPayload {
@@ -86,10 +101,12 @@ export async function getBoardingBySlug(slug: string) {
   return response.data;
 }
 
-export async function getMyListings() {
-  logger.boarding.debug('getMyListings');
+export async function getMyListings(options?: { includeArchived?: boolean }) {
+  logger.boarding.debug('getMyListings', options);
+  const params = options?.includeArchived ? { includeArchived: 'true' } : undefined;
   const response = await api.get<UniStayApiResponse<{ boardings: Boarding[] }>>(
     '/boardings/my-listings',
+    { params },
   );
   return response.data;
 }
@@ -133,6 +150,36 @@ export async function activateBoarding(id: string) {
   const response = await api.patch<UniStayApiResponse<{ boarding: Boarding }>>(
     `/boardings/${id}/activate`,
   );
+  return response.data;
+}
+
+export async function archiveBoarding(id: string) {
+  logger.boarding.debug('archiveBoarding', { id });
+  const response = await api.patch<UniStayApiResponse<{ id: string; isDeleted: boolean }>>(
+    `/boardings/${id}/archive`,
+  );
+  return response.data;
+}
+
+export async function restoreBoarding(id: string) {
+  logger.boarding.debug('restoreBoarding', { id });
+  const response = await api.patch<UniStayApiResponse<{ id: string; isDeleted: boolean }>>(
+    `/boardings/${id}/restore`,
+  );
+  return response.data;
+}
+
+export async function getBoardingStatusHistory(id: string) {
+  logger.boarding.debug('getBoardingStatusHistory', { id });
+  const response = await api.get<UniStayApiResponse<{ history: BoardingStatusHistoryEntry[] }>>(
+    `/boardings/${id}/status-history`,
+  );
+  return response.data;
+}
+
+export async function getBoardingLifecycleSpec() {
+  logger.boarding.debug('getBoardingLifecycleSpec');
+  const response = await api.get<UniStayApiResponse<BoardingLifecycleSpec>>('/boardings/lifecycle/spec');
   return response.data;
 }
 
