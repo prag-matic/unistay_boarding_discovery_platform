@@ -51,6 +51,12 @@ enum BoardingStatus {
 }
 ```
 
+### Lifecycle Policy (Authoritative)
+- Active listing edits use **auto-unpublish and re-review** policy:
+  - `ACTIVE` listing update transitions to `PENDING_APPROVAL`
+  - listing is hidden from public discovery until approved again
+- Lifecycle transitions are centralized in backend workflow service.
+
 ### BoardingType
 ```typescript
 enum BoardingType {
@@ -241,6 +247,25 @@ Invalid page parameter:
 ```
 
 ---
+
+### Lifecycle Utilities
+
+**Endpoint:** `GET /api/boardings/lifecycle/spec`
+
+**Description:** Returns authoritative lifecycle policy, transition matrix, and visibility rules.
+
+**Authentication:** ❌ Not required
+
+---
+
+### Owner Lifecycle Commands
+
+- `PATCH /api/boardings/:id/submit`
+- `PATCH /api/boardings/:id/deactivate`
+- `PATCH /api/boardings/:id/activate`
+- `PATCH /api/boardings/:id/archive`
+- `PATCH /api/boardings/:id/restore`
+- `GET /api/boardings/:id/status-history`
 
 ### 2. Get Boarding by Slug (Public)
 
