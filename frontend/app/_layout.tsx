@@ -28,6 +28,7 @@ export default function RootLayout() {
         <Stack.Screen name="saved" />
         <Stack.Screen name="my-listings" />
         <Stack.Screen name="boardings" />
+        <Stack.Screen name="marketplace" />
         <Stack.Screen name="explore" />
         <Stack.Screen name="visits" />
         <Stack.Screen name="reservations" />

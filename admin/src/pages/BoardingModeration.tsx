@@ -2,15 +2,21 @@ import type { MouseEvent } from 'react';
 import { useEffect, useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import BoardingDetailDrawer from '../components/BoardingDetailDrawer';
-import { api, type ApiClientError, type Boarding, type BoardingStatusHistoryEntry } from '../services/api';
+import DataTable from '../components/admin/DataTable';
+import PaginationControls from '../components/admin/PaginationControls';
+import StatusChip from '../components/admin/StatusChip';
+import { api, type ApiClientError, type Boarding } from '../services/api';
+
+const PAGE_SIZE = 10;
 
 export default function BoardingModeration() {
   const [boardings, setBoardings] = useState<Boarding[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedBoarding, setSelectedBoarding] = useState<Boarding | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(1);
   const [error, setError] = useState('');
-  const [history, setHistory] = useState<BoardingStatusHistoryEntry[]>([]);
+  const hasActiveFilters = searchQuery.trim().length > 0;
 
   const fetchBoardings = async () => {
     setLoading(true);
@@ -36,7 +42,6 @@ export default function BoardingModeration() {
     try {
       await api.approveBoarding(id);
       await fetchBoardings();
-      setHistory([]);
       if (selectedBoarding?.id === id) {
         setSelectedBoarding(null);
       }
@@ -52,7 +57,6 @@ export default function BoardingModeration() {
     try {
       await api.rejectBoarding(id, reason);
       await fetchBoardings();
-      setHistory([]);
       if (selectedBoarding?.id === id) {
         setSelectedBoarding(null);
       }
@@ -69,120 +73,116 @@ export default function BoardingModeration() {
     `${boarding.owner?.firstName ?? ''} ${boarding.owner?.lastName ?? ''}`.toLowerCase().includes(normalizedQuery) ||
     boarding.id.toLowerCase().includes(normalizedQuery),
   );
+  const totalPages = Math.max(1, Math.ceil(filteredBoardings.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const startIndex = (currentPage - 1) * PAGE_SIZE;
+  const pagedBoardings = filteredBoardings.slice(startIndex, startIndex + PAGE_SIZE);
+
+  const clearFilters = () => {
+    setSearchQuery('');
+  };
 
   useEffect(() => {
-    if (!selectedBoarding) {
-      setHistory([]);
-      return;
-    }
-    api.getBoardingStatusHistory(selectedBoarding.id)
-      .then((response) => setHistory(response.history))
-      .catch(() => setHistory([]));
-  }, [selectedBoarding]);
+    setPage(1);
+  }, [searchQuery]);
 
   return (
     <div className="h-full flex flex-col p-8 gap-8 overflow-y-auto thin-scrollbar">
-      <section className="shrink-0 flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <section className="shrink-0">
+        <p className="font-label text-xs uppercase tracking-[0.15em] text-on-surface-variant mb-1">Approval Queues</p>
+        <div className="flex items-baseline gap-4">
+          <h2 className="font-headline text-3xl font-extrabold text-on-surface">Boarding Approval Queue</h2>
+          <span className="text-sm font-medium bg-primary-container text-on-primary-container px-3 py-1 rounded-full">
+            {filteredBoardings.length} pending listings
+          </span>
+        </div>
+      </section>
+
+      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-outline-variant/30 bg-surface-container-low p-3">
         <div>
-          <p className="font-label text-xs uppercase tracking-[0.15em] text-primary mb-1">Queue Management</p>
-          <div className="flex items-baseline gap-4">
-            <h2 className="font-headline text-3xl font-extrabold text-on-surface">Boarding Moderation</h2>
-            <span className="text-sm font-medium bg-primary-container text-on-primary-container px-3 py-1 rounded-full">
-              {filteredBoardings.length} listings pending review
-            </span>
+          <p className="text-[11px] uppercase tracking-[0.12em] text-on-surface-variant mb-1">Search</p>
+          <div className="relative">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg">search</span>
+            <input
+              type="text"
+              placeholder="Title, owner, city, district"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              className="focus-ring-control pl-10 pr-4 py-2.5 bg-surface-container-lowest border border-outline-variant/40 rounded-md text-sm text-on-surface placeholder:text-on-surface-variant/80 w-full md:w-72"
+            />
           </div>
         </div>
-        <div className="relative">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
-          <input
-            type="text"
-            placeholder="Search moderation queue..."
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            className="pl-10 pr-4 py-2 bg-surface-container-lowest border border-outline-variant/30 rounded-full text-sm focus:ring-1 focus:ring-primary w-full md:w-64 outline-none shadow-sm"
-          />
-        </div>
-      </section>
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="px-3 py-2.5 text-xs font-medium border border-outline-variant/40 text-on-surface rounded-md hover:bg-surface-container-high transition-colors"
+          >
+            Clear filters
+          </button>
+        )}
+      </div>
       {error && <p className="text-sm text-error">{error}</p>}
 
-      <section className="bg-surface-container-lowest rounded-xl overflow-hidden flex-1 shadow-[0px_20px_40px_rgba(42,52,57,0.04)] flex flex-col min-h-0">
-        <div className="overflow-x-auto flex-1">
-          <table className="w-full text-left border-collapse">
-            <thead className="sticky top-0 bg-surface-container-low z-10">
-              <tr className="border-b border-outline-variant/15 font-label text-[10px] uppercase tracking-wider text-on-surface-variant">
-                <th className="px-6 py-4 font-bold">Boarding ID</th>
-                <th className="px-6 py-4 font-bold">Title</th>
-                <th className="px-6 py-4 font-bold">Owner</th>
-                <th className="px-6 py-4 font-bold">City / District</th>
-                <th className="px-6 py-4 font-bold text-right">Monthly Rent</th>
-                <th className="px-6 py-4 font-bold">Updated At</th>
-                <th className="px-6 py-4 font-bold">Status</th>
-                <th className="px-6 py-4 font-bold text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-outline-variant/10">
-              {loading ? (
-                <tr>
-                  <td colSpan={8} className="px-6 py-8 text-center text-on-surface-variant">Loading...</td>
-                </tr>
-              ) : filteredBoardings.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-6 py-8 text-center text-on-surface-variant">No pending boardings found.</td>
-                </tr>
-              ) : (
-                filteredBoardings.map((boarding) => (
-                  <tr
-                    key={boarding.id}
-                    onClick={() => setSelectedBoarding(boarding)}
-                    className={`transition-colors cursor-pointer group ${selectedBoarding?.id === boarding.id ? 'bg-surface-container-high/30' : 'hover:bg-surface-container-high'}`}
-                  >
-                    <td className="px-6 py-5 font-mono text-xs text-on-surface-variant">{boarding.id}</td>
-                    <td className="px-6 py-5 font-bold text-sm text-on-surface">{boarding.title}</td>
-                    <td className="px-6 py-5">
-                      <div className="text-sm">{boarding.owner ? `${boarding.owner.firstName} ${boarding.owner.lastName}` : '—'}</div>
-                      <div className="text-xs text-on-surface-variant">{boarding.owner?.phone ?? '—'}</div>
-                    </td>
-                    <td className="px-6 py-5 text-sm">{boarding.city} / {boarding.district}</td>
-                    <td className="px-6 py-5 text-right font-mono font-medium text-sm">
-                      LKR {boarding.monthlyRent.toLocaleString()}
-                    </td>
-                    <td className="px-6 py-5 text-xs text-on-surface-variant">
-                      {formatDistanceToNow(new Date(boarding.updatedAt), { addSuffix: true })}
-                    </td>
-                    <td className="px-6 py-5">
-                      <span className="bg-error-container/20 text-on-error-container text-[10px] font-bold px-2 py-1 rounded-sm">
-                        {boarding.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-5">
-                      <div className="flex justify-center gap-2">
-                        <button
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setSelectedBoarding(boarding);
-                          }}
-                          className="p-1.5 bg-surface-variant text-on-surface-variant rounded-md hover:scale-110 transition-transform"
-                          title="View"
-                        >
-                          <span className="material-symbols-outlined text-sm">visibility</span>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+      <DataTable
+        columns={['Boarding ID', 'Title', 'Owner', 'City / District', 'Monthly Rent', 'Updated At', 'Status', 'Actions']}
+        loading={loading}
+        emptyText="No pending boardings found."
+        colSpan={8}
+      >
+        {pagedBoardings.map((boarding) => (
+          <tr
+            key={boarding.id}
+            onClick={() => setSelectedBoarding(boarding)}
+            className={`transition-colors cursor-pointer group ${selectedBoarding?.id === boarding.id ? 'bg-surface-container-high/30' : 'hover:bg-surface-container-high'}`}
+          >
+            <td className="px-6 py-5 font-mono text-sm text-on-surface-variant">{boarding.id}</td>
+            <td className="px-6 py-5 font-bold text-sm text-on-surface">{boarding.title}</td>
+            <td className="px-6 py-5">
+              <div className="text-sm">{boarding.owner ? `${boarding.owner.firstName} ${boarding.owner.lastName}` : '—'}</div>
+              <div className="text-xs text-on-surface-variant">{boarding.owner?.phone ?? '—'}</div>
+            </td>
+            <td className="px-6 py-5 text-sm">{boarding.city} / {boarding.district}</td>
+            <td className="px-6 py-5 text-right font-mono font-medium text-sm">
+              LKR {boarding.monthlyRent.toLocaleString()}
+            </td>
+            <td className="px-6 py-5 text-xs text-on-surface-variant">
+              {formatDistanceToNow(new Date(boarding.updatedAt), { addSuffix: true })}
+            </td>
+            <td className="px-6 py-5">
+              <StatusChip value={boarding.status} />
+            </td>
+            <td className="px-6 py-5">
+              <div className="flex justify-center gap-2">
+                <button
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setSelectedBoarding(boarding);
+                  }}
+                  className="inline-flex h-9 w-9 items-center justify-center bg-surface-container-high text-on-surface rounded-md border border-outline-variant/35 hover:bg-surface-container-highest transition-colors"
+                  title="View"
+                >
+                  <span className="material-symbols-outlined text-[18px] leading-none">visibility</span>
+                </button>
+              </div>
+            </td>
+          </tr>
+        ))}
+      </DataTable>
 
-        <div className="mt-auto p-4 border-t border-outline-variant/15 flex items-center justify-between bg-surface-container-low/50 shrink-0">
-          <p className="text-xs text-on-surface-variant">Showing 1 to {filteredBoardings.length} of {filteredBoardings.length} entries</p>
-        </div>
-      </section>
+      <div className="p-4 border border-outline-variant/15 border-t-0 rounded-b-xl flex items-center justify-between bg-surface-container-low/50 shrink-0">
+        <p className="text-xs text-on-surface-variant">Page {currentPage} of {totalPages}</p>
+        <PaginationControls
+          page={currentPage}
+          totalPages={totalPages}
+          loading={loading}
+          onPrev={() => setPage(Math.max(currentPage - 1, 1))}
+          onNext={() => setPage(Math.min(currentPage + 1, totalPages))}
+        />
+      </div>
 
       <BoardingDetailDrawer
         boarding={selectedBoarding}
-        history={history}
         onClose={() => setSelectedBoarding(null)}
         onApprove={() => selectedBoarding && void handleApprove(selectedBoarding.id)}
         onReject={(reason) => selectedBoarding && void handleReject(selectedBoarding.id, reason)}

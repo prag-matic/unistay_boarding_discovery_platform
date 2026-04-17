@@ -7,7 +7,10 @@
 		"dev": "tsx watch src/index.ts",
 		"build": "tsc && tsc-alias",
 		"start": "node dist/index.js",
-		"check": "echo 'check biome \n' && biome check --write && echo 'check typescript \n' && tsc --noEmit"
+		"check": "echo 'check biome \n' && biome check --write && echo 'check typescript \n' && tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
 	},
 	"repository": {
 		"type": "git",
@@ -40,6 +43,7 @@
 	"devDependencies": {
 		"@biomejs/biome": "2.4.8",
 		"@faker-js/faker": "^9.3.0",
+		"@vitest/coverage-v8": "^3.2.4",
 		"@types/bcryptjs": "^2.4.6",
 		"@types/cors": "^2.8.19",
 		"@types/express": "^5.0.6",
@@ -51,6 +55,7 @@
 		"ts-node-dev": "^2.0.0",
 		"tsc-alias": "^1.8.16",
 		"tsx": "^4.21.0",
-		"typescript": "^5.9.3"
+		"typescript": "^5.9.3",
+		"vitest": "^3.2.4"
 	}
 }
