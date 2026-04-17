@@ -66,6 +66,14 @@ function InfoRow({ label, value, bold }: { label: string; value: string; bold?: 
   );
 }
 
+function getPaymentStudent(payment: DetailedPayment) {
+  return payment.student ?? payment.reservation?.student ?? null;
+}
+
+function getPaymentRentalPeriod(payment: DetailedPayment) {
+  return payment.rentalPeriod ?? null;
+}
+
 // ─── Screen ──────────────────────────────────────────────────────────────────
 export default function PaymentDetailScreen() {
   const params = useLocalSearchParams<{ data: string }>();
@@ -154,15 +162,15 @@ export default function PaymentDetailScreen() {
         </View>
 
         {/* Tenant section */}
-        {(payment.student ?? payment.reservation?.student) && (
+        {getPaymentStudent(payment) && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Tenant</Text>
             <InfoRow
               label="Name"
-              value={`${(payment.student ?? payment.reservation!.student)!.firstName} ${(payment.student ?? payment.reservation!.student)!.lastName}`}
+              value={`${getPaymentStudent(payment)!.firstName} ${getPaymentStudent(payment)!.lastName}`}
               bold
             />
-            <InfoRow label="Email" value={(payment.student ?? payment.reservation!.student)!.email} />
+            <InfoRow label="Email" value={getPaymentStudent(payment)!.email} />
           </View>
         )}
 
@@ -175,11 +183,11 @@ export default function PaymentDetailScreen() {
         )}
 
         {/* Rental period section */}
-        {payment.rentalPeriod && (
+        {getPaymentRentalPeriod(payment) && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Rental Period</Text>
-            <InfoRow label="Period" value={payment.rentalPeriod.periodLabel} bold />
-            <InfoRow label="Due Date" value={formatDate(payment.rentalPeriod.dueDate)} />
+            <InfoRow label="Period" value={getPaymentRentalPeriod(payment)!.periodLabel} bold />
+            <InfoRow label="Due Date" value={formatDate(getPaymentRentalPeriod(payment)!.dueDate)} />
           </View>
         )}
 
