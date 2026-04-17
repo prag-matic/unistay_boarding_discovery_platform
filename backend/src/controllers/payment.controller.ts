@@ -145,6 +145,10 @@ export async function getMyPayments(
 			studentId: new mongoose.Types.ObjectId(studentId),
 		})
 			.populate({
+				path: "studentId",
+				select: "firstName lastName email",
+			})
+			.populate({
 				path: "rentalPeriodId",
 				select: "periodLabel dueDate amountDue status",
 			})
@@ -207,6 +211,14 @@ export async function getMyBoardingPayments(
 		const payments = await Payment.find({
 			reservationId: { $in: reservationIds },
 		})
+			.populate({
+				path: "studentId",
+				select: "firstName lastName email",
+			})
+			.populate({
+				path: "rentalPeriodId",
+				select: "periodLabel dueDate amountDue status",
+			})
 			.populate({
 				path: "reservationId",
 				populate: {

@@ -8,21 +8,25 @@ import {
   Image,
   Alert,
   ActivityIndicator,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getMyListings, deactivateBoarding, activateBoarding } from '@/lib/boarding';
+import { getMyListings, deactivateBoarding, activateBoarding, archiveBoarding, restoreBoarding, getBoardingLifecycleSpec } from '@/lib/boarding';
 import { COLORS } from '@/lib/constants';
 import type { Boarding, BoardingStatus } from '@/types/boarding.types';
+import { getOwnerListingActions } from '@/lib/boarding-lifecycle';
 
-const TABS: { label: string; value: BoardingStatus | 'ALL' }[] = [
+const TABS: { label: string; value: BoardingStatus | 'ALL' | 'ARCHIVED' }[] = [
   { label: 'All', value: 'ALL' },
   { label: 'Active', value: 'ACTIVE' },
   { label: 'Draft', value: 'DRAFT' },
   { label: 'Inactive', value: 'INACTIVE' },
   { label: 'Pending', value: 'PENDING_APPROVAL' },
   { label: 'Rejected', value: 'REJECTED' },
+  { label: 'Archived', value: 'ARCHIVED' },
 ];
 
 const STATUS_COLORS: Record<BoardingStatus, string> = {
@@ -41,15 +45,31 @@ const STATUS_TEXT_COLORS: Record<BoardingStatus, string> = {
   REJECTED: COLORS.red,
 };
 
+type LifecycleTransitions = Record<string, { allowedFrom: BoardingStatus[]; actorRoles: string[] }>;
+type ListingMenuAction = {
+  key: string;
+  text: string;
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  destructive?: boolean;
+  onPress: () => void;
+};
+
 export default function MyListingsScreen() {
-  const [activeTab, setActiveTab] = useState<BoardingStatus | 'ALL'>('ALL');
+  const [activeTab, setActiveTab] = useState<BoardingStatus | 'ALL' | 'ARCHIVED'>('ALL');
   const [listings, setListings] = useState<Boarding[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [lifecycleTransitions, setLifecycleTransitions] = useState<LifecycleTransitions | undefined>(undefined);
+  const [isActionDrawerVisible, setIsActionDrawerVisible] = useState(false);
+  const [selectedListing, setSelectedListing] = useState<Boarding | null>(null);
 
   const loadListings = useCallback(async () => {
     setIsLoading(true);
     try {
-      const result = await getMyListings();
+      const spec = await getBoardingLifecycleSpec().catch(() => null);
+      if (spec) {
+        setLifecycleTransitions(spec.data.transitions as LifecycleTransitions);
+      }
+      const result = await getMyListings({ includeArchived: true });
       setListings(result.data.boardings);
     } catch {
       Alert.alert('Error', 'Failed to load your listings. Please try again.');
@@ -60,7 +80,11 @@ export default function MyListingsScreen() {
 
   useFocusEffect(useCallback(() => { loadListings(); }, [loadListings]));
 
-  const filtered = activeTab === 'ALL' ? listings : listings.filter((b) => b.status === activeTab);
+  const filtered = listings.filter((b) => {
+    if (activeTab === 'ARCHIVED') return b.isDeleted;
+    if (activeTab === 'ALL') return !b.isDeleted;
+    return !b.isDeleted && b.status === activeTab;
+  });
 
   const handleDeactivate = (boarding: Boarding) => {
     Alert.alert('Deactivate Listing', `Deactivate "${boarding.title}"?`, [
@@ -101,8 +125,82 @@ export default function MyListingsScreen() {
     ]);
   };
 
+  const handleArchive = (boarding: Boarding) => {
+    Alert.alert('Archive Listing', `Archive "${boarding.title}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Archive',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await archiveBoarding(boarding.id);
+            setListings((prev) =>
+              prev.map((b) => (b.id === boarding.id ? { ...b, isDeleted: true } : b)),
+            );
+          } catch {
+            Alert.alert('Error', 'Failed to archive the listing. Please try again.');
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleRestore = (boarding: Boarding) => {
+    Alert.alert('Restore Listing', `Restore "${boarding.title}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Restore',
+        onPress: async () => {
+          try {
+            await restoreBoarding(boarding.id);
+            setListings((prev) =>
+              prev.map((b) => (b.id === boarding.id ? { ...b, isDeleted: false } : b)),
+            );
+          } catch {
+            Alert.alert('Error', 'Failed to restore the listing. Please try again.');
+          }
+        },
+      },
+    ]);
+  };
+
+  const closeActionDrawer = () => {
+    setIsActionDrawerVisible(false);
+    setSelectedListing(null);
+  };
+
+  const openActionDrawer = (boarding: Boarding) => {
+    setSelectedListing(boarding);
+    setIsActionDrawerVisible(true);
+  };
+
+  const getListingMenuActions = (boarding: Boarding): ListingMenuAction[] => {
+    const available = getOwnerListingActions(boarding.status, lifecycleTransitions);
+    const actions: ListingMenuAction[] = [];
+    if (boarding.isDeleted) {
+      actions.push({ key: 'restore', text: 'Restore', icon: 'refresh-outline', onPress: () => handleRestore(boarding) });
+      return actions;
+    }
+    if (available.canEdit) {
+      actions.push({ key: 'edit', text: 'Edit', icon: 'create-outline', onPress: () => router.push(`/my-listings/${boarding.id}/edit` as never) });
+    }
+    if (available.canActivate) {
+      actions.push({ key: 'activate', text: 'Activate', icon: 'checkmark-circle-outline', onPress: () => handleActivate(boarding) });
+    }
+    if (available.canDeactivate) {
+      actions.push({ key: 'deactivate', text: 'Deactivate', icon: 'pause-circle-outline', destructive: true, onPress: () => handleDeactivate(boarding) });
+    }
+    if (available.canArchive) {
+      actions.push({ key: 'archive', text: 'Archive', icon: 'archive-outline', destructive: true, onPress: () => handleArchive(boarding) });
+    }
+    return actions;
+  };
+
+  const preventDrawerDismiss = () => undefined;
+
   const renderItem = ({ item }: { item: Boarding }) => {
     const primaryImage = item.images[0];
+    const available = getOwnerListingActions(item.status, lifecycleTransitions);
     return (
       <View style={styles.card}>
         <View style={styles.cardImageContainer}>
@@ -124,18 +222,7 @@ export default function MyListingsScreen() {
             <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
             <TouchableOpacity
               style={styles.menuBtn}
-              onPress={() => {
-                const actions: { text: string; style?: 'cancel' | 'default' | 'destructive'; onPress?: () => void }[] = [];
-                if (item.status === 'ACTIVE') {
-                  actions.push({ text: 'Deactivate', style: 'destructive', onPress: () => handleDeactivate(item) });
-                }
-                if (item.status === 'INACTIVE') {
-                  actions.push({ text: 'Activate', onPress: () => handleActivate(item) });
-                }
-                actions.push({ text: 'Edit', onPress: () => router.push(`/my-listings/${item.id}/edit` as never) });
-                actions.push({ text: 'Cancel', style: 'cancel' });
-                Alert.alert(item.title, 'Choose an action', actions);
-              }}
+              onPress={() => openActionDrawer(item)}
             >
               <Ionicons name="ellipsis-vertical" size={18} color={COLORS.gray} />
             </TouchableOpacity>
@@ -147,20 +234,33 @@ export default function MyListingsScreen() {
             {item.monthlyRent ? `LKR ${item.monthlyRent.toLocaleString()}/mo` : '—'}
           </Text>
           <View style={styles.cardActions}>
-            <TouchableOpacity
-              style={styles.editBtn}
-              onPress={() => router.push(`/my-listings/${item.id}/edit` as never)}
-            >
-              <Ionicons name="pencil-outline" size={14} color={COLORS.primary} />
-              <Text style={styles.editBtnText}>Edit</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.analyticsBtn}
-              onPress={() => router.push(`/my-listings/${item.id}/analytics` as never)}
-            >
-              <Ionicons name="bar-chart-outline" size={14} color={COLORS.white} />
-              <Text style={styles.analyticsBtnText}>Analytics</Text>
-            </TouchableOpacity>
+            {!item.isDeleted && available.canEdit && (
+              <TouchableOpacity
+                style={styles.editBtn}
+                onPress={() => router.push(`/my-listings/${item.id}/edit` as never)}
+              >
+                <Ionicons name="pencil-outline" size={14} color={COLORS.primary} />
+                <Text style={styles.editBtnText}>Edit</Text>
+              </TouchableOpacity>
+            )}
+            {!item.isDeleted && (
+              <TouchableOpacity
+                style={styles.analyticsBtn}
+                onPress={() => router.push(`/my-listings/${item.id}/analytics` as never)}
+              >
+                <Ionicons name="bar-chart-outline" size={14} color={COLORS.white} />
+                <Text style={styles.analyticsBtnText}>Analytics</Text>
+              </TouchableOpacity>
+            )}
+            {item.isDeleted && (
+              <TouchableOpacity
+                style={styles.restoreBtn}
+                onPress={() => handleRestore(item)}
+              >
+                <Ionicons name="refresh-outline" size={14} color={COLORS.white} />
+                <Text style={styles.restoreBtnText}>Restore</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>
@@ -218,6 +318,52 @@ export default function MyListingsScreen() {
           }
         />
       )}
+
+      <Modal
+        visible={isActionDrawerVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={closeActionDrawer}
+      >
+        <Pressable style={styles.drawerBackdrop} onPress={closeActionDrawer}>
+          <Pressable style={styles.drawer} onPress={preventDrawerDismiss}>
+            <View style={styles.drawerHandle} />
+            <Text style={styles.drawerTitle}>{selectedListing?.title ?? 'Listing Actions'}</Text>
+            {(selectedListing ? getListingMenuActions(selectedListing) : []).map((action) => (
+              <TouchableOpacity
+                key={action.key}
+                style={styles.drawerActionBtn}
+                onPress={() => {
+                  closeActionDrawer();
+                  action.onPress();
+                }}
+              >
+                <View style={styles.drawerActionContent}>
+                  <View style={styles.drawerActionLeft}>
+                    <Ionicons
+                      name={action.icon}
+                      size={18}
+                      color={action.destructive ? COLORS.red : COLORS.textSecondary}
+                    />
+                    <Text
+                      style={[
+                        styles.drawerActionText,
+                        action.destructive && styles.drawerActionTextDestructive,
+                      ]}
+                    >
+                      {action.text}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={COLORS.gray} />
+                </View>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity style={styles.drawerCancelBtn} onPress={closeActionDrawer}>
+              <Text style={styles.drawerCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* FAB */}
       <TouchableOpacity
@@ -285,7 +431,7 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 10, fontWeight: '700' },
   cardBody: { flex: 1, padding: 12 },
   cardTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  cardTitle: { flex: 1, fontSize: 14, fontWeight: '700', color: COLORS.text, marginRight: 8 },
+  cardTitle: { flex: 1, fontSize: 16, fontWeight: '700', color: COLORS.text, marginRight: 8 },
   menuBtn: { padding: 2 },
   cardOccupancy: { fontSize: 12, color: COLORS.textSecondary, marginTop: 4 },
   cardPrice: { fontSize: 15, fontWeight: '800', color: COLORS.primary, marginTop: 4 },
@@ -311,6 +457,79 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   analyticsBtnText: { fontSize: 12, color: COLORS.white, fontWeight: '600' },
+  restoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 8,
+    backgroundColor: COLORS.green,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  restoreBtnText: { fontSize: 12, color: COLORS.white, fontWeight: '600' },
+  drawerBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  drawer: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 20,
+  },
+  drawerHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 999,
+    backgroundColor: COLORS.grayBorder,
+    alignSelf: 'center',
+    marginBottom: 10,
+  },
+  drawerTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.text,
+    marginBottom: 8,
+  },
+  drawerActionBtn: {
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.grayLight,
+  },
+  drawerActionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  drawerActionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  drawerActionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  drawerActionTextDestructive: {
+    color: COLORS.red,
+  },
+  drawerCancelBtn: {
+    marginTop: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.grayBorder,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  drawerCancelText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.textSecondary,
+  },
   emptyState: { alignItems: 'center', paddingTop: 80, gap: 12 },
   emptyTitle: { fontSize: 17, fontWeight: '700', color: COLORS.text },
   emptySub: { fontSize: 14, color: COLORS.textSecondary, textAlign: 'center' },
