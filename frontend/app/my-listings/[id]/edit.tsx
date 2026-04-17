@@ -22,12 +22,15 @@ import {
   submitBoardingForApproval,
   uploadBoardingImages,
   deleteBoardingImage,
+  getBoardingStatusHistory,
+  getBoardingLifecycleSpec,
 } from '@/lib/boarding';
 import type { UpdateBoardingPayload } from '@/lib/boarding';
 import { COLORS } from '@/lib/constants';
 import logger from '@/lib/logger';
+import { getOwnerListingActions } from '@/lib/boarding-lifecycle';
 import { useLocationPickerStore } from '@/store/location-picker.store';
-import type { Boarding, BoardingType, GenderPreference, AmenityName, BoardingImage } from '@/types/boarding.types';
+import type { Boarding, BoardingType, GenderPreference, AmenityName, BoardingImage, BoardingStatusHistoryEntry } from '@/types/boarding.types';
 
 type ApiError = { response?: { data?: { message?: string; details?: { field: string; message: string }[] } } };
 
@@ -133,6 +136,8 @@ export default function EditBoardingScreen() {
   const [existingImages, setExistingImages] = useState<BoardingImage[]>([]);
   const [deletedImageIds, setDeletedImageIds] = useState<string[]>([]);
   const [newImageUris, setNewImageUris] = useState<string[]>([]);
+  const [statusHistory, setStatusHistory] = useState<BoardingStatusHistoryEntry[]>([]);
+  const [lifecycleTransitions, setLifecycleTransitions] = useState<Record<string, { allowedFrom: Boarding['status'][]; actorRoles: string[] }> | undefined>(undefined);
 
   useEffect(() => {
     logger.boarding.debug('useEffect:start', { id });
@@ -178,6 +183,12 @@ export default function EditBoardingScreen() {
         setRules(b.rules.map((r) => r.rule));
         // Images
         setExistingImages(b.images);
+        getBoardingLifecycleSpec()
+          .then((spec) => setLifecycleTransitions(spec.data.transitions as Record<string, { allowedFrom: Boarding['status'][]; actorRoles: string[] }>))
+          .catch(() => setLifecycleTransitions(undefined));
+        getBoardingStatusHistory(b.id)
+          .then((historyResult) => setStatusHistory(historyResult.data.history))
+          .catch(() => setStatusHistory([]));
       })
       .catch((err: unknown) => {
         logger.boarding.error('Fetch failed', { error: err instanceof Error ? err.message : err });
@@ -192,6 +203,7 @@ export default function EditBoardingScreen() {
   }, [id]);
 
   const isLocked = boarding?.status === 'ACTIVE';
+  const ownerActions = boarding ? getOwnerListingActions(boarding.status, lifecycleTransitions) : null;
   const totalImages = existingImages.filter((img) => !deletedImageIds.includes(img.id)).length + newImageUris.length;
 
   // Apply coordinates returned from the location picker
@@ -300,6 +312,10 @@ export default function EditBoardingScreen() {
   const doSave = async () => {
     if (!boarding) {
       logger.boarding.warn('Save aborted: boarding is null');
+      return;
+    }
+    if (ownerActions && !ownerActions.canEdit) {
+      Alert.alert('Not allowed', 'This listing cannot be edited in its current status.');
       return;
     }
     if (!validate()) return;
@@ -435,6 +451,16 @@ export default function EditBoardingScreen() {
       )}
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {statusHistory.length > 0 && (
+          <View style={styles.historyCard}>
+            <Text style={styles.historyTitle}>Status History</Text>
+            {statusHistory.slice(0, 5).map((entry) => (
+              <Text key={entry.id} style={styles.historyItem}>
+                {entry.fromStatus} → {entry.toStatus} ({entry.action})
+              </Text>
+            ))}
+          </View>
+        )}
 
         {/* ── Section 1: Basic Information ── */}
         <SectionHeader title="Basic Information" />
@@ -841,6 +867,17 @@ const styles = StyleSheet.create({
   },
   warningText: { fontSize: 13, color: COLORS.orange, fontWeight: '500', flex: 1 },
   content: { padding: 20 },
+  historyCard: {
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.grayBorder,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+    gap: 4,
+  },
+  historyTitle: { fontSize: 13, fontWeight: '700', color: COLORS.text },
+  historyItem: { fontSize: 12, color: COLORS.textSecondary },
   // Section headers
   sectionHeader: { marginTop: 24, marginBottom: 4 },
   sectionTitle: { fontSize: 17, fontWeight: '800', color: COLORS.text, marginBottom: 6 },

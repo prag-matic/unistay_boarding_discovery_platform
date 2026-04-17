@@ -22,6 +22,17 @@ export interface IBoarding extends Document {
 	currentOccupants: number;
 	status: BoardingStatus;
 	rejectionReason?: string;
+	rejectionHistory?: {
+		reason: string;
+		note?: string;
+		rejectedBy?: Types.ObjectId;
+		rejectedAt: Date;
+	}[];
+	lastModeratedBy?: Types.ObjectId;
+	lastModerationNote?: string;
+	lastModeratedAt?: Date;
+	archivedAt?: Date | null;
+	archivedBy?: Types.ObjectId | null;
 	isDeleted: boolean;
 	createdAt: Date;
 	updatedAt: Date;
@@ -96,6 +107,19 @@ const boardingSchema = new Schema<IBoarding>(
 			default: BoardingStatus.DRAFT,
 		},
 		rejectionReason: String,
+		rejectionHistory: [
+			{
+				reason: { type: String, required: true },
+				note: String,
+				rejectedBy: { type: Schema.Types.ObjectId, ref: "User" },
+				rejectedAt: { type: Date, required: true, default: Date.now },
+			},
+		],
+		lastModeratedBy: { type: Schema.Types.ObjectId, ref: "User" },
+		lastModerationNote: String,
+		lastModeratedAt: Date,
+		archivedAt: { type: Date, default: null },
+		archivedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
 		isDeleted: {
 			type: Boolean,
 			default: false,

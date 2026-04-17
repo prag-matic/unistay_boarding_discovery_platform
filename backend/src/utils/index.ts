@@ -156,16 +156,20 @@ export function transformSavedBoardingDoc(doc: LeanDoc): LeanDoc {
 /**
  * Transform a Payment lean document:
  * - `_id` → `id`
+ * - populated `studentId` → `student: { id, … }` + `studentId: string`
  * - populated `reservationId` → `reservation: { id, boarding?: { id, … } }` + `reservationId: string`
  * - populated `rentalPeriodId` → `rentalPeriod: { id, … }` + `rentalPeriodId: string`
  */
 export function transformPaymentDoc(doc: LeanDoc): LeanDoc {
+    const studentRef = doc.studentId as LeanDoc | null | undefined;
 	const reservationRef = doc.reservationId as LeanDoc | null | undefined;
 	const rentalPeriodRef = doc.rentalPeriodId as LeanDoc | null | undefined;
 
+	const studentPopulated = isPopulatedRef(studentRef);
 	const reservationPopulated = isPopulatedRef(reservationRef);
 	const rentalPeriodPopulated = isPopulatedRef(rentalPeriodRef);
 
+	const student = studentPopulated ? addId(studentRef as LeanDoc) : undefined;
 	let reservation: LeanDoc | undefined;
 	if (reservationPopulated) {
 		const boardingRef = (reservationRef as LeanDoc).boardingId as
@@ -197,11 +201,16 @@ export function transformPaymentDoc(doc: LeanDoc): LeanDoc {
 	const rentalPeriodId = rentalPeriodPopulated
 		? objectIdToString((rentalPeriodRef as LeanDoc)._id)
 		: objectIdToString(doc.rentalPeriodId);
+	const studentId = studentPopulated
+		? objectIdToString((studentRef as LeanDoc)._id)
+		: objectIdToString(doc.studentId);
 
 	return {
 		...addId(doc),
+		studentId,
 		reservationId,
 		rentalPeriodId,
+		...(student !== undefined && { student }),
 		...(reservation !== undefined && { reservation }),
 		...(rentalPeriod !== undefined && { rentalPeriod }),
 	};
