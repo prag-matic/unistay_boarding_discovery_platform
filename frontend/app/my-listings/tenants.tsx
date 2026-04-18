@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getReceivedReservations, completeReservation } from '@/lib/reservation';
 import { COLORS } from '@/lib/constants';
+import { getErrorMessage } from '@/utils/helpers';
 import type { Reservation } from '@/types/reservation.types';
 
 const MONTH_NAMES = [
@@ -58,15 +59,10 @@ export default function ManageTenantsScreen() {
           onPress: async () => {
             setIsActing(true);
             try {
-              const result = await completeReservation(reservation.id);
-              setTenants((prev) =>
-                prev.filter((t) => t.id !== result.data.reservation.id),
-              );
+              await completeReservation(reservation.id);
+              await loadTenants();
             } catch (err: unknown) {
-              const message =
-                (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-                'Failed to complete reservation.';
-              Alert.alert('Error', message);
+              Alert.alert('Error', getErrorMessage(err));
             } finally {
               setIsActing(false);
             }
