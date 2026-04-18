@@ -1,11 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/prisma.js", () => {
-	const db = {
-		user: { findUnique: vi.fn(), update: vi.fn() },
-	};
-	return { default: db, prisma: db };
-});
+const db = {
+	user: { findUnique: vi.fn(), update: vi.fn() },
+};
 
 vi.mock("bcryptjs", () => ({
 	default: { hash: vi.fn().mockResolvedValue("newHash"), compare: vi.fn() },
@@ -25,9 +22,6 @@ import {
 	UserNotFoundError,
 } from "@/errors/AppError.js";
 import { uploadProfileImage } from "@/lib/cloudinary.js";
-import { prisma } from "@/lib/prisma.js";
-
-const db = prisma as any;
 
 function mockReq(overrides: Record<string, unknown> = {}) {
 	return {

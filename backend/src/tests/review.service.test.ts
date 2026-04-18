@@ -1,37 +1,34 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ReviewService } from "@/services/review.service.js";
 
-vi.mock("@/lib/prisma.js", () => {
-	const db = {
-		review: {
-			create: vi.fn(),
-			findUnique: vi.fn(),
-			findMany: vi.fn(),
-			update: vi.fn(),
-			delete: vi.fn(),
-			count: vi.fn(),
-		},
-		reviewReaction: {
-			findUnique: vi.fn(),
-			create: vi.fn(),
-			update: vi.fn(),
-			delete: vi.fn(),
-		},
-		reviewComment: {
-			create: vi.fn(),
-			findUnique: vi.fn(),
-			update: vi.fn(),
-			delete: vi.fn(),
-		},
-		reviewCommentReaction: {
-			findUnique: vi.fn(),
-			create: vi.fn(),
-			update: vi.fn(),
-			delete: vi.fn(),
-		},
-	};
-	return { default: db, prisma: db };
-});
+const db = {
+	review: {
+		create: vi.fn(),
+		findUnique: vi.fn(),
+		findMany: vi.fn(),
+		update: vi.fn(),
+		delete: vi.fn(),
+		count: vi.fn(),
+	},
+	reviewReaction: {
+		findUnique: vi.fn(),
+		create: vi.fn(),
+		update: vi.fn(),
+		delete: vi.fn(),
+	},
+	reviewComment: {
+		create: vi.fn(),
+		findUnique: vi.fn(),
+		update: vi.fn(),
+		delete: vi.fn(),
+	},
+	reviewCommentReaction: {
+		findUnique: vi.fn(),
+		create: vi.fn(),
+		update: vi.fn(),
+		delete: vi.fn(),
+	},
+};
 
 vi.mock("@/lib/cloudinary.js", () => ({
 	uploadReviewImage: vi.fn(),
@@ -44,9 +41,6 @@ import {
 	uploadReviewImage,
 	uploadReviewVideo,
 } from "@/lib/cloudinary.js";
-import prisma from "@/lib/prisma.js";
-
-const db = prisma as any;
 const mockUploadImage = uploadReviewImage as ReturnType<typeof vi.fn>;
 const mockUploadVideo = uploadReviewVideo as ReturnType<typeof vi.fn>;
 const mockDeleteAsset = deleteCloudinaryAsset as ReturnType<typeof vi.fn>;

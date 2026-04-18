@@ -1,21 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/prisma.js", () => {
-	const db = {
-		boarding: {
-			findUnique: vi.fn(),
-			findMany: vi.fn(),
-			create: vi.fn(),
-			update: vi.fn(),
-			count: vi.fn(),
-		},
-		boardingImage: { findUnique: vi.fn(), create: vi.fn(), delete: vi.fn() },
-		boardingRule: { deleteMany: vi.fn() },
-		boardingAmenity: { deleteMany: vi.fn() },
-		$transaction: vi.fn(),
-	};
-	return { default: db, prisma: db };
-});
+const db = {
+	boarding: {
+		findUnique: vi.fn(),
+		findMany: vi.fn(),
+		create: vi.fn(),
+		update: vi.fn(),
+		count: vi.fn(),
+	},
+	boardingImage: { findUnique: vi.fn(), create: vi.fn(), delete: vi.fn() },
+	boardingRule: { deleteMany: vi.fn() },
+	boardingAmenity: { deleteMany: vi.fn() },
+	$transaction: vi.fn(),
+};
 
 vi.mock("@/utils/slug.js", () => ({
 	generateUniqueSlug: vi.fn().mockResolvedValue("my-title"),
@@ -46,9 +43,6 @@ import {
 	ValidationError,
 } from "@/errors/AppError.js";
 import { deleteBoardingImage, uploadBoardingImage } from "@/lib/cloudinary.js";
-import prisma from "@/lib/prisma.js";
-
-const db = prisma as any;
 
 function mockReq(overrides: Record<string, unknown> = {}) {
 	return {

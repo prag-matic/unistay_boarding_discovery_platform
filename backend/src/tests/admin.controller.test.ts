@@ -1,18 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/prisma.js", () => {
-	const db = {
-		user: {
-			findUnique: vi.fn(),
-			update: vi.fn(),
-			findMany: vi.fn(),
-			count: vi.fn(),
-		},
-		boarding: { findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn() },
-		$transaction: vi.fn(),
-	};
-	return { default: db, prisma: db };
-});
+const db = {
+	user: {
+		findUnique: vi.fn(),
+		update: vi.fn(),
+		findMany: vi.fn(),
+		count: vi.fn(),
+	},
+	boarding: { findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn() },
+	$transaction: vi.fn(),
+};
 
 import {
 	activateUser,
@@ -28,9 +25,6 @@ import {
 	InvalidStateTransitionError,
 	UserNotFoundError,
 } from "@/errors/AppError.js";
-import { prisma } from "@/lib/prisma.js";
-
-const db = prisma as any;
 
 function mockReq(overrides: Record<string, unknown> = {}) {
 	return {

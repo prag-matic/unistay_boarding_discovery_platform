@@ -385,10 +385,10 @@ npm run test:run  # single run (CI)
 | 1 | handles ZodError with 422 | Zod validation failures map to 422 Unprocessable Entity |
 | 2 | handles JsonWebTokenError with 401 | JWT signature error maps to 401 Unauthorized |
 | 3 | handles TokenExpiredError (JWT) with 401 | Expired JWT maps to 401 |
-| 4 | handles Prisma P2002 with 409 | Unique constraint violation maps to 409 Conflict |
-| 5 | handles Prisma P2025 with 404 | Record not found maps to 404 Not Found |
-| 6 | handles Prisma P2003 with 400 | Foreign key constraint failure maps to 400 Bad Request |
-| 7 | handles unknown Prisma error with 500 | Unrecognised Prisma error falls back to 500 |
+| 4 | handles duplicate-key DB error with 409 | Unique constraint violation maps to 409 Conflict |
+| 5 | handles not-found DB error with 404 | Record not found maps to 404 Not Found |
+| 6 | handles relation constraint DB error with 400 | Foreign key / relation constraint failure maps to 400 Bad Request |
+| 7 | handles unknown DB error with 500 | Unrecognised database error falls back to 500 |
 | 8 | handles AppError with correct status | `AppError` subclasses use their own `statusCode` |
 | 9 | handles ValidationError (AppError subclass) with details | `details` payload is included in the response |
 | 10 | falls back to 500 for unexpected errors | Unknown errors default to 500 Internal Server Error |
@@ -636,7 +636,7 @@ npm run test:run  # single run (CI)
 #### `ReviewService › getReviewById`
 | # | Test | What it verifies |
 |---|---|---|
-| 4 | returns review when found | Prisma record returned as-is |
+| 4 | returns review when found | Database record returned as-is |
 | 5 | returns null when not found | Returns `null` for unknown ID |
 
 #### `ReviewService › getReviewsByBoarding`
@@ -659,7 +659,7 @@ npm run test:run  # single run (CI)
 |---|---|---|
 | 13 | throws when not found | `"Review not found"` error thrown |
 | 14 | throws when belongs to different student | Ownership check enforced |
-| 15 | deletes assets and record | Cloudinary assets deleted, Prisma record deleted |
+| 15 | deletes assets and record | Cloudinary assets deleted, database record deleted |
 
 #### `ReviewService › addReviewReaction`
 | # | Test | What it verifies |
@@ -708,7 +708,7 @@ npm run test:run  # single run (CI)
 
 ## Controllers
 
-All controller tests mock `@/lib/prisma.js` (and other external dependencies such as Cloudinary, bcrypt, and JWT utilities) so they run without a real database or network connection.
+Controller tests mock data-layer calls (and other external dependencies such as Cloudinary, bcrypt, and JWT utilities) so they run without a real database or network connection.
 
 ---
 
