@@ -28,20 +28,8 @@ const GENDER_OPTIONS: { label: string; value: GenderPreference }[] = [
   { label: 'Any', value: 'ANY' },
 ];
 
-const UNIVERSITIES = [
-  'University of Colombo',
-  'University of Moratuwa',
-  'University of Kelaniya',
-  'University of Peradeniya',
-  'University of Sri Jayewardenepura',
-  'University of Ruhuna',
-  'Eastern University',
-  'South Eastern University',
-  'Rajarata University',
-  'Sabaragamuwa University',
-  'Wayamba University',
-  'Uva Wellassa University',
-];
+const DEFAULT_UNIVERSITY = 'SLIIT';
+const UNIVERSITY_OPTIONS = [DEFAULT_UNIVERSITY];
 
 function ProgressBar({ step, total }: { step: number; total: number }) {
   return (
@@ -63,7 +51,7 @@ export default function CreateStep1Screen() {
   const [gender, setGender] = useState<GenderPreference | ''>(createDraft.genderPref ?? '');
   const [maxOccupants, setMaxOccupants] = useState(String(createDraft.maxOccupants ?? '1'));
   const [rent, setRent] = useState(String(createDraft.monthlyRent ?? ''));
-  const [university, setUniversity] = useState(createDraft.nearUniversity ?? '');
+  const [university, setUniversity] = useState(createDraft.nearUniversity || DEFAULT_UNIVERSITY);
   const [showUniList, setShowUniList] = useState(false);
 
   const validate = () => {
@@ -73,8 +61,8 @@ export default function CreateStep1Screen() {
     if (description.trim().length < 30) { Alert.alert('Invalid', 'Description must be at least 30 characters.'); return false; }
     if (!type) { Alert.alert('Required', 'Please select a boarding type.'); return false; }
     if (!gender) { Alert.alert('Required', 'Please select a gender preference.'); return false; }
-    if (!rent || isNaN(Number(rent))) { Alert.alert('Required', 'Please enter a valid monthly rent.'); return false; }
-    if (Number(rent) < 1000) { Alert.alert('Invalid', 'Monthly rent must be at least LKR 1,000.'); return false; }
+    if (!rent || isNaN(Number(rent))) { Alert.alert('Required', 'Please enter a valid monthly price per person.'); return false; }
+    if (Number(rent) < 1000) { Alert.alert('Invalid', 'Per-person monthly rent must be at least LKR 1,000.'); return false; }
     return true;
   };
 
@@ -87,7 +75,7 @@ export default function CreateStep1Screen() {
       genderPref: gender as GenderPreference,
       maxOccupants: parseInt(maxOccupants, 10) || 1,
       monthlyRent: parseInt(rent, 10),
-      nearUniversity: university,
+      nearUniversity: DEFAULT_UNIVERSITY,
     });
     router.push('/boardings/create/step2' as never);
   };
@@ -100,7 +88,7 @@ export default function CreateStep1Screen() {
       genderPref: gender,
       maxOccupants: parseInt(maxOccupants, 10) || 1,
       monthlyRent: parseInt(rent, 10) || 0,
-      nearUniversity: university,
+      nearUniversity: DEFAULT_UNIVERSITY,
     });
     Alert.alert('Progress Saved', 'Your progress has been saved locally. Complete all steps to create your listing.', [
       { text: 'OK', onPress: () => router.back() },
@@ -125,7 +113,7 @@ export default function CreateStep1Screen() {
         <Text style={styles.label}>Title *</Text>
         <TextInput
           style={styles.input}
-          placeholder="e.g. The Hub Residences"
+          placeholder="e.g. Shared Student Rooms - Malabe"
           placeholderTextColor={COLORS.grayBorder}
           value={title}
           onChangeText={setTitle}
@@ -134,7 +122,7 @@ export default function CreateStep1Screen() {
         <Text style={styles.label}>Description</Text>
         <TextInput
           style={[styles.input, styles.textarea]}
-          placeholder="Describe your boarding..."
+          placeholder="Describe room setup, who it suits, and what is included in the per-person monthly price..."
           placeholderTextColor={COLORS.grayBorder}
           value={description}
           onChangeText={setDescription}
@@ -186,17 +174,19 @@ export default function CreateStep1Screen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.label}>Monthly Rent (LKR) *</Text>
+        <Text style={styles.label}>Per Person Monthly Rent (LKR) *</Text>
         <TextInput
           style={styles.input}
-          placeholder="e.g. 15000"
+          placeholder="e.g. 12000"
           placeholderTextColor={COLORS.grayBorder}
           value={rent}
           onChangeText={setRent}
           keyboardType="number-pad"
         />
+        <Text style={styles.fieldHelp}>Example: If each student pays LKR 12,000 monthly, enter 12000.</Text>
 
         <Text style={styles.label}>Nearest University</Text>
+        <Text style={styles.fieldHelp}>Current release supports SLIIT listings only.</Text>
         <TouchableOpacity
           style={styles.dropdown}
           onPress={() => setShowUniList((v) => !v)}
@@ -208,7 +198,7 @@ export default function CreateStep1Screen() {
         </TouchableOpacity>
         {showUniList && (
           <View style={styles.dropdownMenu}>
-            {UNIVERSITIES.map((u) => (
+            {UNIVERSITY_OPTIONS.map((u) => (
               <TouchableOpacity
                 key={u}
                 style={styles.dropdownItem}
@@ -254,9 +244,10 @@ const styles = StyleSheet.create({
   progressLabel: { fontSize: 12, color: COLORS.textSecondary, marginBottom: 6 },
   progressTrack: { height: 4, backgroundColor: COLORS.grayLight, borderRadius: 2, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: COLORS.primary, borderRadius: 2 },
-  content: { padding: 20 },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: COLORS.text, marginBottom: 16 },
-  label: { fontSize: 14, fontWeight: '600', color: COLORS.text, marginBottom: 6, marginTop: 12 },
+  content: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 20 },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: COLORS.text, marginBottom: 18 },
+  label: { fontSize: 14, fontWeight: '600', color: COLORS.text, marginBottom: 6, marginTop: 14 },
+  fieldHelp: { fontSize: 12, color: COLORS.textSecondary, marginTop: 6, lineHeight: 18 },
   input: {
     backgroundColor: COLORS.white,
     borderRadius: 10,
@@ -268,19 +259,23 @@ const styles = StyleSheet.create({
     borderColor: COLORS.grayBorder,
   },
   textarea: { minHeight: 90, paddingTop: 12 },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 4 },
   chip: {
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    minWidth: '46%',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     borderWidth: 1.5,
     borderColor: COLORS.grayBorder,
     backgroundColor: COLORS.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexGrow: 1,
   },
   chipActive: { borderColor: COLORS.primary, backgroundColor: '#EBF0FF' },
-  chipText: { fontSize: 13, color: COLORS.text, fontWeight: '500' },
+  chipText: { fontSize: 14, color: COLORS.text, fontWeight: '600' },
   chipTextActive: { color: COLORS.primary, fontWeight: '700' },
-  stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 20 },
+  stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 24 },
   stepperBtn: {
     width: 40,
     height: 40,
@@ -301,7 +296,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderWidth: 1,
     borderColor: COLORS.grayBorder,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   dropdownValue: { fontSize: 15, color: COLORS.text },
   dropdownPlaceholder: { fontSize: 15, color: COLORS.grayBorder },

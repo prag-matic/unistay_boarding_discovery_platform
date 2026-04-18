@@ -56,7 +56,14 @@ export default function CreateStep2Screen() {
   const { createDraft, setCreateDraft } = useBoardingStore();
   const { pending, clearPending } = useLocationPickerStore();
 
-  const [address, setAddress] = useState(createDraft.address ?? '');
+  const existingAddress = createDraft.address ?? '';
+  const [line1Default, line2Default] = existingAddress
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  const [addressLine1, setAddressLine1] = useState(line1Default ?? '');
+  const [addressLine2, setAddressLine2] = useState(line2Default ?? '');
   const [city, setCity] = useState(createDraft.city ?? '');
   const [district, setDistrict] = useState(createDraft.district ?? '');
   const [showDistricts, setShowDistricts] = useState(false);
@@ -105,22 +112,27 @@ export default function CreateStep2Screen() {
   };
 
   const validate = () => {
-    if (!address.trim()) { Alert.alert('Required', 'Please enter an address.'); return false; }
-    if (!city.trim()) { Alert.alert('Required', 'Please enter a city.'); return false; }
-    if (!district) { Alert.alert('Required', 'Please select a district.'); return false; }
+    if (!addressLine1.trim()) { Alert.alert('Required', 'Please enter Address Line 1 (street/lane) so students can identify the area.'); return false; }
+    if (!city.trim()) { Alert.alert('Required', 'Please enter a city near SLIIT (for example: Malabe).'); return false; }
+    if (!district) { Alert.alert('Required', 'Please select a district for your SLIIT-area listing.'); return false; }
     const latNum = parseFloat(lat);
     const lngNum = parseFloat(lng);
-    if (!lat || isNaN(latNum)) { Alert.alert('Required', 'Please set the map location (latitude).'); return false; }
-    if (!lng || isNaN(lngNum)) { Alert.alert('Required', 'Please set the map location (longitude).'); return false; }
-    if (latNum < SRI_LANKA_LAT_MIN || latNum > SRI_LANKA_LAT_MAX) { Alert.alert('Invalid', `Latitude must be within Sri Lanka (${SRI_LANKA_LAT_MIN} – ${SRI_LANKA_LAT_MAX}).`); return false; }
-    if (lngNum < SRI_LANKA_LNG_MIN || lngNum > SRI_LANKA_LNG_MAX) { Alert.alert('Invalid', `Longitude must be within Sri Lanka (${SRI_LANKA_LNG_MIN} – ${SRI_LANKA_LNG_MAX}).`); return false; }
+    if (!lat || isNaN(latNum)) { Alert.alert('Required', 'Please pick the boarding location on the map to set latitude.'); return false; }
+    if (!lng || isNaN(lngNum)) { Alert.alert('Required', 'Please pick the boarding location on the map to set longitude.'); return false; }
+    if (latNum < SRI_LANKA_LAT_MIN || latNum > SRI_LANKA_LAT_MAX) { Alert.alert('Invalid', `Latitude must be within Sri Lanka (${SRI_LANKA_LAT_MIN} – ${SRI_LANKA_LAT_MAX}). Keep the pin around the SLIIT area.`); return false; }
+    if (lngNum < SRI_LANKA_LNG_MIN || lngNum > SRI_LANKA_LNG_MAX) { Alert.alert('Invalid', `Longitude must be within Sri Lanka (${SRI_LANKA_LNG_MIN} – ${SRI_LANKA_LNG_MAX}). Keep the pin around the SLIIT area.`); return false; }
     return true;
   };
 
   const handleNext = () => {
     if (!validate()) return;
+
+    const combinedAddress = [addressLine1.trim(), addressLine2.trim()]
+      .filter(Boolean)
+      .join(', ');
+
     setCreateDraft({
-      address: address.trim(),
+      address: combinedAddress,
       city: city.trim(),
       district,
       latitude: parseFloat(lat),
@@ -144,19 +156,28 @@ export default function CreateStep2Screen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.sectionTitle}>Location</Text>
 
-        <Text style={styles.label}>Address Line *</Text>
+        <Text style={styles.label}>Address Line 1 *</Text>
         <TextInput
           style={styles.input}
-          placeholder="e.g. 123 Kandy Road"
+          placeholder="e.g. 45/2 New Kandy Road"
           placeholderTextColor={COLORS.grayBorder}
-          value={address}
-          onChangeText={setAddress}
+          value={addressLine1}
+          onChangeText={setAddressLine1}
+        />
+
+        <Text style={styles.label}>Address Line 2 (Optional)</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="e.g. Near Millennium Drive"
+          placeholderTextColor={COLORS.grayBorder}
+          value={addressLine2}
+          onChangeText={setAddressLine2}
         />
 
         <Text style={styles.label}>City *</Text>
         <TextInput
           style={styles.input}
-          placeholder="e.g. Kelaniya"
+          placeholder="e.g. Malabe"
           placeholderTextColor={COLORS.grayBorder}
           value={city}
           onChangeText={setCity}
@@ -191,7 +212,7 @@ export default function CreateStep2Screen() {
 
         {/* Map Location Picker */}
         <Text style={styles.label}>Map Location *</Text>
-        <Text style={styles.mapHint}>Drag the map to position the pin on your boarding's exact location</Text>
+        <Text style={styles.mapHint}>Pick the exact boarding point. Keep it close to SLIIT so students can estimate commute reliably.</Text>
         <View style={styles.mapContainer}>
           {/* Read-only preview shown once a location is set */}
           {lat && lng && !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lng)) && (
@@ -249,6 +270,7 @@ export default function CreateStep2Screen() {
             </Text>
           </TouchableOpacity>
         </View>
+        <Text style={styles.mapHint}>Tip: Open map picker, place the pin at the property gate, then verify latitude and longitude fields.</Text>
 
         <View style={styles.coordsRow}>
           <View style={{ flex: 1 }}>
@@ -309,9 +331,9 @@ const styles = StyleSheet.create({
   progressLabel: { fontSize: 12, color: COLORS.textSecondary, marginBottom: 6 },
   progressTrack: { height: 4, backgroundColor: COLORS.grayLight, borderRadius: 2, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: COLORS.primary, borderRadius: 2 },
-  content: { padding: 20 },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: COLORS.text, marginBottom: 16 },
-  label: { fontSize: 14, fontWeight: '600', color: COLORS.text, marginBottom: 6, marginTop: 12 },
+  content: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 20 },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: COLORS.text, marginBottom: 18 },
+  label: { fontSize: 14, fontWeight: '600', color: COLORS.text, marginBottom: 6, marginTop: 14 },
   input: {
     backgroundColor: COLORS.white,
     borderRadius: 10,
@@ -332,7 +354,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderWidth: 1,
     borderColor: COLORS.grayBorder,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   dropdownValue: { fontSize: 15, color: COLORS.text },
   dropdownPlaceholder: { fontSize: 15, color: COLORS.grayBorder },
@@ -341,7 +363,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: COLORS.grayBorder,
-    marginBottom: 10,
+    marginBottom: 12,
     overflow: 'hidden',
   },
   dropdownItem: {
@@ -355,7 +377,7 @@ const styles = StyleSheet.create({
   },
   dropdownItemText: { fontSize: 14, color: COLORS.text },
   dropdownItemActive: { color: COLORS.primary, fontWeight: '600' },
-  mapContainer: { gap: 8 },
+  mapContainer: { gap: 12 },
   mapViewWrapper: {
     height: 180,
     borderRadius: 12,
@@ -366,7 +388,7 @@ const styles = StyleSheet.create({
   map: {
     ...StyleSheet.absoluteFillObject,
   },
-  mapHint: { fontSize: 12, color: COLORS.textSecondary, marginBottom: 4 },
+  mapHint: { fontSize: 12, color: COLORS.textSecondary, marginBottom: 6, lineHeight: 18 },
   locationPin: { alignItems: 'center' },
   pickOnMapBtn: {
     flexDirection: 'row',
@@ -390,7 +412,7 @@ const styles = StyleSheet.create({
   locationBtnDisabled: { backgroundColor: COLORS.grayLight },
   locationBtnText: { fontSize: 14, color: COLORS.primary, fontWeight: '600' },
   locationBtnTextDisabled: { color: COLORS.gray },
-  coordsRow: { flexDirection: 'row', gap: 10 },
+  coordsRow: { flexDirection: 'row', gap: 12, marginTop: 4 },
   coordInput: { backgroundColor: COLORS.grayLight },
   footer: {
     flexDirection: 'row',
