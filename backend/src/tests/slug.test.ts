@@ -26,8 +26,8 @@ describe("generateUniqueSlug", () => {
 	beforeEach(() => vi.resetModules());
 
 	it("returns a slug when no collision found", async () => {
-		vi.doMock("@/lib/prisma.js", () => ({
-			default: { boarding: { findUnique: vi.fn().mockResolvedValue(null) } },
+		vi.doMock("@/models/index.js", () => ({
+			Boarding: { findOne: vi.fn().mockResolvedValue(null) },
 		}));
 		const { generateUniqueSlug } = await import("@/utils/slug.js");
 		const slug = await generateUniqueSlug("Nice Place");
@@ -36,16 +36,14 @@ describe("generateUniqueSlug", () => {
 
 	it("retries on collision and returns a valid slug", async () => {
 		let calls = 0;
-		vi.doMock("@/lib/prisma.js", () => ({
-			default: {
-				boarding: {
-					findUnique: vi.fn().mockImplementation(() => {
-						calls++;
-						return calls === 1
-							? Promise.resolve({ id: "other", slug: "taken" })
-							: Promise.resolve(null);
-					}),
-				},
+		vi.doMock("@/models/index.js", () => ({
+			Boarding: {
+				findOne: vi.fn().mockImplementation(() => {
+					calls++;
+					return calls === 1
+						? Promise.resolve({ _id: "other", slug: "taken" })
+						: Promise.resolve(null);
+				}),
 			},
 		}));
 		const { generateUniqueSlug } = await import("@/utils/slug.js");
@@ -55,11 +53,12 @@ describe("generateUniqueSlug", () => {
 	});
 
 	it("skips collision when the existing record has the excluded ID", async () => {
-		vi.doMock("@/lib/prisma.js", () => ({
-			default: {
-				boarding: {
-					findUnique: vi.fn().mockResolvedValue({ id: "my-id", slug: "s" }),
-				},
+		vi.doMock("@/models/index.js", () => ({
+			Boarding: {
+				findOne: vi.fn().mockResolvedValue({
+					_id: { toString: () => "my-id" },
+					slug: "s",
+				}),
 			},
 		}));
 		const { generateUniqueSlug } = await import("@/utils/slug.js");
@@ -68,11 +67,12 @@ describe("generateUniqueSlug", () => {
 	});
 
 	it("throws AppError after max attempts", async () => {
-		vi.doMock("@/lib/prisma.js", () => ({
-			default: {
-				boarding: {
-					findUnique: vi.fn().mockResolvedValue({ id: "other", slug: "taken" }),
-				},
+		vi.doMock("@/models/index.js", () => ({
+			Boarding: {
+				findOne: vi.fn().mockResolvedValue({
+					_id: { toString: () => "other" },
+					slug: "taken",
+				}),
 			},
 		}));
 		const { generateUniqueSlug } = await import("@/utils/slug.js");

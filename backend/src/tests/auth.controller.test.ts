@@ -1,32 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// ── Prisma mock ──────────────────────────────────────────────────────────────
-vi.mock("@/lib/prisma.js", () => {
-	const db = {
-		user: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
-		emailVerificationToken: {
-			create: vi.fn(),
-			findUnique: vi.fn(),
-			delete: vi.fn(),
-			deleteMany: vi.fn(),
-		},
-		refreshToken: {
-			create: vi.fn(),
-			findUnique: vi.fn(),
-			update: vi.fn(),
-			updateMany: vi.fn(),
-		},
-		passwordResetToken: {
-			create: vi.fn(),
-			findUnique: vi.fn(),
-			delete: vi.fn(),
-			deleteMany: vi.fn(),
-			update: vi.fn(),
-		},
-		$transaction: vi.fn(),
-	};
-	return { default: db, prisma: db };
-});
+const db = {
+	user: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
+	emailVerificationToken: {
+		create: vi.fn(),
+		findUnique: vi.fn(),
+		delete: vi.fn(),
+		deleteMany: vi.fn(),
+	},
+	refreshToken: {
+		create: vi.fn(),
+		findUnique: vi.fn(),
+		update: vi.fn(),
+		updateMany: vi.fn(),
+	},
+	passwordResetToken: {
+		create: vi.fn(),
+		findUnique: vi.fn(),
+		delete: vi.fn(),
+		deleteMany: vi.fn(),
+		update: vi.fn(),
+	},
+	$transaction: vi.fn(),
+};
 
 vi.mock("bcryptjs", () => ({
 	default: { hash: vi.fn().mockResolvedValue("hashed"), compare: vi.fn() },
@@ -69,9 +65,6 @@ import {
 	UserAlreadyExistsError,
 	UserNotFoundError,
 } from "@/errors/AppError.js";
-import { prisma } from "@/lib/prisma.js";
-
-const db = prisma as any;
 
 function mockReq(overrides: Record<string, unknown> = {}) {
 	return {
