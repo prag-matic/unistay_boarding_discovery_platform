@@ -1,17 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/prisma.js", () => {
-	const db = {
-		boarding: { findUnique: vi.fn() },
-		savedBoarding: {
-			findUnique: vi.fn(),
-			create: vi.fn(),
-			delete: vi.fn(),
-			findMany: vi.fn(),
-		},
-	};
-	return { default: db, prisma: db };
-});
+const db = {
+	boarding: { findUnique: vi.fn() },
+	savedBoarding: {
+		findUnique: vi.fn(),
+		create: vi.fn(),
+		delete: vi.fn(),
+		findMany: vi.fn(),
+	},
+};
 
 import {
 	getSavedBoardings,
@@ -19,9 +16,6 @@ import {
 	unsaveBoarding,
 } from "@/controllers/savedBoarding.controller.js";
 import { BoardingNotFoundError, ValidationError } from "@/errors/AppError.js";
-import prisma from "@/lib/prisma.js";
-
-const db = prisma as any;
 
 function mockReq(o: Record<string, unknown> = {}) {
 	return { body: {}, params: {}, user: { userId: "student1" }, ...o } as any;
