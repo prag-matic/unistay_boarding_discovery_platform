@@ -24,6 +24,16 @@ import type { CreateBoardingPayload } from '@/lib/boarding';
 import { COLORS } from '@/lib/constants';
 import type { BoardingType, GenderPreference } from '@/types/boarding.types';
 
+const DEFAULT_UNIVERSITY = 'SLIIT';
+const RULE_SUGGESTIONS = [
+  'No smoking inside rooms',
+  'Quiet hours after 10:00 PM',
+  'Visitors allowed only in common areas',
+  'Keep shared kitchen clean after use',
+  'Monthly rent must be paid on time',
+  'Report maintenance issues promptly',
+];
+
 function ProgressBar({ step, total }: { step: number; total: number }) {
   return (
     <View style={styles.progressContainer}>
@@ -70,11 +80,24 @@ export default function CreateStep5Screen() {
   const [successVisible, setSuccessVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const isDuplicateRule = (value: string) =>
+    rules.some((rule) => rule.toLowerCase() === value.toLowerCase());
+
   const handleAddRule = () => {
-    if (!newRule.trim()) return;
-    setRules((prev) => [...prev, newRule.trim()]);
+    const value = newRule.trim();
+    if (!value) return;
+    if (isDuplicateRule(value)) {
+      Alert.alert('Duplicate Rule', 'This rule is already added.');
+      return;
+    }
+    setRules((prev) => [...prev, value]);
     setNewRule('');
     setShowRuleInput(false);
+  };
+
+  const handleSelectSuggestion = (suggestion: string) => {
+    if (isDuplicateRule(suggestion)) return;
+    setRules((prev) => [...prev, suggestion]);
   };
 
   const handleDeleteRule = (index: number) => {
@@ -82,6 +105,7 @@ export default function CreateStep5Screen() {
   };
 
   const buildPayload = (): CreateBoardingPayload => {
+    const university = createDraft.nearUniversity?.trim() || DEFAULT_UNIVERSITY;
     const payload: CreateBoardingPayload = {
       title: createDraft.title ?? '',
       description: createDraft.description ?? '',
@@ -95,11 +119,10 @@ export default function CreateStep5Screen() {
       maxOccupants: createDraft.maxOccupants ?? 1,
       amenities: createDraft.amenities ?? [],
       rules,
+      nearUniversity: university,
     };
     const addr = createDraft.address?.trim();
     if (addr) payload.address = addr;
-    const uni = createDraft.nearUniversity?.trim();
-    if (uni) payload.nearUniversity = uni;
     return payload;
   };
 
@@ -129,7 +152,7 @@ export default function CreateStep5Screen() {
       return false;
     }
     if (!createDraft.monthlyRent || createDraft.monthlyRent < 1000) {
-      Alert.alert('Incomplete', 'Monthly rent must be at least LKR 1,000 (Step 1).');
+      Alert.alert('Incomplete', 'Per-person monthly rent must be at least LKR 1,000 (Step 1).');
       return false;
     }
     if (!createDraft.city?.trim()) {
@@ -199,8 +222,19 @@ export default function CreateStep5Screen() {
     SINGLE_ROOM: 'Single Room', SHARED_ROOM: 'Shared Room',
     ANNEX: 'Annex', HOUSE: 'House',
   };
+  const GENDER_LABELS: Record<string, string> = {
+    MALE: 'Male',
+    FEMALE: 'Female',
+    ANY: 'Any',
+  };
 
   const imageUris = createDraft.imageUris ?? [];
+  const addressParts = (createDraft.address ?? '')
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const addressLine1 = addressParts[0] ?? '';
+  const addressLine2 = addressParts.slice(1).join(', ');
 
   return (
     <SafeAreaView style={styles.container}>
@@ -217,6 +251,15 @@ export default function CreateStep5Screen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* House Rules */}
         <Text style={styles.sectionTitle}>House Rules</Text>
+        <Text style={styles.helperText}>Add rules that help students understand expectations before booking.</Text>
+
+        {rules.length === 0 && (
+          <View style={styles.ruleEmptyState}>
+            <Ionicons name="information-circle-outline" size={16} color={COLORS.primary} />
+            <Text style={styles.ruleEmptyStateText}>No rules added yet. Add at least a few clear rules for residents.</Text>
+          </View>
+        )}
+
         {rules.map((rule, i) => (
           <View key={i} style={styles.ruleItem}>
             <Ionicons name="ellipse" size={6} color={COLORS.primary} />
@@ -236,6 +279,8 @@ export default function CreateStep5Screen() {
               value={newRule}
               onChangeText={setNewRule}
               autoFocus
+              returnKeyType="done"
+              onSubmitEditing={handleAddRule}
             />
             <TouchableOpacity style={styles.ruleAddBtn} onPress={handleAddRule}>
               <Ionicons name="checkmark" size={20} color={COLORS.white} />
@@ -251,33 +296,84 @@ export default function CreateStep5Screen() {
           </TouchableOpacity>
         )}
 
+        <Text style={styles.suggestionTitle}>Quick Suggestions</Text>
+        <View style={styles.suggestionWrap}>
+          {RULE_SUGGESTIONS.map((suggestion) => {
+            const selected = isDuplicateRule(suggestion);
+            return (
+              <TouchableOpacity
+                key={suggestion}
+                style={[styles.suggestionChip, selected && styles.suggestionChipSelected]}
+                onPress={() => handleSelectSuggestion(suggestion)}
+                disabled={selected}
+              >
+                <Text style={[styles.suggestionChipText, selected && styles.suggestionChipTextSelected]}>
+                  {suggestion}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
         {/* Review Summary */}
         <View style={styles.divider} />
         <Text style={styles.sectionTitle}>Review Summary</Text>
 
         <View style={styles.summaryCard}>
-          <Text style={styles.summaryLabel}>Title</Text>
-          <Text style={styles.summaryValue}>{createDraft.title || '—'}</Text>
-
-          <Text style={styles.summaryLabel}>Type</Text>
-          <Text style={styles.summaryValue}>{createDraft.boardingType ? TYPE_LABELS[createDraft.boardingType] : '—'}</Text>
-
-          <Text style={styles.summaryLabel}>Monthly Rent</Text>
-          <Text style={styles.summaryValue}>
-            {createDraft.monthlyRent ? `LKR ${createDraft.monthlyRent.toLocaleString()}` : '—'}
+          <Text style={styles.summaryTitle}>{createDraft.title || 'Listing title not set'}</Text>
+          <Text style={styles.summaryDescription}>
+            {createDraft.description?.trim() || '—'}
           </Text>
+          <View style={styles.summaryMetaWrap}>
+            <View style={styles.summaryMetaChip}>
+              <Text style={styles.summaryMetaChipText}>
+                {createDraft.boardingType ? TYPE_LABELS[createDraft.boardingType] : 'Type not set'}
+              </Text>
+            </View>
+            <View style={styles.summaryMetaChip}>
+              <Text style={styles.summaryMetaChipText}>
+                {createDraft.genderPref ? GENDER_LABELS[createDraft.genderPref] : 'Gender not set'}
+              </Text>
+            </View>
+            <View style={styles.summaryMetaChipPrimary}>
+              <Text style={styles.summaryMetaChipPrimaryText}>
+                {createDraft.monthlyRent ? `LKR ${createDraft.monthlyRent.toLocaleString()} / person` : 'Rent not set'}
+              </Text>
+            </View>
+          </View>
 
-          <Text style={styles.summaryLabel}>Address</Text>
-          <Text style={styles.summaryValue}>
-            {[createDraft.address, createDraft.city, createDraft.district].filter(Boolean).join(', ') || '—'}
-          </Text>
+          <View style={styles.summaryDivider} />
 
-          <Text style={styles.summaryLabel}>Amenities</Text>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>University</Text>
+            <Text style={styles.summaryValue}>{createDraft.nearUniversity || DEFAULT_UNIVERSITY}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Address Line 1</Text>
+            <Text style={styles.summaryValue}>{addressLine1 || '—'}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Address Line 2</Text>
+            <Text style={styles.summaryValue}>{addressLine2 || '—'}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>City / District</Text>
+            <Text style={styles.summaryValue}>
+              {[createDraft.city, createDraft.district].filter(Boolean).join(', ') || '—'}
+            </Text>
+          </View>
+
+          <Text style={styles.summarySectionLabel}>Amenities</Text>
           <View style={styles.amenitySummaryRow}>
             {(createDraft.amenities ?? []).length > 0 ? (
               (createDraft.amenities ?? []).map((amenity) => (
                 <View key={amenity} style={styles.amenityChip}>
-                  <Text style={styles.amenityChipText}>{amenity.replace(/_/g, ' ')}</Text>
+                  <Text style={styles.amenityChipText}>
+                    {amenity
+                      .replace(/_/g, ' ')
+                      .toLowerCase()
+                      .replace(/\b\w/g, (char) => char.toUpperCase())}
+                  </Text>
                 </View>
               ))
             ) : (
@@ -288,7 +384,7 @@ export default function CreateStep5Screen() {
           {/* Image thumbnails */}
           {imageUris.length > 0 && (
             <>
-              <Text style={styles.summaryLabel}>Photos ({imageUris.length})</Text>
+              <Text style={styles.summarySectionLabel}>Photos ({imageUris.length})</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={styles.thumbRow}>
                   {imageUris.map((uri) => (
@@ -369,13 +465,26 @@ const styles = StyleSheet.create({
   progressLabel: { fontSize: 12, color: COLORS.textSecondary, marginBottom: 6 },
   progressTrack: { height: 4, backgroundColor: COLORS.grayLight, borderRadius: 2, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: COLORS.primary, borderRadius: 2 },
-  content: { padding: 20 },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: COLORS.text, marginBottom: 14 },
+  content: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 20 },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: COLORS.text, marginBottom: 16 },
+  helperText: { fontSize: 13, color: COLORS.textSecondary, marginTop: -4, marginBottom: 10, lineHeight: 18 },
+  ruleEmptyState: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#EBF0FF',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    padding: 10,
+    marginBottom: 8,
+  },
+  ruleEmptyStateText: { flex: 1, fontSize: 12, color: COLORS.textSecondary, lineHeight: 18 },
   ruleItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.grayLight,
   },
@@ -407,20 +516,61 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   addRuleBtnText: { fontSize: 14, color: COLORS.primary, fontWeight: '600' },
+  suggestionTitle: { fontSize: 12, color: COLORS.textSecondary, marginTop: 4, marginBottom: 8 },
+  suggestionWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 6 },
+  suggestionChip: {
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.grayBorder,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  suggestionChipSelected: { backgroundColor: '#EBF0FF', borderColor: COLORS.primary },
+  suggestionChipText: { fontSize: 12, color: COLORS.text },
+  suggestionChipTextSelected: { color: COLORS.primary, fontWeight: '600' },
   divider: { height: 1, backgroundColor: COLORS.grayLight, marginVertical: 20 },
   summaryCard: {
     backgroundColor: COLORS.white,
-    borderRadius: 14,
-    padding: 16,
-    gap: 4,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.grayBorder,
+    overflow: 'hidden',
+    padding: 18,
+    gap: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 1,
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 0,
   },
-  summaryLabel: { fontSize: 12, color: COLORS.textSecondary, marginTop: 10 },
-  summaryValue: { fontSize: 14, fontWeight: '600', color: COLORS.text },
+  summaryTitle: { fontSize: 18, fontWeight: '800', color: COLORS.text, lineHeight: 24 },
+  summaryMetaWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  summaryMetaChip: {
+    backgroundColor: COLORS.grayLight,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  summaryMetaChipText: { fontSize: 12, color: COLORS.text, fontWeight: '600' },
+  summaryMetaChipPrimary: {
+    backgroundColor: '#EBF0FF',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  summaryMetaChipPrimaryText: { fontSize: 12, color: COLORS.primary, fontWeight: '700' },
+  summaryDivider: { height: 1, backgroundColor: COLORS.grayLight, marginTop: 2, marginBottom: 2 },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+  },
+  summaryLabel: { fontSize: 12, color: COLORS.textSecondary, flex: 1 },
+  summaryValue: { fontSize: 14, fontWeight: '600', color: COLORS.text, flex: 1.4, textAlign: 'right' },
+  summarySectionLabel: { fontSize: 12, color: COLORS.textSecondary, marginTop: 8, marginBottom: 2 },
+  summaryDescription: { fontSize: 14, color: COLORS.text, lineHeight: 21 },
   amenitySummaryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
   amenityChip: { backgroundColor: '#EBF0FF', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
   amenityChipText: { fontSize: 11, fontWeight: '700', color: COLORS.primary },
