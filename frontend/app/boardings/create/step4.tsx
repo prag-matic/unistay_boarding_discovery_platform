@@ -16,6 +16,7 @@ import { useBoardingStore } from '@/store/boarding.store';
 import { COLORS } from '@/lib/constants';
 
 const MAX_IMAGES = 10;
+const GRID_GAP = 10;
 
 function ProgressBar({ step, total }: { step: number; total: number }) {
   return (
@@ -31,6 +32,9 @@ function ProgressBar({ step, total }: { step: number; total: number }) {
 export default function CreateStep4Screen() {
   const { createDraft, setCreateDraft } = useBoardingStore();
   const [imageUris, setImageUris] = useState<string[]>(createDraft.imageUris ?? []);
+  const [gridWidth, setGridWidth] = useState(0);
+
+  const tileSize = gridWidth > 0 ? (gridWidth - GRID_GAP) / 2 : undefined;
 
   const handleAddPhoto = async () => {
     if (imageUris.length >= MAX_IMAGES) {
@@ -96,9 +100,19 @@ export default function CreateStep4Screen() {
         <Text style={styles.sectionTitle}>Photos</Text>
         <Text style={styles.subtitle}>Add up to {MAX_IMAGES} photos. The first image will be the primary photo.</Text>
 
-        <View style={styles.imageGrid}>
+        <View
+          style={styles.imageGrid}
+          onLayout={(event) => setGridWidth(event.nativeEvent.layout.width)}
+        >
           {imageUris.map((uri, index) => (
-            <View key={uri} style={[styles.imageCell, index === 0 && styles.imageCellPrimary]}>
+            <View
+              key={uri}
+              style={[
+                styles.imageCell,
+                tileSize ? { width: tileSize, height: tileSize } : null,
+                index === 0 && styles.imageCellPrimary,
+              ]}
+            >
               <Image source={{ uri }} style={styles.cellImage} />
               {index === 0 && (
                 <View style={styles.primaryBadge}>
@@ -123,8 +137,17 @@ export default function CreateStep4Screen() {
           ))}
 
           {imageUris.length < MAX_IMAGES && (
-            <TouchableOpacity style={styles.addCell} onPress={handleAddPhoto} activeOpacity={0.75}>
-              <Ionicons name="add" size={32} color={COLORS.primary} />
+            <TouchableOpacity
+              style={[
+                styles.addCell,
+                tileSize ? { width: tileSize, height: tileSize } : null,
+              ]}
+              onPress={handleAddPhoto}
+              activeOpacity={0.75}
+            >
+              <View style={styles.addCellIconWrap}>
+                <Ionicons name="add" size={34} color={COLORS.primary} />
+              </View>
               <Text style={styles.addCellText}>Add Photo</Text>
             </TouchableOpacity>
           )}
@@ -174,15 +197,16 @@ const styles = StyleSheet.create({
   content: { padding: 20, gap: 16 },
   sectionTitle: { fontSize: 18, fontWeight: '800', color: COLORS.text },
   subtitle: { fontSize: 14, color: COLORS.textSecondary },
-  imageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  imageGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   imageCell: {
-    width: '47%',
-    aspectRatio: 1.3,
+    width: '48.5%',
+    aspectRatio: 1,
     borderRadius: 12,
     overflow: 'hidden',
     position: 'relative',
     borderWidth: 1.5,
     borderColor: COLORS.grayBorder,
+    marginBottom: 10,
   },
   imageCellPrimary: { borderColor: COLORS.primary, borderWidth: 2 },
   cellImage: { width: '100%', height: '100%' },
@@ -208,17 +232,31 @@ const styles = StyleSheet.create({
   },
   setPrimaryText: { fontSize: 10, fontWeight: '600', color: COLORS.white },
   addCell: {
-    width: '47%',
-    aspectRatio: 1.3,
+    width: '48.5%',
+    aspectRatio: 1,
     borderRadius: 12,
     borderWidth: 2,
     borderColor: COLORS.grayBorder,
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    position: 'relative',
+    marginBottom: 10,
   },
-  addCellText: { fontSize: 12, color: COLORS.primary, fontWeight: '600' },
+  addCellIconWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addCellText: {
+    position: 'absolute',
+    bottom: 12,
+    left: 0,
+    right: 0,
+    textAlign: 'center',
+    fontSize: 12,
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
   emptyHint: { alignItems: 'center', gap: 8, paddingVertical: 20 },
   emptyHintText: { fontSize: 13, color: COLORS.gray },
   countLabel: { fontSize: 13, color: COLORS.textSecondary, textAlign: 'center' },
