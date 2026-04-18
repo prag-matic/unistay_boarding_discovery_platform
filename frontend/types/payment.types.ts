@@ -27,7 +27,7 @@ export interface DetailedPayment {
     id: string;
     periodLabel: string;
     dueDate: string;
-    /** Prisma Decimal serialised as number */
+    /** Decimal value serialised as number */
     amountDue?: number;
     status?: string;
   };

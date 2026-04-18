@@ -1,18 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/prisma.js", () => {
-	const db = {
-		reservation: { findUnique: vi.fn() },
-		rentalPeriod: { findMany: vi.fn() },
-	};
-	return { default: db, prisma: db };
-});
+const db = {
+	reservation: { findUnique: vi.fn() },
+	rentalPeriod: { findMany: vi.fn() },
+};
 
 import { getRentalPeriods } from "@/controllers/rentalPeriod.controller.js";
 import { ForbiddenError, NotFoundError } from "@/errors/AppError.js";
-import prisma from "@/lib/prisma.js";
-
-const db = prisma as any;
 
 function mockReq(overrides: Record<string, unknown> = {}) {
 	return {

@@ -1,19 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/prisma.js", () => {
-	const db = {
-		payment: {
-			create: vi.fn(),
-			findMany: vi.fn(),
-			findUnique: vi.fn(),
-			update: vi.fn(),
-		},
-		rentalPeriod: { findUnique: vi.fn(), update: vi.fn() },
-		reservation: { findUnique: vi.fn() },
-		$transaction: vi.fn(),
-	};
-	return { default: db, prisma: db };
-});
+const db = {
+	payment: {
+		create: vi.fn(),
+		findMany: vi.fn(),
+		findUnique: vi.fn(),
+		update: vi.fn(),
+	},
+	rentalPeriod: { findUnique: vi.fn(), update: vi.fn() },
+	reservation: { findUnique: vi.fn() },
+	$transaction: vi.fn(),
+};
 
 vi.mock("@/lib/cloudinary.js", () => ({
 	uploadPaymentProofImage: vi.fn().mockResolvedValue("https://cdn/proof.jpg"),
@@ -35,9 +32,6 @@ import {
 	UnauthorizedError,
 } from "@/errors/AppError.js";
 import { uploadPaymentProofImage } from "@/lib/cloudinary.js";
-import prisma from "@/lib/prisma.js";
-
-const db = prisma as any;
 
 function mockReq(overrides: Record<string, unknown> = {}) {
 	return {

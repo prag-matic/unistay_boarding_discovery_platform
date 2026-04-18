@@ -22,7 +22,7 @@ import type {
 function normalizeComment(raw: RawReviewComment): ReviewComment {
   // Mongoose populates the relation in-place under the FK field name:
   // raw.commentorId becomes the populated User object (not a string).
-  // Accept both the Mongoose shape and a Prisma-like { commentor } shape.
+  // Accept both the populated Mongoose shape and { commentor } shape.
   const commentor: ReviewPersonInfo =
     raw.commentor ?? (raw.commentorId as unknown as ReviewPersonInfo);
   const authorId =
@@ -52,7 +52,7 @@ function normalizeComment(raw: RawReviewComment): ReviewComment {
 function normalizeReview(raw: RawReview): Review {
   // Mongoose populates the relation in-place under the FK field name:
   // raw.studentId becomes the populated User object (not a string).
-  // Accept both the Mongoose shape and a Prisma-like { student } shape.
+  // Accept both the populated Mongoose shape and { student } shape.
   const student: ReviewPersonInfo =
     raw.student ?? (raw.studentId as unknown as ReviewPersonInfo);
   const authorId =
