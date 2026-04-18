@@ -18,6 +18,7 @@ import { getReservationById, getRentalPeriods, cancelReservation } from '@/lib/r
 import { createPayment, uploadProofImage } from '@/lib/payment';
 import { COLORS } from '@/lib/constants';
 import logger from '@/lib/logger';
+import { getErrorMessage } from '@/utils/helpers';
 import type { Reservation, RentalPeriod, ReservationStatus, RentalPeriodStatus, Payment, PaymentStatus } from '@/types/reservation.types';
 import type { PaymentMethod } from '@/types/reservation.types';
 import * as ImagePicker from 'expo-image-picker';
@@ -299,10 +300,7 @@ export default function ReservationDetailScreen() {
               const res = await cancelReservation(reservation.id);
               setReservation(res.data.reservation);
             } catch (err: unknown) {
-              const message =
-                (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-                'Failed to cancel reservation.';
-              Alert.alert('Error', message);
+              Alert.alert('Error', getErrorMessage(err));
             } finally {
               setCancelling(false);
             }
@@ -393,10 +391,7 @@ export default function ReservationDetailScreen() {
       Alert.alert('Payment Logged', 'Your payment has been submitted and is awaiting owner confirmation.');
     } catch (err: unknown) {
       logger.reservation.error('handleSubmitPayment error', { error: err instanceof Error ? err.message : err });
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        'Failed to log payment.';
-      Alert.alert('Error', msg);
+      Alert.alert('Error', getErrorMessage(err));
     } finally {
       setIsSubmittingPayment(false);
     }

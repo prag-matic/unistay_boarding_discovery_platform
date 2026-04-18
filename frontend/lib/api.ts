@@ -86,7 +86,7 @@ api.interceptors.response.use(
     logger.api.debug(`← ${method} ${url}`, summary);
     return response;
   },
-  (error) => error // errors handled in the auth interceptor below
+  (error) => Promise.reject(error) // errors handled in the auth interceptor below
 );
 
 // ── Auth interceptor – request (attach token) ──────────────────────────────────
@@ -116,6 +116,9 @@ api.interceptors.response.use(
     const method = (originalRequest?.method ?? 'GET').toUpperCase();
     const url = originalRequest?.url ?? '';
     const status: number | undefined = error.response?.status;
+    const errorData = error.response?.data as
+      | { error?: string; message?: string; details?: unknown[] }
+      | undefined;
 
     const isRefreshEndpoint = (originalRequest.url as string | undefined)?.includes(
       '/auth/refresh'
@@ -162,20 +165,24 @@ api.interceptors.response.use(
       }
     }
 
-    // Log the error response
     const duration = originalRequest?._requestStartTime
       ? Date.now() - originalRequest._requestStartTime
       : undefined;
-    const errorData = error.response?.data as
-      | { error?: string; message?: string; details?: unknown[] }
-      | undefined;
-    logger.api.error(`✗ ${method} ${url}`, {
+    const logPayload = {
       status: status ?? 'NETWORK_ERROR',
       ...(duration !== undefined && { durationMs: duration }),
       ...(errorData?.message && { message: errorData.message }),
       ...(errorData?.error && { error: errorData.error }),
       ...(errorData?.details?.length && { details: errorData.details }),
-    });
+    };
+
+    // Expected client/auth failures should not be reported as hard errors in the console.
+    // Only network failures and 5xx responses are treated as errors.
+    if (!status || status >= 500) {
+      logger.api.error(`✗ ${method} ${url}`, logPayload);
+    } else {
+      logger.api.warn(`✗ ${method} ${url}`, logPayload);
+    }
 
     return Promise.reject(error);
   }

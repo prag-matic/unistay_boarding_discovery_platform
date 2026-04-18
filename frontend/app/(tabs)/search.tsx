@@ -10,6 +10,11 @@ import {
   ListRenderItem,
   ActivityIndicator,
   RefreshControl,
+  Modal,
+  Pressable,
+  ScrollView,
+  PanResponder,
+  LayoutChangeEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,7 +25,7 @@ import { useBoardingStore } from '@/store/boarding.store';
 import { useSaveBoarding } from '@/hooks/useSaveBoarding';
 import { searchBoardings } from '@/lib/boarding';
 import { COLORS } from '@/lib/constants';
-import type { Boarding, SortOption } from '@/types/boarding.types';
+import type { Boarding, SortOption, BoardingType, GenderPreference, BoardingFilters, AmenityName } from '@/types/boarding.types';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -46,6 +51,41 @@ const GENDER_LABELS: Record<string, string> = {
   ANY: 'Any Gender',
 };
 
+const BOARDING_TYPE_OPTIONS: { label: string; value: BoardingType }[] = [
+  { label: 'Single Room', value: 'SINGLE_ROOM' },
+  { label: 'Shared Room', value: 'SHARED_ROOM' },
+  { label: 'Annex', value: 'ANNEX' },
+  { label: 'House', value: 'HOUSE' },
+];
+
+const GENDER_FILTER_OPTIONS: { label: string; value: GenderPreference }[] = [
+  { label: 'Male Only', value: 'MALE' },
+  { label: 'Female Only', value: 'FEMALE' },
+  { label: 'Any Gender', value: 'ANY' },
+];
+
+const AMENITY_OPTIONS: { key: AmenityName; label: string; icon: string }[] = [
+  { key: 'WIFI', label: 'WiFi', icon: 'wifi-outline' },
+  { key: 'PARKING', label: 'Parking', icon: 'car-outline' },
+  { key: 'AIR_CONDITIONING', label: 'A/C', icon: 'snow-outline' },
+  { key: 'HOT_WATER', label: 'Hot Water', icon: 'water-outline' },
+  { key: 'SECURITY', label: 'Security', icon: 'shield-checkmark-outline' },
+  { key: 'KITCHEN', label: 'Kitchen', icon: 'restaurant-outline' },
+  { key: 'LAUNDRY', label: 'Laundry', icon: 'shirt-outline' },
+  { key: 'GENERATOR', label: 'Generator', icon: 'flash-outline' },
+  { key: 'WATER_TANK', label: 'Water Tank', icon: 'beaker-outline' },
+  { key: 'GYM', label: 'Gym', icon: 'barbell-outline' },
+  { key: 'SWIMMING_POOL', label: 'Pool', icon: 'water-outline' },
+  { key: 'STUDY_ROOM', label: 'Study Room', icon: 'book-outline' },
+  { key: 'COMMON_AREA', label: 'Common Area', icon: 'people-outline' },
+  { key: 'BALCONY', label: 'Balcony', icon: 'sunny-outline' },
+];
+
+const PRICE_MIN = 0;
+const PRICE_MAX = 100000;
+const PRICE_STEP = 1000;
+const THUMB_SIZE = 26;
+
 // Top amenities to surface on card
 const AMENITY_ICONS: Record<string, string> = {
   WIFI: 'wifi-outline',
@@ -62,8 +102,8 @@ const DEFAULT_LONGITUDE = 80.7718;
 const MAP_REGION = {
   latitude: 6.915137412076758,
   longitude: 79.9731566669944,
-  latitudeDelta: 0.1,
-  longitudeDelta: 0.1,
+  latitudeDelta: 0.01,
+  longitudeDelta: 0.01,
 };
 
 const MAP_CAMERA_BOUNDARY = {
@@ -201,6 +241,109 @@ function MapBottomSheet({
   );
 }
 
+interface DualRangeSliderProps {
+  min: number;
+  max: number;
+  step: number;
+  low: number;
+  high: number;
+  onLowChange: (v: number) => void;
+  onHighChange: (v: number) => void;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
+}
+
+function DualRangeSlider({
+  min,
+  max,
+  step,
+  low,
+  high,
+  onLowChange,
+  onHighChange,
+  onDragStart,
+  onDragEnd,
+}: DualRangeSliderProps) {
+  const [trackW, setTrackW] = useState(0);
+  const trackWRef = useRef(0);
+  const lowRef = useRef(low);
+  const highRef = useRef(high);
+  lowRef.current = low;
+  highRef.current = high;
+
+  const lowStartPx = useRef(0);
+  const highStartPx = useRef(0);
+
+  const valToPx = (v: number) => ((v - min) / (max - min)) * trackWRef.current;
+  const pxToVal = (px: number) => {
+    const raw = (px / trackWRef.current) * (max - min) + min;
+    return Math.round(raw / step) * step;
+  };
+  const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+  const lowPan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        lowStartPx.current = valToPx(lowRef.current);
+        onDragStart?.();
+      },
+      onPanResponderMove: (_, ges) => {
+        if (trackWRef.current === 0) return;
+        const newPx = clamp(lowStartPx.current + ges.dx, 0, valToPx(highRef.current) - THUMB_SIZE);
+        const newVal = clamp(pxToVal(newPx), min, highRef.current - step);
+        onLowChange(newVal);
+      },
+      onPanResponderRelease: () => onDragEnd?.(),
+      onPanResponderTerminate: () => onDragEnd?.(),
+    }),
+  ).current;
+
+  const highPan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        highStartPx.current = valToPx(highRef.current);
+        onDragStart?.();
+      },
+      onPanResponderMove: (_, ges) => {
+        if (trackWRef.current === 0) return;
+        const newPx = clamp(highStartPx.current + ges.dx, valToPx(lowRef.current) + THUMB_SIZE, trackWRef.current);
+        const newVal = clamp(pxToVal(newPx), lowRef.current + step, max);
+        onHighChange(newVal);
+      },
+      onPanResponderRelease: () => onDragEnd?.(),
+      onPanResponderTerminate: () => onDragEnd?.(),
+    }),
+  ).current;
+
+  const onTrackLayout = (e: LayoutChangeEvent) => {
+    const w = e.nativeEvent.layout.width;
+    trackWRef.current = w;
+    setTrackW(w);
+  };
+
+  const lowPx = trackW > 0 ? ((low - min) / (max - min)) * trackW : 0;
+  const highPx = trackW > 0 ? ((high - min) / (max - min)) * trackW : trackW;
+
+  return (
+    <View>
+      <View style={styles.sliderTrackContainer} onLayout={onTrackLayout}>
+        <View style={styles.sliderTrack} />
+        {trackW > 0 && <View style={[styles.sliderRange, { left: lowPx, width: highPx - lowPx }]} />}
+        {trackW > 0 && <View {...lowPan.panHandlers} style={[styles.sliderThumb, { left: lowPx - THUMB_SIZE / 2 }]} />}
+        {trackW > 0 && <View {...highPan.panHandlers} style={[styles.sliderThumb, { left: highPx - THUMB_SIZE / 2 }]} />}
+      </View>
+      <View style={styles.sliderLabels}>
+        <Text style={styles.sliderLabel}>LKR {low.toLocaleString()}</Text>
+        <Text style={styles.sliderLabel}>LKR {high.toLocaleString()}</Text>
+      </View>
+    </View>
+  );
+}
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function ExploreScreen() {
   const [query, setQuery] = useState('');
@@ -211,7 +354,13 @@ export default function ExploreScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [total, setTotal] = useState(0);
-  const { filters, sortOption, setSortOption, clearFilters } = useBoardingStore();
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+  const { filters, sortOption, setSortOption, setFilters, clearFilters } = useBoardingStore();
+  const [minRent, setMinRent] = useState(filters.minRent ?? PRICE_MIN);
+  const [maxRent, setMaxRent] = useState(filters.maxRent ?? PRICE_MAX);
+  const [boardingType, setBoardingType] = useState<BoardingType | undefined>(filters.boardingType);
+  const [genderPref, setGenderPref] = useState<GenderPreference | undefined>(filters.genderPref);
+  const [selectedAmenities, setSelectedAmenities] = useState<AmenityName[]>(filters.amenities ?? []);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const sortParams = useMemo(() => {
@@ -269,6 +418,39 @@ export default function ExploreScreen() {
     return n;
   }, [filters]);
 
+  const openFilterDrawer = () => {
+    setMinRent(filters.minRent ?? PRICE_MIN);
+    setMaxRent(filters.maxRent ?? PRICE_MAX);
+    setBoardingType(filters.boardingType);
+    setGenderPref(filters.genderPref);
+    setSelectedAmenities(filters.amenities ?? []);
+    setIsFilterDrawerOpen(true);
+  };
+
+  const toggleAmenity = (key: AmenityName) => {
+    setSelectedAmenities((prev) => (prev.includes(key) ? prev.filter((a) => a !== key) : [...prev, key]));
+  };
+
+  const handleFilterClearAll = () => {
+    setMinRent(PRICE_MIN);
+    setMaxRent(PRICE_MAX);
+    setBoardingType(undefined);
+    setGenderPref(undefined);
+    setSelectedAmenities([]);
+    clearFilters();
+  };
+
+  const applyFilters = () => {
+    const newFilters: BoardingFilters = {};
+    if (minRent > PRICE_MIN) newFilters.minRent = minRent;
+    if (maxRent < PRICE_MAX) newFilters.maxRent = maxRent;
+    if (boardingType) newFilters.boardingType = boardingType;
+    if (genderPref) newFilters.genderPref = genderPref;
+    if (selectedAmenities.length) newFilters.amenities = selectedAmenities;
+    setFilters(newFilters);
+    setIsFilterDrawerOpen(false);
+  };
+
   const renderItem: ListRenderItem<Boarding> = ({ item }) => <BoardingCard item={item} />;
 
   return (
@@ -302,7 +484,7 @@ export default function ExploreScreen() {
           {/* Filter button */}
           <TouchableOpacity
             style={[styles.iconBtn, activeFilterCount > 0 && styles.iconBtnActive]}
-            onPress={() => router.push('/explore/filter' as never)}
+            onPress={openFilterDrawer}
           >
             <Ionicons
               name="options-outline"
@@ -433,6 +615,109 @@ export default function ExploreScreen() {
         </View>
       )}
 
+      <Modal
+        visible={isFilterDrawerOpen}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setIsFilterDrawerOpen(false)}
+      >
+        <View style={styles.filterModalRoot}>
+          <Pressable style={styles.filterBackdrop} onPress={() => setIsFilterDrawerOpen(false)} />
+          <View style={styles.filterDrawer}>
+            <View style={styles.filterHandle} />
+            <View style={styles.filterHeaderRow}>
+              <Text style={styles.filterTitle}>Filters</Text>
+              <TouchableOpacity onPress={() => setIsFilterDrawerOpen(false)}>
+                <Ionicons name="close" size={22} color={COLORS.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.filterScroll} contentContainerStyle={styles.filterScrollContent}>
+              <View style={styles.filterSection}>
+                <Text style={styles.filterSectionTitle}>Monthly Rent</Text>
+                <DualRangeSlider
+                  min={PRICE_MIN}
+                  max={PRICE_MAX}
+                  step={PRICE_STEP}
+                  low={minRent}
+                  high={maxRent}
+                  onLowChange={setMinRent}
+                  onHighChange={setMaxRent}
+                />
+              </View>
+
+              <View style={styles.filterSection}>
+                <Text style={styles.filterSectionTitle}>Boarding Type</Text>
+                <View style={styles.filterChipWrap}>
+                  {BOARDING_TYPE_OPTIONS.map((type) => {
+                    const selected = boardingType === type.value;
+                    return (
+                      <TouchableOpacity
+                        key={type.value}
+                        style={[styles.filterChip, selected && styles.filterChipActive]}
+                        onPress={() => setBoardingType(selected ? undefined : type.value)}
+                      >
+                        <Text style={[styles.filterChipText, selected && styles.filterChipTextActive]}>{type.label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <View style={styles.filterSection}>
+                <Text style={styles.filterSectionTitle}>Gender Preference</Text>
+                <View style={styles.filterChipWrap}>
+                  {GENDER_FILTER_OPTIONS.map((gender) => {
+                    const selected = genderPref === gender.value;
+                    return (
+                      <TouchableOpacity
+                        key={gender.value}
+                        style={[styles.filterChip, selected && styles.filterChipActive]}
+                        onPress={() => setGenderPref(selected ? undefined : gender.value)}
+                      >
+                        <Text style={[styles.filterChipText, selected && styles.filterChipTextActive]}>{gender.label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <View style={styles.filterSection}>
+                <Text style={styles.filterSectionTitle}>Amenities</Text>
+                <View style={styles.filterChipWrap}>
+                  {AMENITY_OPTIONS.map((amenity) => {
+                    const selected = selectedAmenities.includes(amenity.key);
+                    return (
+                      <TouchableOpacity
+                        key={amenity.key}
+                        style={[styles.filterChip, styles.filterAmenityChip, selected && styles.filterChipActive]}
+                        onPress={() => toggleAmenity(amenity.key)}
+                      >
+                        <Ionicons
+                          name={amenity.icon as never}
+                          size={14}
+                          color={selected ? COLORS.white : COLORS.primary}
+                        />
+                        <Text style={[styles.filterChipText, selected && styles.filterChipTextActive]}>{amenity.label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            </ScrollView>
+
+            <View style={styles.filterActions}>
+              <TouchableOpacity style={styles.filterClearBtn} onPress={handleFilterClearAll}>
+                <Text style={styles.filterClearBtnText}>Clear all</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.filterApplyBtn} onPress={applyFilters}>
+                <Text style={styles.filterApplyBtnText}>Show results</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* ── Clear Filters FAB (pill, bottom-center) ── */}
       {activeFilterCount > 0 && (
         <TouchableOpacity
@@ -469,10 +754,10 @@ const styles = StyleSheet.create({
   // ── Header
   header: {
     backgroundColor: COLORS.white,
-    paddingHorizontal: 14,
-    paddingTop: 8,
-    paddingBottom: 8,
-    gap: 6,
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: 12,
+    gap: 12,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.grayBorder,
     zIndex: 10,
@@ -490,7 +775,7 @@ const styles = StyleSheet.create({
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
   },
   searchBar: {
     flex: 1,
@@ -499,8 +784,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: COLORS.grayLight,
     borderRadius: 12,
-    paddingHorizontal: 12,
-    gap: 8,
+    paddingHorizontal: 14,
+    gap: 10,
   },
   searchInput: { flex: 1, fontSize: 14, color: COLORS.text },
   iconBtn: {
@@ -560,6 +845,166 @@ const styles = StyleSheet.create({
   },
   sortMenuText: { fontSize: 14, color: COLORS.text },
   sortMenuTextActive: { color: COLORS.primary, fontWeight: '600' },
+
+  // ── Filter Drawer
+  filterModalRoot: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.32)',
+  },
+  filterBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  filterDrawer: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '86%',
+    paddingTop: 8,
+  },
+  filterHandle: {
+    alignSelf: 'center',
+    width: 42,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: COLORS.grayBorder,
+    marginBottom: 10,
+  },
+  filterHeaderRow: {
+    paddingHorizontal: 28,
+    paddingBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  filterTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: COLORS.text,
+    letterSpacing: -0.2,
+  },
+  filterScroll: {
+    maxHeight: 480,
+  },
+  filterScrollContent: {
+    paddingHorizontal: 28,
+    paddingBottom: 20,
+    gap: 16,
+  },
+  filterSection: {
+    gap: 10,
+  },
+  filterSectionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  sliderTrackContainer: {
+    height: 28,
+    justifyContent: 'center',
+  },
+  sliderTrack: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: COLORS.grayBorder,
+  },
+  sliderRange: {
+    position: 'absolute',
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: COLORS.primary,
+  },
+  sliderThumb: {
+    position: 'absolute',
+    width: THUMB_SIZE,
+    height: THUMB_SIZE,
+    borderRadius: THUMB_SIZE / 2,
+    backgroundColor: COLORS.primary,
+    borderWidth: 2,
+    borderColor: COLORS.white,
+    top: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  sliderLabels: {
+    marginTop: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  sliderLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
+  filterChipWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  filterChip: {
+    borderWidth: 1,
+    borderColor: COLORS.grayBorder,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: COLORS.white,
+  },
+  filterAmenityChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  filterChipActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  filterChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
+  filterChipTextActive: {
+    color: COLORS.white,
+  },
+  filterActions: {
+    flexDirection: 'row',
+    gap: 10,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.grayLight,
+    paddingHorizontal: 28,
+    paddingTop: 12,
+    paddingBottom: 16,
+  },
+  filterClearBtn: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.grayBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 46,
+  },
+  filterClearBtnText: {
+    color: COLORS.textSecondary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  filterApplyBtn: {
+    flex: 1,
+    borderRadius: 12,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 46,
+  },
+  filterApplyBtnText: {
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: '700',
+  },
 
   // ── List
   listContent: { padding: 14, paddingBottom: 100, gap: 12 },
