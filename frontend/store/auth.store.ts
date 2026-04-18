@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import api, { uploadMyProfileImage } from '@/lib/api';
 import logger from '@/lib/logger';
 import { storage } from '@/lib/storage';
+import { getErrorMessage } from '@/utils/helpers';
 import type { User } from '@/types/user.types';
 import type { RegisterData, LoginResponse, RefreshResponse } from '@/types/auth.types';
 import type { UniStayApiResponse } from '@/types/api.types';
@@ -49,6 +50,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await storage.setRefreshToken(refreshToken);
       await storage.setUser(user);
       set({ token: accessToken, refreshToken, user, isAuthenticated: true });
+    } catch (error) {
+      throw new Error(getErrorMessage(error));
     } finally {
       set({ isLoading: false });
     }

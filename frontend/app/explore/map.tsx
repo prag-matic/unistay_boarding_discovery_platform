@@ -1,51 +1,94 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-  TextInput,
-} from 'react-native';
-import { router } from 'expo-router';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
-import { searchBoardings } from '@/lib/boarding';
+import { getBoardingBySlug } from '@/lib/boarding';
 import { COLORS } from '@/lib/constants';
 import type { Boarding } from '@/types/boarding.types';
 
-const INITIAL_REGION = {
-  latitude: 6.915137412076758,
-  longitude: 79.9731566669944,
-  latitudeDelta: 0.1,
-  longitudeDelta: 0.1,
-};
+const DEFAULT_LATITUDE = 6.915137412076758;
+const DEFAULT_LONGITUDE = 79.9731566669944;
 
-const CAMERA_BOUNDARY = {
-  northEast: { latitude: 7.035961932644662, longitude: 80.19100325001236 },
-  southWest: { latitude: 6.8302835564392455, longitude: 79.89361663337401 },
+const INITIAL_REGION = {
+  latitude: DEFAULT_LATITUDE,
+  longitude: DEFAULT_LONGITUDE,
+  latitudeDelta: 0.02,
+  longitudeDelta: 0.02,
 };
 
 export default function MapViewScreen() {
-  const [selected, setSelected] = useState<Boarding | null>(null);
-  const [query, setQuery] = useState('');
-  const [allBoardings, setAllBoardings] = useState<Boarding[]>([]);
+  const { selectedSlug } = useLocalSearchParams<{ selectedSlug?: string }>();
+  const [boarding, setBoarding] = useState<Boarding | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const mapRef = useRef<MapView>(null);
 
   useEffect(() => {
-    searchBoardings({ size: 100 })
-      .then((r) => setAllBoardings(r.data.boarding))
-      .catch(() => {});
-  }, []);
+    let mounted = true;
 
-  const filtered = query
-    ? allBoardings.filter(
-        (b) =>
-          b.title.toLowerCase().includes(query.toLowerCase()) ||
-          b.city.toLowerCase().includes(query.toLowerCase()),
-      )
-    : allBoardings;
+    if (!selectedSlug) {
+      setBoarding(null);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    getBoardingBySlug(selectedSlug)
+      .then((response) => {
+        if (!mounted) return;
+        setBoarding(response.data.boarding);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setBoarding(null);
+      })
+      .finally(() => {
+        if (!mounted) return;
+        setIsLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [selectedSlug]);
+
+  useEffect(() => {
+    if (!boarding || boarding.latitude == null || boarding.longitude == null) return;
+
+    mapRef.current?.animateToRegion(
+      {
+        latitude: boarding.latitude,
+        longitude: boarding.longitude,
+        latitudeDelta: 0.008,
+        longitudeDelta: 0.008,
+      },
+      350,
+    );
+  }, [boarding]);
+
+  const markerCoordinate = useMemo(
+    () => ({
+      latitude: boarding?.latitude ?? DEFAULT_LATITUDE,
+      longitude: boarding?.longitude ?? DEFAULT_LONGITUDE,
+    }),
+    [boarding],
+  );
+
+  const recenterToBoarding = () => {
+    const latitude = boarding?.latitude ?? DEFAULT_LATITUDE;
+    const longitude = boarding?.longitude ?? DEFAULT_LONGITUDE;
+
+    mapRef.current?.animateToRegion(
+      {
+        latitude,
+        longitude,
+        latitudeDelta: boarding ? 0.008 : 0.02,
+        longitudeDelta: boarding ? 0.008 : 0.02,
+      },
+      280,
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -54,89 +97,74 @@ export default function MapViewScreen() {
         style={styles.map}
         provider={PROVIDER_GOOGLE}
         initialRegion={INITIAL_REGION}
-        // cameraBoundary={CAMERA_BOUNDARY}
         minZoomLevel={14}
         maxZoomLevel={18}
         showsUserLocation
         showsMyLocationButton
       >
-        {filtered.map((boarding) => (
+        {boarding && (
           <Marker
-            key={boarding.id}
-            coordinate={{ latitude: boarding.latitude ?? 7.8731, longitude: boarding.longitude ?? 80.7718 }}
+            coordinate={markerCoordinate}
             title={boarding.title}
             description={`${boarding.city}, ${boarding.district}`}
-            onPress={() => setSelected(selected?.id === boarding.id ? null : boarding)}
+            pinColor={COLORS.red}
+            zIndex={1000}
           />
-        ))}
+        )}
       </MapView>
 
-      {/* Top overlay: Back + Search + Buttons */}
-      <View style={styles.topOverlay}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={22} color={COLORS.text} />
-        </TouchableOpacity>
-        <View style={styles.searchBar}>
-          <Ionicons name="search-outline" size={16} color={COLORS.gray} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search on map..."
-            placeholderTextColor={COLORS.grayBorder}
-            value={query}
-            onChangeText={setQuery}
-          />
-        </View>
-        <TouchableOpacity
-          style={styles.iconBtn}
-          onPress={() => router.push('/explore/filter' as never)}
-        >
-          <Ionicons name="options-outline" size={20} color={COLORS.text} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.iconBtn}
-          onPress={() => router.back()}
-        >
-          <Ionicons name="list-outline" size={20} color={COLORS.text} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Recenter button */}
-      <TouchableOpacity
-        style={styles.recenterBtn}
-        onPress={() => mapRef.current?.animateToRegion(INITIAL_REGION, 400)}
-      >
+      <TouchableOpacity style={styles.recenterBtn} onPress={recenterToBoarding} activeOpacity={0.85}>
         <Ionicons name="locate" size={20} color={COLORS.primary} />
       </TouchableOpacity>
 
-      {/* Bottom sheet preview */}
-      {selected && (
+      {isLoading ? (
+        <View style={styles.statusCard}>
+          <ActivityIndicator size="small" color={COLORS.primary} />
+          <Text style={styles.statusText}>Loading location…</Text>
+        </View>
+      ) : !boarding ? (
+        <View style={styles.statusCard}>
+          <Ionicons name="alert-circle-outline" size={16} color={COLORS.gray} />
+          <Text style={styles.statusText}>Selected boarding not found</Text>
+        </View>
+      ) : (
         <View style={styles.bottomSheet}>
           <View style={styles.bottomSheetHandle} />
           <View style={styles.previewRow}>
-            {selected.images[0] ? (
-              <Image source={{ uri: selected.images[0].url }} style={styles.previewImage} />
+            {boarding.images[0] ? (
+              <Image source={{ uri: boarding.images[0].url }} style={styles.previewImage} />
             ) : (
               <View style={[styles.previewImage, styles.previewImagePlaceholder]}>
                 <Ionicons name="home-outline" size={24} color={COLORS.gray} />
               </View>
             )}
             <View style={styles.previewInfo}>
-              <Text style={styles.previewTitle} numberOfLines={1}>{selected.title}</Text>
-              <Text style={styles.previewAddress} numberOfLines={1}>{selected.city}, {selected.district}</Text>
+              <Text style={styles.previewTitle} numberOfLines={1}>{boarding.title}</Text>
+              <Text style={styles.previewAddress} numberOfLines={1}>{boarding.address}</Text>
               <Text style={styles.previewPrice}>
-                {selected.monthlyRent ? `LKR ${selected.monthlyRent.toLocaleString()}/mo` : '—'}
+                {boarding.monthlyRent ? `LKR ${boarding.monthlyRent.toLocaleString()}/mo` : '—'}
               </Text>
             </View>
-            <TouchableOpacity onPress={() => setSelected(null)} style={styles.closePreview}>
-              <Ionicons name="close" size={20} color={COLORS.gray} />
+          </View>
+
+          <View style={styles.drawerActions}>
+            <TouchableOpacity
+              style={styles.goBackBtn}
+              onPress={() => router.back()}
+              activeOpacity={0.88}
+            >
+              <Ionicons name="arrow-back" size={16} color={COLORS.primary} />
+              <Text style={styles.goBackBtnText}>Go Back</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.viewDetailsBtn}
+              onPress={() => router.push(`/boardings/${boarding.slug}` as never)}
+              activeOpacity={0.88}
+            >
+              <Text style={styles.viewDetailsBtnText}>View Details</Text>
             </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={styles.viewDetailsBtn}
-            onPress={() => router.push(`/boardings/${selected.slug}` as never)}
-          >
-            <Text style={styles.viewDetailsBtnText}>View Details</Text>
-          </TouchableOpacity>
         </View>
       )}
     </SafeAreaView>
@@ -144,67 +172,13 @@ export default function MapViewScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, backgroundColor: COLORS.background },
   map: { flex: 1 },
 
-  // Top overlay
-  topOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  backBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    backgroundColor: COLORS.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  searchBar: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 9,
-    gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  searchInput: { flex: 1, fontSize: 14, color: COLORS.text },
-  iconBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    backgroundColor: COLORS.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
-    elevation: 3,
-  },
   recenterBtn: {
     position: 'absolute',
     right: 14,
-    bottom: 24,
+    bottom: 128,
     width: 44,
     height: 44,
     borderRadius: 22,
@@ -218,7 +192,25 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
 
-  // Bottom sheet
+  statusCard: {
+    position: 'absolute',
+    top: 62,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  statusText: { fontSize: 12, color: COLORS.text, fontWeight: '600' },
+
   bottomSheet: {
     position: 'absolute',
     bottom: 0,
@@ -228,6 +220,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 16,
+    paddingBottom: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.1,
@@ -244,13 +237,31 @@ const styles = StyleSheet.create({
   },
   previewRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
   previewImage: { width: 72, height: 72, borderRadius: 10 },
-  previewImagePlaceholder: { backgroundColor: COLORS.grayLight, alignItems: 'center', justifyContent: 'center' },
+  previewImagePlaceholder: {
+    backgroundColor: COLORS.grayLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   previewInfo: { flex: 1 },
   previewTitle: { fontSize: 15, fontWeight: '700', color: COLORS.text },
   previewAddress: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2 },
   previewPrice: { fontSize: 14, fontWeight: '700', color: COLORS.primary, marginTop: 4 },
-  closePreview: { padding: 4 },
+  drawerActions: { flexDirection: 'row', gap: 10 },
+  goBackBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
+    borderRadius: 12,
+    paddingVertical: 12,
+    backgroundColor: COLORS.white,
+  },
+  goBackBtnText: { fontSize: 14, fontWeight: '700', color: COLORS.primary },
   viewDetailsBtn: {
+    flex: 1,
     backgroundColor: COLORS.primary,
     borderRadius: 12,
     paddingVertical: 12,
@@ -258,4 +269,3 @@ const styles = StyleSheet.create({
   },
   viewDetailsBtnText: { fontSize: 15, fontWeight: '700', color: COLORS.white },
 });
-
