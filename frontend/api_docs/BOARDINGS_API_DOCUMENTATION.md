@@ -550,7 +550,7 @@ Insufficient permissions (403):
 
 **Endpoint:** `POST /api/boardings`
 
-**Description:** Create a new boarding listing. Initial status is DRAFT.
+**Description:** Create a new boarding listing. Initial status is DRAFT. In the initial release phase, owner onboarding is focused on SLIIT-area listings.
 
 **Authentication:** ✅ Required (Bearer token)
 
@@ -571,10 +571,10 @@ Content-Type: application/json
 | `city` | string | ✅ | Non-empty |
 | `district` | string | ✅ | Non-empty |
 | `address` | string | ❌ | - |
-| `monthlyRent` | number | ✅ | Min 1000, Max 500000 |
+| `monthlyRent` | number | ✅ | Per-person monthly rent. Min 1000, Max 500000 |
 | `boardingType` | string | ✅ | One of: SINGLE_ROOM, SHARED_ROOM, ANNEX, HOUSE |
 | `genderPref` | string | ✅ | One of: MALE, FEMALE, ANY |
-| `nearUniversity` | string | ❌ | - |
+| `nearUniversity` | string | ❌ | Initial release guidance: use `SLIIT` |
 | `latitude` | number | ✅ | 5.9-9.9 (Sri Lanka bounds) |
 | `longitude` | number | ✅ | 79.5-81.9 (Sri Lanka bounds) |
 | `maxOccupants` | number | ✅ | Min 1, Max 20 |
@@ -590,14 +590,14 @@ Content-Type: application/json
 
 {
   "title": "Beautiful Boarding House Near University",
-  "description": "Fully furnished boarding house with modern amenities. Located 2km from Colombo University. Perfect for students and young professionals.",
+  "description": "Fully furnished boarding house with modern amenities. Located near SLIIT. Perfect for students and young professionals.",
   "city": "Colombo",
   "district": "Colombo",
   "address": "123 Main Street, Colombo 7",
   "monthlyRent": 15000,
   "boardingType": "SHARED_ROOM",
   "genderPref": "ANY",
-  "nearUniversity": "Colombo University",
+  "nearUniversity": "SLIIT",
   "latitude": 6.9124,
   "longitude": 80.7701,
   "maxOccupants": 3,
@@ -628,14 +628,14 @@ Content-Type: application/json
       },
       "title": "Beautiful Boarding House Near University",
       "slug": "beautiful-boarding-house-near-university",
-      "description": "Fully furnished boarding house with modern amenities. Located 2km from Colombo University. Perfect for students and young professionals.",
+      "description": "Fully furnished boarding house with modern amenities. Located near SLIIT. Perfect for students and young professionals.",
       "city": "Colombo",
       "district": "Colombo",
       "address": "123 Main Street, Colombo 7",
       "monthlyRent": 15000,
       "boardingType": "SHARED_ROOM",
       "genderPref": "ANY",
-      "nearUniversity": "Colombo University",
+      "nearUniversity": "SLIIT",
       "latitude": 6.9124,
       "longitude": 80.7701,
       "maxOccupants": 3,
@@ -687,6 +687,7 @@ Content-Type: application/json
 
 **Business Logic:**
 - Creates boarding with initial status: `DRAFT`
+- Initial owner onboarding flow is SLIIT-focused (UI guidance)
 - Generates unique slug from title (auto-incremented if duplicate)
 - Creates associated amenity and rule records
 - Validates that `currentOccupants` does not exceed `maxOccupants`

@@ -351,10 +351,6 @@ export default function BoardingDetailsScreen() {
                   latitudeDelta: 0.015,
                   longitudeDelta: 0.015,
                 }}
-                cameraBoundary={{
-                  northEast: { latitude: 7.035961932644662, longitude: 80.19100325001236 },
-                  southWest: { latitude: 6.8302835564392455, longitude: 79.89361663337401 },
-                }}
                 minZoomLevel={14}
                 maxZoomLevel={18}
                 scrollEnabled={false}
@@ -370,7 +366,12 @@ export default function BoardingDetailsScreen() {
               </MapView>
               <TouchableOpacity
                 style={styles.mapExpandBtn}
-                onPress={() => router.push('/explore/map' as never)}
+                onPress={() =>
+                  router.push({
+                    pathname: '/explore/map' as never,
+                    params: { selectedSlug: boarding.slug },
+                  })
+                }
                 activeOpacity={0.85}
               >
                 <Ionicons name="expand-outline" size={16} color={COLORS.white} />
@@ -386,7 +387,12 @@ export default function BoardingDetailsScreen() {
           ) : (
             <TouchableOpacity
               style={styles.mapCard}
-              onPress={() => router.push('/explore/map' as never)}
+              onPress={() =>
+                router.push({
+                  pathname: '/explore/map' as never,
+                  params: { selectedSlug: boarding.slug },
+                })
+              }
               activeOpacity={0.85}
             >
               <View style={styles.mapIconWrap}>
@@ -509,7 +515,12 @@ export default function BoardingDetailsScreen() {
       <View style={styles.fabContainer}>
         <TouchableOpacity
           style={[styles.fab, styles.fabSecondary]}
-          onPress={() => router.push('/explore/map' as never)}
+          onPress={() =>
+            router.push({
+              pathname: '/explore/map' as never,
+              params: { selectedSlug: boarding.slug },
+            })
+          }
           activeOpacity={0.85}
         >
           <Ionicons name="map-outline" size={20} color={COLORS.primary} />

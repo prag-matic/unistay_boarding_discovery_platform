@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getMyReservations, getRentalPeriods, cancelReservation } from '@/lib/reservation';
 import { COLORS } from '@/lib/constants';
+import { getErrorMessage } from '@/utils/helpers';
 import type { Reservation, RentalPeriod, ReservationStatus, RentalPeriodStatus } from '@/types/reservation.types';
 
 const RES_STATUS_COLORS: Record<ReservationStatus, string> = {
@@ -127,10 +128,7 @@ function ReservationCard({
               const result = await cancelReservation(item.id);
               onCancelled(result.data.reservation);
             } catch (err: unknown) {
-              const message =
-                (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-                'Failed to cancel reservation.';
-              Alert.alert('Error', message);
+              Alert.alert('Error', getErrorMessage(err));
             } finally {
               setCancelling(false);
             }

@@ -20,7 +20,7 @@ export const useBoardingStore = create<BoardingState>((set, get) => ({
   savedIds: [],
   filters: {},
   sortOption: 'RELEVANCE',
-  createDraft: {},
+  createDraft: { nearUniversity: 'SLIIT' },
 
   toggleSaved: (id) => {
     const { savedIds } = get();
@@ -41,5 +41,5 @@ export const useBoardingStore = create<BoardingState>((set, get) => ({
 
   setCreateDraft: (data) =>
     set((state) => ({ createDraft: { ...state.createDraft, ...data } })),
-  clearCreateDraft: () => set({ createDraft: {} }),
+  clearCreateDraft: () => set({ createDraft: { nearUniversity: 'SLIIT' } }),
 }));
