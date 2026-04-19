@@ -214,6 +214,11 @@ Detailed backend API specs are available in:
 - `backend/docs/VISIT_REQUEST_API_DOCUMENTATION.md`
 - `backend/docs/MARKETPLACE_API_DOCUMENTATION.md`
 
+Testing documentation:
+
+- `backend/docs/TESTING_GUIDE.md`
+- `backend/docs/CONTROLLER_COVERAGE_SNAPSHOT.md`
+
 Mobile-side mirrored docs are available under `frontend/api_docs/`.
 
 ---
