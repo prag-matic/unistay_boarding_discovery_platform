@@ -6,6 +6,9 @@ WORKDIR /app
 ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
+# Set default port for Bun
+ENV PORT=3000
+
 # Copy package files and install dependencies
 COPY package.json pnpm-lock.yaml* ./
 RUN bun install
@@ -18,4 +21,4 @@ RUN bun run build
 EXPOSE 3000
 
 # Serve the static files using Bun's built-in SPA support
-CMD ["bun", "dist/index.html", "--host", "0.0.0.0", "--port", "3000"]
+CMD ["bun", "dist/index.html", "--host", "0.0.0.0"]
