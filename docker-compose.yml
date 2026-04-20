@@ -1,11 +1,31 @@
 services:
+  traefik:
+    image: traefik:v3.6
+    container_name: unistay_traefik
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.file.filename=/etc/traefik/traefik-dynamic.yml"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      # Redirect HTTP to HTTPS
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik-dynamic.yml:/etc/traefik/traefik-dynamic.yml:ro
+      - ./certs:/etc/traefik/certs:ro
+    networks:
+      - unistay-net
+
   backend:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
     container_name: unistay_backend
-    ports:
-      - "${PORT}:${PORT}"
     environment:
       - NODE_ENV=development
       - PORT=${PORT}
@@ -20,14 +40,36 @@ services:
         condition: service_started
     command: pnpm run dev
     volumes:
-      - .:/app
+      - ./backend:/app
       - /app/node_modules
+    networks:
+      - unistay-net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=Host(`unistay.mrbhanuka.dev`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.tls=true"
+      - "traefik.http.services.backend.loadbalancer.server.port=${PORT}"
+
+  admin:
+    build:
+      context: ./admin
+      dockerfile: Dockerfile
+    container_name: unistay_admin
+    env_file:
+      - .env
+    networks:
+      - unistay-net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.admin.rule=Host(`unistay.mrbhanuka.dev`) && PathPrefix(`/admin`)"
+      - "traefik.http.routers.admin.entrypoints=websecure"
+      - "traefik.http.routers.admin.tls=true"
+      - "traefik.http.services.admin.loadbalancer.server.port=3000"
 
   mongodb:
     image: mongo:7
     container_name: unistay_mongodb
-    ports:
-      - "27017:27017"
     env_file:
       - .env
     volumes:
@@ -37,13 +79,12 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - unistay-net
 
   minio:
     image: minio/minio:latest
     container_name: unistay_minio
-    ports:
-      - "9000:9000"
-      - "9001:9001"
     env_file:
       - .env
     volumes:
@@ -54,6 +95,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - unistay-net
 
   create-bucket:
     image: minio/mc:latest
@@ -68,12 +111,12 @@ services:
       mc anonymous set download myminio/${MINIO_BUCKET} || exit 0;
       exit 0;
       "
+    networks:
+      - unistay-net
 
   openinary:
     image: openinary/openinary:latest
     container_name: unistay_openinary
-    ports:
-      - "3001:3001"
     environment:
       - STORAGE_REGION=${MINIO_REGION}
       - STORAGE_ACCESS_KEY_ID=${MINIO_ROOT_USER}
@@ -94,6 +137,12 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+    networks:
+      - unistay-net
+
+networks:
+  unistay-net:
+    name: unistay-net
 
 volumes:
   mongodb_data:
