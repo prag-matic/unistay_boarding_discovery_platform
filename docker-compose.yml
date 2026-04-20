@@ -65,7 +65,7 @@ services:
         - VITE_API_BASE_URL=https://backend.unistay.mrbhanuka.dev/api
     container_name: unistay_admin
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -146,7 +146,13 @@ services:
     volumes:
       - openinary_db:/app/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001"]
+      test:
+        [
+          "CMD",
+          "python3",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:3001')",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
