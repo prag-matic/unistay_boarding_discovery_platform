@@ -400,24 +400,28 @@ export default function CreateStep5Screen() {
       </ScrollView>
 
       <View style={styles.footer}>
-        <TouchableOpacity
-          style={[styles.draftBtn, isSubmitting && styles.btnDisabled]}
-          onPress={handleSaveDraft}
-          disabled={isSubmitting}
-        >
-          <Text style={styles.draftBtnText}>Save Draft</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.submitBtn, isSubmitting && styles.btnDisabled]}
-          onPress={handleSubmit}
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? (
-            <ActivityIndicator color={COLORS.white} />
-          ) : (
-            <Text style={styles.submitBtnText}>Submit for Approval</Text>
-          )}
-        </TouchableOpacity>
+        <View style={styles.footerRow}>
+          <TouchableOpacity
+            style={[styles.draftBtn, isSubmitting && styles.btnDisabled]}
+            onPress={handleSaveDraft}
+            disabled={isSubmitting}
+          >
+            <Text style={styles.draftBtnText}>Save Draft</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.footerRow}>
+          <TouchableOpacity
+            style={[styles.submitBtn, isSubmitting && styles.btnDisabled]}
+            onPress={handleSubmit}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator color={COLORS.white} />
+            ) : (
+              <Text style={styles.submitBtnText}>Submit for Approval</Text>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Success Modal */}
@@ -577,12 +581,15 @@ const styles = StyleSheet.create({
   thumbRow: { flexDirection: 'row', gap: 8, marginTop: 6 },
   thumb: { width: 64, height: 64, borderRadius: 8 },
   footer: {
-    flexDirection: 'row',
-    gap: 12,
+    gap: 10,
     padding: 16,
     backgroundColor: COLORS.white,
     borderTopWidth: 1,
     borderTopColor: COLORS.grayBorder,
+  },
+  footerRow: {
+    flexDirection: 'row',
+    gap: 12,
   },
   draftBtn: {
     flex: 1,
@@ -595,7 +602,7 @@ const styles = StyleSheet.create({
   },
   draftBtnText: { fontSize: 15, fontWeight: '600', color: COLORS.text },
   submitBtn: {
-    flex: 2,
+    flex: 1,
     height: 50,
     borderRadius: 12,
     backgroundColor: COLORS.primary,

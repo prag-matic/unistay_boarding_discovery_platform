@@ -543,22 +543,13 @@ export default function BoardingDetailsScreen() {
       {/* ── Sticky Footer ── */}
       <View style={styles.footer}>
         {isOwnListing ? (
-          <>
-            <TouchableOpacity
-              style={[styles.footerBtn, styles.footerBtnSecondary]}
-              onPress={() => router.push(`/my-listings/${boarding.id}/analytics` as never)}
-            >
-              <Ionicons name="bar-chart-outline" size={16} color={COLORS.primary} />
-              <Text style={styles.footerBtnSecondaryText}>Analytics</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.footerBtn, styles.footerBtnPrimary]}
-              onPress={() => router.push(`/my-listings/${boarding.id}/edit` as never)}
-            >
-              <Ionicons name="create-outline" size={16} color={COLORS.white} />
-              <Text style={styles.footerBtnPrimaryText}>Edit Listing</Text>
-            </TouchableOpacity>
-          </>
+          <TouchableOpacity
+            style={[styles.footerBtn, styles.footerBtnPrimary]}
+            onPress={() => router.push(`/my-listings/${boarding.id}/edit` as never)}
+          >
+            <Ionicons name="create-outline" size={16} color={COLORS.white} />
+            <Text style={styles.footerBtnPrimaryText}>Edit Listing</Text>
+          </TouchableOpacity>
         ) : (
           <>
             {!isOwner && (

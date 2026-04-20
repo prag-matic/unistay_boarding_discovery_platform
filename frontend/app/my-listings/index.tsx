@@ -14,7 +14,7 @@ import {
 import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getMyListings, deactivateBoarding, activateBoarding, archiveBoarding, restoreBoarding, getBoardingLifecycleSpec } from '@/lib/boarding';
+import { getMyListings, deactivateBoarding, activateBoarding, archiveBoarding, restoreBoarding, deleteBoarding, getBoardingLifecycleSpec } from '@/lib/boarding';
 import { COLORS } from '@/lib/constants';
 import type { Boarding, BoardingStatus } from '@/types/boarding.types';
 import { getOwnerListingActions } from '@/lib/boarding-lifecycle';
@@ -164,6 +164,33 @@ export default function MyListingsScreen() {
     ]);
   };
 
+  const handleDeleteDraft = (boarding: Boarding) => {
+    if (boarding.status !== 'DRAFT') {
+      Alert.alert('Not allowed', 'Only draft listings can be permanently deleted.');
+      return;
+    }
+
+    Alert.alert(
+      'Delete Draft Listing',
+      `Delete "${boarding.title}" permanently? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteBoarding(boarding.id);
+              setListings((prev) => prev.filter((b) => b.id !== boarding.id));
+            } catch {
+              Alert.alert('Error', 'Failed to delete the draft listing. Please try again.');
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const closeActionDrawer = () => {
     setIsActionDrawerVisible(false);
     setSelectedListing(null);
@@ -193,6 +220,9 @@ export default function MyListingsScreen() {
     if (available.canArchive) {
       actions.push({ key: 'archive', text: 'Archive', icon: 'archive-outline', destructive: true, onPress: () => handleArchive(boarding) });
     }
+    if (available.canDelete) {
+      actions.push({ key: 'delete', text: 'Delete Draft', icon: 'trash-outline', destructive: true, onPress: () => handleDeleteDraft(boarding) });
+    }
     return actions;
   };
 
@@ -201,8 +231,10 @@ export default function MyListingsScreen() {
   const renderItem = ({ item }: { item: Boarding }) => {
     const primaryImage = item.images[0];
     const available = getOwnerListingActions(item.status, lifecycleTransitions);
-    return (
-      <View style={styles.card}>
+    const isActiveListing = item.status === 'ACTIVE' && !item.isDeleted;
+
+    const cardContent = (
+      <>
         <View style={styles.cardImageContainer}>
           {primaryImage ? (
             <Image source={{ uri: primaryImage.url }} style={styles.cardImage} />
@@ -243,15 +275,6 @@ export default function MyListingsScreen() {
                 <Text style={styles.editBtnText}>Edit</Text>
               </TouchableOpacity>
             )}
-            {!item.isDeleted && (
-              <TouchableOpacity
-                style={styles.analyticsBtn}
-                onPress={() => router.push(`/my-listings/${item.id}/analytics` as never)}
-              >
-                <Ionicons name="bar-chart-outline" size={14} color={COLORS.white} />
-                <Text style={styles.analyticsBtnText}>Analytics</Text>
-              </TouchableOpacity>
-            )}
             {item.isDeleted && (
               <TouchableOpacity
                 style={styles.restoreBtn}
@@ -263,7 +286,21 @@ export default function MyListingsScreen() {
             )}
           </View>
         </View>
-      </View>
+      </>
+    );
+
+    return (
+      isActiveListing ? (
+        <TouchableOpacity
+          style={styles.card}
+          activeOpacity={0.9}
+          onPress={() => router.push(`/boardings/${item.slug}` as never)}
+        >
+          {cardContent}
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.card}>{cardContent}</View>
+      )
     );
   };
 
@@ -447,16 +484,6 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   editBtnText: { fontSize: 12, color: COLORS.primary, fontWeight: '600' },
-  analyticsBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    borderRadius: 8,
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  analyticsBtnText: { fontSize: 12, color: COLORS.white, fontWeight: '600' },
   restoreBtn: {
     flexDirection: 'row',
     alignItems: 'center',
