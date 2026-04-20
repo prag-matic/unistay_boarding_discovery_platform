@@ -129,6 +129,12 @@ export async function updateBoarding(id: string, payload: UpdateBoardingPayload)
   return response.data;
 }
 
+export async function deleteBoarding(id: string) {
+  logger.boarding.debug('deleteBoarding', { id });
+  const response = await api.delete<UniStayApiResponse<{ id: string }>>(`/boardings/${id}`);
+  return response.data;
+}
+
 export async function submitBoardingForApproval(id: string) {
   logger.boarding.debug('submitBoardingForApproval', { id });
   const response = await api.patch<UniStayApiResponse<{ boarding: Boarding }>>(
