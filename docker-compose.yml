@@ -27,7 +27,7 @@ services:
       dockerfile: Dockerfile
     container_name: unistay_backend
     environment:
-      - PORT=${PORT}
+      - PORT=4001
       - OPENINARY_PUBLIC_URL=https://unistay.mrbhanuka.dev/openinary
     env_file:
       - .env
@@ -54,8 +54,8 @@ services:
       context: ./admin
       dockerfile: Dockerfile
     container_name: unistay_admin
-    env_file:
-      - .env
+    environment:
+      - PORT=4002
     networks:
       - unistay-net
     labels:
@@ -63,7 +63,7 @@ services:
       - "traefik.http.routers.admin.rule=Host(`unistay.mrbhanuka.dev`) && PathPrefix(`/admin`)"
       - "traefik.http.routers.admin.entrypoints=websecure"
       - "traefik.http.routers.admin.tls=true"
-      - "traefik.http.services.admin.loadbalancer.server.port=3000"
+      - "traefik.http.services.admin.loadbalancer.server.port=${PORT}"
 
   mongodb:
     image: mongo:7
