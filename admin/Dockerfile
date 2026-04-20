@@ -11,7 +11,7 @@ COPY . .
 RUN bun run build
 
 # Expose the port Bun will serve on
-EXPOSE 3000
+EXPOSE ${PORT}
 
 # Serve the static files using Bun's built-in SPA support
-CMD ["bun", "dist/index.html", "--port", "$PORT", "--host", "0.0.0.0"]
+CMD ["bun", "dist/index.html", "--host", "0.0.0.0"]
