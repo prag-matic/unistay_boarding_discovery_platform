@@ -3,6 +3,8 @@ services:
     image: traefik:v3.6
     container_name: unistay_traefik
     command:
+      - "--log.level=DEBUG"
+      - "--accesslog=true"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
@@ -46,6 +48,7 @@ services:
       - "traefik.http.routers.backend.tls=true"
       - "traefik.http.routers.backend.tls.certresolver=unistay-resolver"
       - "traefik.http.services.backend.loadbalancer.server.port=3000"
+      - "traefik.docker.network=unistay-backend"
 
   admin:
     build:
@@ -63,6 +66,7 @@ services:
       - "traefik.http.routers.admin.tls=true"
       - "traefik.http.routers.admin.tls.certresolver=unistay-resolver"
       - "traefik.http.services.admin.loadbalancer.server.port=3000"
+      - "traefik.docker.network=unistay-admin"
 
   mongodb:
     image: mongo:7
@@ -129,7 +133,7 @@ services:
     volumes:
       - openinary_db:/app/data
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3001"]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -142,7 +146,8 @@ services:
       - "traefik.http.routers.openinary.entrypoints=websecure"
       - "traefik.http.routers.openinary.tls=true"
       - "traefik.http.routers.openinary.tls.certresolver=unistay-resolver"
-      - "traefik.http.services.openinary.loadbalancer.server.port=3001"
+      - "traefik.http.services.openinary.loadbalancer.server.port=3000"
+      - "traefik.docker.network=unistay-openinary"
 
 networks:
   unistay-backend:
