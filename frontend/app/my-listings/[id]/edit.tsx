@@ -103,6 +103,7 @@ export default function EditBoardingScreen() {
   const [boarding, setBoarding] = useState<Boarding | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const mapRef = useRef<MapView>(null);
   const { pending, clearPending } = useLocationPickerStore();
 
@@ -205,6 +206,7 @@ export default function EditBoardingScreen() {
   const isLocked = boarding?.status === 'ACTIVE';
   const ownerActions = boarding ? getOwnerListingActions(boarding.status, lifecycleTransitions) : null;
   const totalImages = existingImages.filter((img) => !deletedImageIds.includes(img.id)).length + newImageUris.length;
+  const canSubmitForApproval = Boolean(boarding && ownerActions?.canSubmit && !isLocked);
 
   // Apply coordinates returned from the location picker
   useFocusEffect(
@@ -309,7 +311,7 @@ export default function EditBoardingScreen() {
     return true;
   };
 
-  const doSave = async () => {
+  const doSave = async (options?: { submitAfterSave?: boolean }) => {
     if (!boarding) {
       logger.boarding.warn('Save aborted: boarding is null');
       return;
@@ -339,11 +341,16 @@ export default function EditBoardingScreen() {
 
     logger.boarding.debug('Save start', {
       boardingId: boarding.id,
+      submitAfterSave: Boolean(options?.submitAfterSave),
       deletedImageIdsCount: deletedImageIds.length,
       newImageUrisCount: newImageUris.length,
     });
 
-    setIsSaving(true);
+    if (options?.submitAfterSave) {
+      setIsSubmitting(true);
+    } else {
+      setIsSaving(true);
+    }
     try {
       if (isLocked) {
         logger.boarding.debug('Deactivating boarding before edit', { boardingId: boarding.id });
@@ -378,13 +385,18 @@ export default function EditBoardingScreen() {
         logger.boarding.debug('Image upload success');
       }
 
-      if (isLocked) {
+      const shouldSubmitForApproval = isLocked || Boolean(options?.submitAfterSave);
+
+      if (shouldSubmitForApproval) {
         logger.boarding.debug('Submitting for approval', { updatedId });
-        await submitBoardingForApproval(updatedId);
+        const submitResult = await submitBoardingForApproval(updatedId);
         logger.boarding.debug('submitBoardingForApproval success');
+        setBoarding(submitResult.data.boarding);
         Alert.alert(
-          'Resubmitted',
-          'Your changes have been saved and the listing has been submitted for re-review.',
+          isLocked ? 'Resubmitted' : 'Submitted for Approval',
+          isLocked
+            ? 'Your changes have been saved and the listing has been submitted for re-review.'
+            : 'Your changes have been saved and the listing has been submitted for approval.',
           [{ text: 'OK', onPress: () => router.back() }],
         );
       } else {
@@ -405,6 +417,7 @@ export default function EditBoardingScreen() {
     } finally {
       logger.boarding.debug('Save finished');
       setIsSaving(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -421,6 +434,23 @@ export default function EditBoardingScreen() {
       return;
     }
     doSave();
+  };
+
+  const handleSubmitForApproval = () => {
+    if (!boarding) return;
+    if (!ownerActions?.canSubmit) {
+      Alert.alert('Not allowed', 'This listing cannot be submitted for approval in its current status.');
+      return;
+    }
+
+    Alert.alert(
+      'Submit for Approval',
+      'Save your changes and submit this listing for admin approval?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Submit', onPress: () => void doSave({ submitAfterSave: true }) },
+      ],
+    );
   };
 
   if (isLoading) {
@@ -822,20 +852,37 @@ export default function EditBoardingScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.cancelBtn} onPress={() => router.back()}>
-          <Text style={styles.cancelBtnText}>Cancel</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.saveBtn, isSaving && styles.saveBtnDisabled]}
-          onPress={handleSave}
-          disabled={isSaving}
-        >
-          {isSaving ? (
-            <ActivityIndicator size="small" color={COLORS.white} />
-          ) : (
-            <Text style={styles.saveBtnText}>{isLocked ? 'Save & Resubmit' : 'Save Changes'}</Text>
-          )}
-        </TouchableOpacity>
+        <View style={styles.footerRow}>
+          <TouchableOpacity style={styles.cancelBtn} onPress={() => router.back()}>
+            <Text style={styles.cancelBtnText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.saveBtn, isSaving && styles.saveBtnDisabled]}
+            onPress={handleSave}
+            disabled={isSaving || isSubmitting}
+          >
+            {isSaving ? (
+              <ActivityIndicator size="small" color={COLORS.white} />
+            ) : (
+              <Text style={styles.saveBtnText}>{isLocked ? 'Save & Resubmit' : 'Save Changes'}</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+        {canSubmitForApproval && (
+          <View style={styles.footerRow}>
+            <TouchableOpacity
+              style={[styles.submitBtn, isSubmitting && styles.saveBtnDisabled]}
+              onPress={handleSubmitForApproval}
+              disabled={isSaving || isSubmitting}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator size="small" color={COLORS.white} />
+              ) : (
+                <Text style={styles.submitBtnText}>Submit for Approval</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -1098,12 +1145,15 @@ const styles = StyleSheet.create({
   noImagesHintText: { fontSize: 13, color: COLORS.gray, textAlign: 'center' },
   // Footer
   footer: {
-    flexDirection: 'row',
-    gap: 12,
+    gap: 10,
     padding: 16,
     backgroundColor: COLORS.white,
     borderTopWidth: 1,
     borderTopColor: COLORS.grayBorder,
+  },
+  footerRow: {
+    flexDirection: 'row',
+    gap: 12,
   },
   cancelBtn: {
     flex: 1,
@@ -1116,7 +1166,7 @@ const styles = StyleSheet.create({
   },
   cancelBtnText: { fontSize: 15, fontWeight: '600', color: COLORS.text },
   saveBtn: {
-    flex: 2,
+    flex: 1,
     height: 50,
     borderRadius: 12,
     backgroundColor: COLORS.primary,
@@ -1124,5 +1174,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   saveBtnText: { fontSize: 15, fontWeight: '700', color: COLORS.white },
+  submitBtn: {
+    flex: 1,
+    height: 50,
+    borderRadius: 12,
+    backgroundColor: COLORS.green,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submitBtnText: { fontSize: 14, fontWeight: '700', color: COLORS.white },
   saveBtnDisabled: { opacity: 0.7 },
 });

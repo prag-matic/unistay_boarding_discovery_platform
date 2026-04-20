@@ -5,6 +5,7 @@ type TransitionSpec = Record<string, { allowedFrom: BoardingStatus[]; actorRoles
 export interface OwnerListingActions {
   canEdit: boolean;
   canSubmit: boolean;
+  canDelete: boolean;
   canDeactivate: boolean;
   canActivate: boolean;
   canArchive: boolean;
@@ -13,6 +14,10 @@ export interface OwnerListingActions {
 const FALLBACK_TRANSITIONS: TransitionSpec = {
   OWNER_UPDATE: {
     allowedFrom: ['DRAFT', 'REJECTED', 'INACTIVE', 'ACTIVE'],
+    actorRoles: ['OWNER'],
+  },
+  OWNER_DELETE: {
+    allowedFrom: ['DRAFT'],
     actorRoles: ['OWNER'],
   },
   OWNER_SUBMIT: {
@@ -51,6 +56,7 @@ export function getOwnerListingActions(
   return {
     canEdit: canOwnerPerform('OWNER_UPDATE', status, transitions),
     canSubmit: canOwnerPerform('OWNER_SUBMIT', status, transitions),
+    canDelete: canOwnerPerform('OWNER_DELETE', status, transitions),
     canDeactivate: canOwnerPerform('OWNER_DEACTIVATE', status, transitions),
     canActivate: canOwnerPerform('OWNER_REACTIVATE', status, transitions),
     canArchive: canOwnerPerform('OWNER_ARCHIVE', status, transitions),
