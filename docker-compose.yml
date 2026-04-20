@@ -5,21 +5,25 @@ services:
     command:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
-      - "--providers.file.filename=/etc/traefik/traefik-dynamic.yml"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
-      # Redirect HTTP to HTTPS
+      # Global HTTP to HTTPS redirect
       - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
       - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      # Let's Encrypt TLS Challenge configuration
+      - "--certificatesresolvers.unistay-resolver.acme.tlschallenge=true"
+      - "--certificatesresolvers.unistay-resolver.acme.email=unistay@mrbhanuka.dev"
+      - "--certificatesresolvers.unistay-resolver.acme.storage=/letsencrypt/acme.json"
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./traefik-dynamic.yml:/etc/traefik/traefik-dynamic.yml:ro
-      - ./certs:/etc/traefik/certs:ro
+      - ./letsencrypt:/letsencrypt
     networks:
-      - unistay-net
+      - unistay-backend
+      - unistay-admin
+      - unistay-openinary
 
   backend:
     build:
@@ -27,43 +31,38 @@ services:
       dockerfile: Dockerfile
     container_name: unistay_backend
     environment:
-      - PORT=4001
-      - OPENINARY_PUBLIC_URL=https://unistay.mrbhanuka.dev/openinary
+      - OPENINARY_PUBLIC_URL=https://openinary.unistay.mrbhanuka.dev
     env_file:
       - .env
     depends_on:
       mongodb:
         condition: service_healthy
-      minio:
-        condition: service_healthy
-      openinary:
-        condition: service_started
     networks:
-      - unistay-net
+      - unistay-backend
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.backend.rule=Host(`unistay.mrbhanuka.dev`) && PathPrefix(`/backend`)"
+      - "traefik.http.routers.backend.rule=Host(`backend.unistay.mrbhanuka.dev`)"
       - "traefik.http.routers.backend.entrypoints=websecure"
       - "traefik.http.routers.backend.tls=true"
-      - "traefik.http.routers.backend.middlewares=backend-strip"
-      - "traefik.http.middlewares.backend-strip.stripprefix.prefixes=/backend"
-      - "traefik.http.services.backend.loadbalancer.server.port=4001"
+      - "traefik.http.routers.backend.tls.certresolver=unistay-resolver"
+      - "traefik.http.services.backend.loadbalancer.server.port=3000"
 
   admin:
     build:
       context: ./admin
       dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=https://backend.unistay.mrbhanuka.dev/api
     container_name: unistay_admin
-    environment:
-      - PORT=4002
     networks:
-      - unistay-net
+      - unistay-admin
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.admin.rule=Host(`unistay.mrbhanuka.dev`) && PathPrefix(`/admin`)"
+      - "traefik.http.routers.admin.rule=Host(`admin.unistay.mrbhanuka.dev`)"
       - "traefik.http.routers.admin.entrypoints=websecure"
       - "traefik.http.routers.admin.tls=true"
-      - "traefik.http.services.admin.loadbalancer.server.port=4002"
+      - "traefik.http.routers.admin.tls.certresolver=unistay-resolver"
+      - "traefik.http.services.admin.loadbalancer.server.port=3000"
 
   mongodb:
     image: mongo:7
@@ -78,7 +77,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - unistay-net
+      - unistay-backend
 
   minio:
     image: minio/minio:latest
@@ -94,7 +93,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - unistay-net
+      - unistay-openinary
 
   create-bucket:
     image: minio/mc:latest
@@ -110,7 +109,7 @@ services:
       exit 0;
       "
     networks:
-      - unistay-net
+      - unistay-openinary
 
   openinary:
     image: openinary/openinary:latest
@@ -121,7 +120,7 @@ services:
       - STORAGE_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
       - STORAGE_BUCKET_NAME=${MINIO_BUCKET}
       - STORAGE_ENDPOINT=http://minio:9000
-      - BETTER_AUTH_URL=http://localhost:3001
+      - BETTER_AUTH_URL=https://openinary.unistay.mrbhanuka.dev
     depends_on:
       minio:
         condition: service_healthy
@@ -130,25 +129,28 @@ services:
     volumes:
       - openinary_db:/app/data
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3002"]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3001"]
       interval: 10s
       timeout: 5s
       retries: 3
       start_period: 15s
     networks:
-      - unistay-net
+      - unistay-openinary
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.openinary.rule=Host(`unistay.mrbhanuka.dev`) && PathPrefix(`/openinary`)"
+      - "traefik.http.routers.openinary.rule=Host(`openinary.unistay.mrbhanuka.dev`)"
       - "traefik.http.routers.openinary.entrypoints=websecure"
       - "traefik.http.routers.openinary.tls=true"
-      - "traefik.http.routers.openinary.middlewares=openinary-strip"
-      - "traefik.http.middlewares.openinary-strip.stripprefix.prefixes=/openinary"
+      - "traefik.http.routers.openinary.tls.certresolver=unistay-resolver"
       - "traefik.http.services.openinary.loadbalancer.server.port=3001"
 
 networks:
-  unistay-net:
-    name: unistay-net
+  unistay-backend:
+    name: unistay-backend
+  unistay-admin:
+    name: unistay-admin
+  unistay-openinary:
+    name: unistay-openinary
 
 volumes:
   mongodb_data:

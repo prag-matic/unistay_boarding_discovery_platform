@@ -2,6 +2,10 @@
 FROM oven/bun:1.3-slim AS base
 WORKDIR /app
 
+# Build-time argument for API URL
+ARG VITE_API_BASE_URL
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+
 # Copy package files and install dependencies
 COPY package.json pnpm-lock.yaml* ./
 RUN bun install
@@ -10,8 +14,8 @@ RUN bun install
 COPY . .
 RUN bun run build
 
-# Expose the port Bun will serve on
-EXPOSE ${PORT}
+# Internal port for SPA serving
+EXPOSE 3000
 
 # Serve the static files using Bun's built-in SPA support
-CMD ["bun", "dist/index.html", "--host", "0.0.0.0"]
+CMD ["bun", "dist/index.html", "--host", "0.0.0.0", "--port", "3000"]
