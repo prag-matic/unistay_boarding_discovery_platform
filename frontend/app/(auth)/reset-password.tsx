@@ -25,7 +25,10 @@ import { getErrorMessage } from '@/utils/helpers';
 type ResetForm = z.infer<typeof resetPasswordSchema>;
 
 export default function ResetPasswordScreen() {
-  const { token } = useLocalSearchParams<{ token: string }>();
+  const params = useLocalSearchParams<{ token?: string | string[]; code?: string | string[] }>();
+  const token = Array.isArray(params.token)
+    ? params.token[0]
+    : params.token ?? (Array.isArray(params.code) ? params.code[0] : params.code);
   const {
     control,
     handleSubmit,
@@ -39,6 +42,11 @@ export default function ResetPasswordScreen() {
   const passwordValue = watch('password');
 
   const onSubmit = async (data: ResetForm) => {
+    if (!token) {
+      Alert.alert('Invalid Link', 'Password reset token is missing. Please request a new reset link.');
+      return;
+    }
+
     try {
       await api.post('/auth/reset-password', { token, password: data.password });
       Alert.alert('Success', 'Your password has been updated.', [
@@ -65,6 +73,20 @@ export default function ResetPasswordScreen() {
           Create a new, strong password for your account. It must be different from
           previously used passwords.
         </Text>
+
+        {!token ? (
+          <View style={styles.invalidTokenCard}>
+            <Text style={styles.invalidTokenText}>
+              This reset link is invalid or missing a token. Please request a new password reset email.
+            </Text>
+            <Button
+              title="Go to Forgot Password"
+              variant="outline"
+              onPress={() => router.replace('/(auth)/forgot-password')}
+              style={styles.invalidTokenBtn}
+            />
+          </View>
+        ) : null}
 
         <Controller
           control={control}
@@ -102,6 +124,7 @@ export default function ResetPasswordScreen() {
           title="Update Password"
           onPress={handleSubmit(onSubmit)}
           loading={isSubmitting}
+          disabled={!token}
           style={styles.updateBtn}
         />
       </ScrollView>
@@ -116,5 +139,20 @@ const styles = StyleSheet.create({
   headerBrand: { fontSize: 18, fontWeight: '700', color: COLORS.primary },
   heading: { fontSize: 26, fontWeight: '700', color: COLORS.text, marginBottom: 12 },
   description: { fontSize: 14, color: COLORS.textSecondary, lineHeight: 22, marginBottom: 24 },
+  invalidTokenCard: {
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1,
+    borderColor: '#FDBA74',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 20,
+  },
+  invalidTokenText: {
+    fontSize: 13,
+    color: '#9A3412',
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  invalidTokenBtn: { height: 44 },
   updateBtn: { marginTop: 8 },
 });

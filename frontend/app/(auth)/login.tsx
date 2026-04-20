@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -26,6 +26,23 @@ type LoginForm = z.infer<typeof loginSchema>;
 
 export default function LoginScreen() {
   const { login, isLoading } = useAuthStore();
+  const { verified } = useLocalSearchParams<{ verified?: string }>();
+  const [showVerifiedBanner, setShowVerifiedBanner] = useState(verified === '1');
+
+  useEffect(() => {
+    if (verified !== '1') {
+      setShowVerifiedBanner(false);
+      return;
+    }
+
+    setShowVerifiedBanner(true);
+    const timer = setTimeout(() => {
+      setShowVerifiedBanner(false);
+      router.replace('/(auth)/login');
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [verified]);
+
   const {
     control,
     handleSubmit,
@@ -63,6 +80,12 @@ export default function LoginScreen() {
           <Text style={styles.logoSubtitle}>
             Find your perfect university home away from home.
           </Text>
+          {showVerifiedBanner ? (
+            <View style={styles.verifiedBanner}>
+              <Ionicons name="checkmark-circle" size={16} color={COLORS.green} />
+              <Text style={styles.verifiedBannerText}>Email verified successfully. Please login.</Text>
+            </View>
+          ) : null}
         </View>
 
         {/* Form */}
@@ -157,6 +180,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
     lineHeight: 20,
+  },
+  verifiedBanner: {
+    marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#D1FAE5',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  verifiedBannerText: {
+    fontSize: 13,
+    color: COLORS.green,
+    fontWeight: '600',
   },
   form: {},
   forgotBtn: { alignSelf: 'flex-end', marginTop: -8, marginBottom: 16 },
