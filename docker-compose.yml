@@ -28,6 +28,7 @@ services:
     container_name: unistay_backend
     environment:
       - PORT=${PORT}
+      - OPENINARY_PUBLIC_URL=https://unistay.mrbhanuka.dev/openinary
     env_file:
       - .env
     depends_on:
@@ -41,9 +42,11 @@ services:
       - unistay-net
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.backend.rule=Host(`unistay.mrbhanuka.dev`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.backend.rule=Host(`unistay.mrbhanuka.dev`) && PathPrefix(`/backend`)"
       - "traefik.http.routers.backend.entrypoints=websecure"
       - "traefik.http.routers.backend.tls=true"
+      - "traefik.http.routers.backend.middlewares=backend-strip"
+      - "traefik.http.middlewares.backend-strip.stripprefix.prefixes=/backend"
       - "traefik.http.services.backend.loadbalancer.server.port=${PORT}"
 
   admin:
@@ -134,6 +137,14 @@ services:
       start_period: 15s
     networks:
       - unistay-net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.openinary.rule=Host(`unistay.mrbhanuka.dev`) && PathPrefix(`/openinary`)"
+      - "traefik.http.routers.openinary.entrypoints=websecure"
+      - "traefik.http.routers.openinary.tls=true"
+      - "traefik.http.routers.openinary.middlewares=openinary-strip"
+      - "traefik.http.middlewares.openinary-strip.stripprefix.prefixes=/openinary"
+      - "traefik.http.services.openinary.loadbalancer.server.port=3001"
 
 networks:
   unistay-net:
