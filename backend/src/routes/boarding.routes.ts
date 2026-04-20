@@ -5,6 +5,7 @@ import {
 	archiveBoarding,
 	createBoarding,
 	deactivateBoarding,
+	deleteBoarding,
 	deleteImage,
 	getBoardingStatusHistory,
 	getBoardingBySlug,
@@ -57,6 +58,14 @@ router.put(
 	validateParams(boardingIdParamSchema),
 	validateBody(updateBoardingSchema),
 	updateBoarding,
+);
+
+router.delete(
+	"/:id",
+	authenticate,
+	requireRole("OWNER"),
+	validateParams(boardingIdParamSchema),
+	deleteBoarding,
 );
 
 router.patch(
