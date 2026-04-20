@@ -20,7 +20,7 @@ import { AuthProvider } from "./auth/AuthContext";
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter basename="/admin">
+      <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route
