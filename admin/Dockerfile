@@ -21,4 +21,4 @@ RUN bun run build
 EXPOSE 3000
 
 # Serve the static files using Bun's built-in SPA support
-CMD ["bun", "dist/index.html", "--host", "0.0.0.0"]
+CMD ["bun", "server.ts"]
