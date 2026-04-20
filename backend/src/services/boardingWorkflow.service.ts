@@ -13,6 +13,14 @@ import {
 	BoardingImage,
 	BoardingRule,
 	BoardingStatusHistory,
+	Issue,
+	Payment,
+	RentalPeriod,
+	Reservation,
+	Review,
+	SavedBoarding,
+	VisitRequest,
+	ChatRoom,
 	type IBoarding,
 } from "@/models/index.js";
 import type { UpdateBoardingInput } from "@/schemas/boarding.validators.js";
@@ -322,6 +330,87 @@ export class BoardingWorkflowService {
 			actorId: ownerId,
 			actorRole: Role.OWNER,
 			expectedOwnerId: ownerId,
+		});
+	}
+
+	async hardDeleteDraft(boardingId: string, ownerId: string): Promise<string[]> {
+		return withMongoTransaction(async (session) => {
+			const existing = await this.getBoardingOrThrow(boardingId, session);
+			if (existing.ownerId.toString() !== ownerId) {
+				throw new ForbiddenError("You do not own this listing");
+			}
+			if (existing.status !== BoardingStatus.DRAFT) {
+				throw new InvalidStateTransitionError(
+					"Only DRAFT listings can be permanently deleted",
+				);
+			}
+
+			const images = (await BoardingImage.find({ boardingId })
+				.session(session)
+				.select("publicId")
+				.lean()) as Array<{ publicId: string }>;
+			const publicIds = images.map((image) => image.publicId);
+
+			const reservations = (await Reservation.find({ boardingId })
+				.session(session)
+				.select("_id")
+				.lean()) as Array<{ _id: mongoose.Types.ObjectId }>;
+			const reservationIds = reservations.map((reservation) => reservation._id);
+
+			await SavedBoarding.deleteMany(
+				{ boardingId },
+				this.getSessionOptions(session),
+			);
+			await Review.deleteMany({ boardingId }, this.getSessionOptions(session));
+			await VisitRequest.deleteMany(
+				{ boardingId },
+				this.getSessionOptions(session),
+			);
+			await Issue.deleteMany({ boardingId }, this.getSessionOptions(session));
+			await ChatRoom.deleteMany({ boardingId }, this.getSessionOptions(session));
+
+			if (reservationIds.length > 0) {
+				await Payment.deleteMany(
+					{ reservationId: { $in: reservationIds } },
+					this.getSessionOptions(session),
+				);
+				await RentalPeriod.deleteMany(
+					{ reservationId: { $in: reservationIds } },
+					this.getSessionOptions(session),
+				);
+			}
+			await Reservation.deleteMany(
+				{ boardingId },
+				this.getSessionOptions(session),
+			);
+
+			await BoardingAmenity.deleteMany(
+				{ boardingId },
+				this.getSessionOptions(session),
+			);
+			await BoardingRule.deleteMany(
+				{ boardingId },
+				this.getSessionOptions(session),
+			);
+			await BoardingStatusHistory.deleteMany(
+				{ boardingId },
+				this.getSessionOptions(session),
+			);
+			await BoardingImage.deleteMany(
+				{ boardingId },
+				this.getSessionOptions(session),
+			);
+
+			const version = existing.__v ?? 0;
+			const deleted = await Boarding.findOneAndDelete({ _id: boardingId, __v: version })
+				.session(session);
+			if (!deleted) {
+				throw new ConflictError(
+					"Boarding was modified by another request. Please retry.",
+				);
+			}
+
+			return publicIds;
 		});
 	}
 
