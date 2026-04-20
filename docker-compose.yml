@@ -47,7 +47,7 @@ services:
       - "traefik.http.routers.backend.tls=true"
       - "traefik.http.routers.backend.middlewares=backend-strip"
       - "traefik.http.middlewares.backend-strip.stripprefix.prefixes=/backend"
-      - "traefik.http.services.backend.loadbalancer.server.port=${PORT}"
+      - "traefik.http.services.backend.loadbalancer.server.port=4001"
 
   admin:
     build:
@@ -63,7 +63,7 @@ services:
       - "traefik.http.routers.admin.rule=Host(`unistay.mrbhanuka.dev`) && PathPrefix(`/admin`)"
       - "traefik.http.routers.admin.entrypoints=websecure"
       - "traefik.http.routers.admin.tls=true"
-      - "traefik.http.services.admin.loadbalancer.server.port=${PORT}"
+      - "traefik.http.services.admin.loadbalancer.server.port=4002"
 
   mongodb:
     image: mongo:7
