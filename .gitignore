@@ -2,3 +2,4 @@ node_modules
 frontend/.expo
 *.pem
 .env
+letsencrypt/
