@@ -80,6 +80,7 @@ const ROUTE_EXPECTATIONS: Array<{ modulePath: string; expected: RouteSignature[]
 			"GET /my-listings",
 			"POST /",
 			"PUT /:id",
+			"DELETE /:id",
 			"PATCH /:id/submit",
 			"PATCH /:id/deactivate",
 			"PATCH /:id/activate",

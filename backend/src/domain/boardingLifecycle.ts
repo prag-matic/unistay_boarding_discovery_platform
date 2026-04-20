@@ -4,6 +4,7 @@ export type LifecycleActor = Role | "SYSTEM";
 
 export type BoardingAction =
 	| "OWNER_UPDATE"
+	| "OWNER_DELETE"
 	| "OWNER_SUBMIT"
 	| "OWNER_DEACTIVATE"
 	| "OWNER_REACTIVATE"
@@ -13,7 +14,7 @@ export type BoardingAction =
 	| "ADMIN_REJECT"
 	| "ADMIN_REOPEN";
 
-export const LIFECYCLE_SPEC_VERSION = "2026-04-07";
+export const LIFECYCLE_SPEC_VERSION = "2026-04-20";
 
 export const BOARDING_LIFECYCLE_POLICY = {
 	activeEditPolicy: "AUTO_UNPUBLISH_AND_REVIEW",
@@ -42,6 +43,10 @@ export const BOARDING_TRANSITIONS: Record<
 			BoardingStatus.INACTIVE,
 			BoardingStatus.ACTIVE,
 		],
+		actorRoles: [Role.OWNER],
+	},
+	OWNER_DELETE: {
+		allowedFrom: [BoardingStatus.DRAFT],
 		actorRoles: [Role.OWNER],
 	},
 	OWNER_SUBMIT: {
