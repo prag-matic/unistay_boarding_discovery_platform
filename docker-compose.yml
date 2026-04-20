@@ -39,6 +39,13 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
+    healthcheck:
+      test:
+        ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - unistay-backend
     labels:
@@ -57,6 +64,12 @@ services:
       args:
         - VITE_API_BASE_URL=https://backend.unistay.mrbhanuka.dev/api
     container_name: unistay_admin
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - unistay-admin
     labels:
@@ -133,10 +146,10 @@ services:
     volumes:
       - openinary_db:/app/data
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000"]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3002"]
       interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 5
       start_period: 15s
     networks:
       - unistay-openinary
@@ -146,7 +159,7 @@ services:
       - "traefik.http.routers.openinary.entrypoints=websecure"
       - "traefik.http.routers.openinary.tls=true"
       - "traefik.http.routers.openinary.tls.certresolver=unistay-resolver"
-      - "traefik.http.services.openinary.loadbalancer.server.port=3000"
+      - "traefik.http.services.openinary.loadbalancer.server.port=3001"
       - "traefik.docker.network=unistay-openinary"
 
 networks:
