@@ -242,6 +242,8 @@ export class BoardingWorkflowService {
 					`Action ${action} does not have a fixed target status`,
 				);
 		}
+
+		throw new InvalidStateTransitionError(`Unsupported action: ${action}`);
 	}
 
 	async updateBoarding(
@@ -335,6 +337,21 @@ export class BoardingWorkflowService {
 
 	async hardDeleteDraft(boardingId: string, ownerId: string): Promise<string[]> {
 		return withMongoTransaction(async (session) => {
+			const deleteManyWithOptionalSession = (
+				model: {
+					deleteMany: (
+						filter: Record<string, unknown>,
+						options?: { session: ClientSession },
+					) => Promise<unknown>;
+				},
+				filter: Record<string, unknown>,
+			) => {
+				if (session) {
+					return model.deleteMany(filter, { session });
+				}
+				return model.deleteMany(filter);
+			};
+
 			const existing = await this.getBoardingOrThrow(boardingId, session);
 			if (existing.ownerId.toString() !== ownerId) {
 				throw new ForbiddenError("You do not own this listing");
@@ -345,65 +362,50 @@ export class BoardingWorkflowService {
 				);
 			}
 
-			const images = (await BoardingImage.find({ boardingId })
-				.session(session)
+			const imagesQuery = BoardingImage.find({ boardingId })
 				.select("publicId")
-				.lean()) as Array<{ publicId: string }>;
+				.lean();
+			if (session) imagesQuery.session(session);
+			const images = (await imagesQuery) as Array<{ publicId: string }>;
 			const publicIds = images.map((image) => image.publicId);
 
-			const reservations = (await Reservation.find({ boardingId })
-				.session(session)
+			const reservationsQuery = Reservation.find({ boardingId })
 				.select("_id")
-				.lean()) as Array<{ _id: mongoose.Types.ObjectId }>;
+				.lean();
+			if (session) reservationsQuery.session(session);
+			const reservations = (await reservationsQuery) as Array<{
+				_id: mongoose.Types.ObjectId;
+			}>;
 			const reservationIds = reservations.map((reservation) => reservation._id);
 
-			await SavedBoarding.deleteMany(
-				{ boardingId },
-				this.getSessionOptions(session),
-			);
-			await Review.deleteMany({ boardingId }, this.getSessionOptions(session));
-			await VisitRequest.deleteMany(
-				{ boardingId },
-				this.getSessionOptions(session),
-			);
-			await Issue.deleteMany({ boardingId }, this.getSessionOptions(session));
-			await ChatRoom.deleteMany({ boardingId }, this.getSessionOptions(session));
+			await deleteManyWithOptionalSession(SavedBoarding, { boardingId });
+			await deleteManyWithOptionalSession(Review, { boardingId });
+			await deleteManyWithOptionalSession(VisitRequest, { boardingId });
+			await deleteManyWithOptionalSession(Issue, { boardingId });
+			await deleteManyWithOptionalSession(ChatRoom, { boardingId });
 
 			if (reservationIds.length > 0) {
-				await Payment.deleteMany(
-					{ reservationId: { $in: reservationIds } },
-					this.getSessionOptions(session),
-				);
-				await RentalPeriod.deleteMany(
-					{ reservationId: { $in: reservationIds } },
-					this.getSessionOptions(session),
-				);
+				await deleteManyWithOptionalSession(Payment, {
+					reservationId: { $in: reservationIds },
+				});
+				await deleteManyWithOptionalSession(RentalPeriod, {
+					reservationId: { $in: reservationIds },
+				});
 			}
-			await Reservation.deleteMany(
-				{ boardingId },
-				this.getSessionOptions(session),
-			);
+			await deleteManyWithOptionalSession(Reservation, { boardingId });
 
-			await BoardingAmenity.deleteMany(
-				{ boardingId },
-				this.getSessionOptions(session),
-			);
-			await BoardingRule.deleteMany(
-				{ boardingId },
-				this.getSessionOptions(session),
-			);
-			await BoardingStatusHistory.deleteMany(
-				{ boardingId },
-				this.getSessionOptions(session),
-			);
-			await BoardingImage.deleteMany(
-				{ boardingId },
-				this.getSessionOptions(session),
-			);
+			await deleteManyWithOptionalSession(BoardingAmenity, { boardingId });
+			await deleteManyWithOptionalSession(BoardingRule, { boardingId });
+			await deleteManyWithOptionalSession(BoardingStatusHistory, { boardingId });
+			await deleteManyWithOptionalSession(BoardingImage, { boardingId });
 
 			const version = existing.__v ?? 0;
-			const deleted = await Boarding.findOneAndDelete({ _id: boardingId, __v: version })
-				.session(session);
+			const deleteBoardingQuery = Boarding.findOneAndDelete({
+				_id: boardingId,
+				__v: version,
+			});
+			if (session) deleteBoardingQuery.session(session);
+			const deleted = await deleteBoardingQuery;
 			if (!deleted) {
 				throw new ConflictError(
 					"Boarding was modified by another request. Please retry.",
