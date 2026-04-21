@@ -308,6 +308,40 @@ const USER_KEY = 'admin.user';
 
 let accessToken: string | null = localStorage.getItem(ACCESS_TOKEN_KEY);
 
+function isLoginRequest(path: string): boolean {
+  return path === '/auth/login';
+}
+
+function decodeJwtPayload(token: string): { exp?: number } | null {
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return null;
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+    return JSON.parse(atob(padded)) as { exp?: number };
+  } catch {
+    return null;
+  }
+}
+
+function isTokenExpired(token: string | null): boolean {
+  if (!token) return false;
+  const payload = decodeJwtPayload(token);
+  if (!payload?.exp) return false;
+  return Date.now() >= payload.exp * 1000;
+}
+
+function redirectToLogin(): void {
+  if (window.location.pathname !== '/login') {
+    window.location.replace('/login');
+  }
+}
+
+function clearSessionAndRedirect(): void {
+  clearAuthSession();
+  redirectToLogin();
+}
+
 function toApiError(status: number, payload: ApiError | null): ApiClientError {
   const error = new Error(payload?.message || 'Request failed') as ApiClientError;
   error.status = status;
@@ -317,12 +351,17 @@ function toApiError(status: number, payload: ApiError | null): ApiClientError {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const shouldAttachAuth = Boolean(accessToken) && !isLoginRequest(path);
+  if (shouldAttachAuth && isTokenExpired(accessToken)) {
+    clearSessionAndRedirect();
+  }
+
   const headers = new Headers(options.headers);
   if (!(options.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
   }
   headers.set('Accept', 'application/json');
-  if (accessToken) {
+  if (accessToken && !isLoginRequest(path)) {
     headers.set('Authorization', `Bearer ${accessToken}`);
   }
 
@@ -359,6 +398,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   if (!response.ok || !payload.success) {
+    if (
+      !isLoginRequest(path) &&
+      (response.status === 401 || response.status === 403) &&
+      accessToken
+    ) {
+      clearSessionAndRedirect();
+    }
     throw toApiError(response.status, (payload as ApiError) ?? null);
   }
 
@@ -395,7 +441,8 @@ export function getStoredAuthUser(): AuthUser | null {
 }
 
 export function hasStoredAccessToken(): boolean {
-  return Boolean(localStorage.getItem(ACCESS_TOKEN_KEY));
+  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+  return Boolean(token) && !isTokenExpired(token);
 }
 
 export const api = {
