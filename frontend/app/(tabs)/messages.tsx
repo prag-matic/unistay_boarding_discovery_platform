@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { COLORS } from "@/lib/constants";
 import logger from "@/lib/logger";
 import { useChatStore } from "@/store/chat.store";
@@ -20,7 +21,7 @@ import { useAuthStore } from "@/store/auth.store";
 import { ChatBubble } from "@/components/chat/ChatBubble";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { IssueBanner } from "@/components/chat/IssueBanner";
-import { CreateChatRoomModal } from "@/components/chat/CreateChatRoomModal";
+
 import {
   ISSUE_BACKGROUND_COLORS,
   ISSUE_BADGE_COLORS,
@@ -34,6 +35,8 @@ import type {
 import { IssueUpgradeModal } from "@/components/chat/IssueUpgradeModal";
 
 export default function MessagesScreen() {
+  const router = useRouter();
+  const { roomId } = useLocalSearchParams<{ roomId?: string }>();
   const { user } = useAuthStore();
   const {
     currentRoom,
@@ -46,13 +49,11 @@ export default function MessagesScreen() {
     loadMessages,
     sendTyping,
     joinRoom,
-    createRoom,
     setCurrentRoom,
     clearChat,
     connectSocket,
     disconnectSocket,
     pendingIssueAnalysis,
-    setPendingIssueAnalysis,
     dismissIssueAnalysis,
     upgradeToIssue,
   } = useChatStore();
@@ -63,8 +64,9 @@ export default function MessagesScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [messageText, setMessageText] = useState("");
   const [isSending, setIsSending] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
+
   const [showChatInterface, setShowChatInterface] = useState(false);
+  const [processedRoomId, setProcessedRoomId] = useState<string | null>(null);
 
   const flatListRef = useRef<FlatList>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -88,13 +90,13 @@ export default function MessagesScreen() {
   const loadChatRooms = async () => {
     setIsLoadingRooms(true);
     try {
-      const { getChatRooms, getRoomIssues } = await import("@/lib/chat");
+      const { getChatRooms, getAllIssues } = await import("@/lib/chat");
       const [roomsResponse, issuesResponse] = await Promise.all([
         getChatRooms(50),
         // Fetch all active issues
         (async () => {
           try {
-            const response = await getRoomIssues("");
+            const response = await getAllIssues(50);
             return response.data.issues;
           } catch {
             return [];
@@ -107,9 +109,17 @@ export default function MessagesScreen() {
 
       // Create a map of room issues (only active ones)
       const issueMap: Record<string, Issue> = {};
-      issues.forEach((issue: Issue) => {
-        if (issue.status === "OPEN" || issue.status === "IN_PROGRESS") {
-          issueMap[issue.roomId] = issue;
+      issues.forEach((issue: any) => {
+        const roomId =
+          typeof issue.roomId === "string"
+            ? issue.roomId
+            : issue.roomId?.id || issue.roomId?._id;
+
+        if (
+          roomId &&
+          (issue.status === "OPEN" || issue.status === "IN_PROGRESS")
+        ) {
+          issueMap[roomId] = issue as Issue;
         }
       });
 
@@ -142,6 +152,17 @@ export default function MessagesScreen() {
     [joinRoom, setCurrentRoom, loadMessages, connectSocket],
   );
 
+  useEffect(() => {
+    if (!roomId || chatRooms.length === 0) return;
+    if (processedRoomId === roomId) return;
+
+    const targetRoom = chatRooms.find((room) => room.id === roomId);
+    if (targetRoom && currentRoom?.id !== targetRoom.id) {
+      setProcessedRoomId(roomId);
+      handleSelectRoom(targetRoom);
+    }
+  }, [roomId, chatRooms, currentRoom?.id, handleSelectRoom, processedRoomId]);
+
   const handleTyping = (text: string) => {
     setMessageText(text);
 
@@ -159,9 +180,12 @@ export default function MessagesScreen() {
   const handleSend = async () => {
     if (!messageText.trim() || isSending) return;
 
-    // If no room, show modal to create room first
+    // New chats must be initiated from Contact Owner / Message Seller entry points
     if (!currentRoom) {
-      setShowCreateModal(true);
+      Alert.alert(
+        "Start a chat from a listing",
+        "Use Contact Owner or Message Seller to begin a new conversation.",
+      );
       return;
     }
 
@@ -189,35 +213,6 @@ export default function MessagesScreen() {
     }
   };
 
-  const handleCreateRoom = async (otherUserId: string) => {
-    try {
-      const boardingId = undefined;
-      const room = await createRoom(otherUserId, boardingId);
-
-      // Set the room immediately to show the chat interface
-      setCurrentRoom(room);
-
-      // Join room and load messages in background
-      await joinRoom(room.id);
-      await loadMessages(room.id);
-
-      // Close modal and show chat interface
-      setShowCreateModal(false);
-      setShowChatInterface(true);
-
-      // Send pending message if exists
-      if (messageText.trim()) {
-        setTimeout(() => handleSend(), 300);
-      }
-    } catch (error: unknown) {
-      Alert.alert(
-        "Error",
-        error instanceof Error ? error.message : "Failed to create chat",
-      );
-      throw error;
-    }
-  };
-
   const handleIssuePress = (issue: Issue) => {
     // Handle issue details if needed
   };
@@ -226,6 +221,8 @@ export default function MessagesScreen() {
     clearChat();
     setShowChatInterface(false);
     setMessageText("");
+    setProcessedRoomId(null);
+    router.setParams({ roomId: "" });
     loadChatRooms();
   };
 
@@ -277,70 +274,38 @@ export default function MessagesScreen() {
               {otherUser.firstName} {otherUser.lastName}
             </Text>
 
+            {lastMessage && (
+              <View style={styles.lastMessageRow}>
+                <Text style={styles.lastMessage} numberOfLines={1}>
+                  {lastMessage.content}
+                </Text>
+                <Text style={styles.time}>{timeAgo}</Text>
+              </View>
+            )}
+
             {hasIssue ? (
               <View style={styles.issueInfo}>
                 <View style={styles.issueRow}>
-                  <Ionicons name="warning" size={12} color={COLORS.primary} />
                   <Text style={styles.issueTitle} numberOfLines={1}>
-                    {activeIssue.title}
+                    {activeIssue.priority === "URGENT"
+                      ? "🔴 "
+                      : activeIssue.priority === "HIGH"
+                        ? "🟠 "
+                        : activeIssue.priority === "MEDIUM"
+                          ? "🟡 "
+                          : "🔵 "}
+                    Issue: {activeIssue.title}
                   </Text>
-                </View>
-                <View style={styles.issueBadges}>
-                  <View
-                    style={[
-                      styles.issueBadge,
-                      {
-                        backgroundColor:
-                          ISSUE_BADGE_COLORS[activeIssue.category]?.bg ||
-                          COLORS.gray,
-                      },
-                    ]}
-                  >
-                    <Text style={styles.issueBadgeText}>
-                      {activeIssue.category.replace("_", " ")}
-                    </Text>
-                  </View>
-                  <View
-                    style={[
-                      styles.issueBadge,
-                      {
-                        backgroundColor: COLORS.white,
-                        borderColor: getIssueStatusColor(activeIssue.status),
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.issueBadgeText,
-                        {
-                          color: getIssueStatusColor(activeIssue.status),
-                        },
-                      ]}
-                    >
-                      {activeIssue.status.replace("_", " ")}
-                    </Text>
-                  </View>
                 </View>
               </View>
-            ) : (
-              lastMessage && (
-                <View style={styles.lastMessageRow}>
-                  <Text style={styles.lastMessage} numberOfLines={1}>
-                    {lastMessage.content}
-                  </Text>
-                  <Text style={styles.time}>{timeAgo}</Text>
-                </View>
-              )
-            )}
-
-            {item.boardingId && !hasIssue && (
+            ) : item.boardingId ? (
               <View style={styles.boardingTag}>
                 <Ionicons name="home-outline" size={12} color={COLORS.gray} />
                 <Text style={styles.boardingTagText} numberOfLines={1}>
                   {item.boardingId.title}
                 </Text>
               </View>
-            )}
+            ) : null}
           </View>
         </TouchableOpacity>
       );
@@ -577,21 +542,6 @@ export default function MessagesScreen() {
             }
           />
 
-          {/* Create Room Modal */}
-          <CreateChatRoomModal
-            visible={showCreateModal}
-            userType={user?.role === "STUDENT" ? "student" : "owner"}
-            onSubmit={handleCreateRoom}
-            onClose={() => {
-              setShowCreateModal(false);
-              // Only reset chat interface if no room is selected
-              // and we're not in the middle of creating a room
-              if (!currentRoom && !showChatInterface) {
-                setMessageText("");
-              }
-            }}
-          />
-
           {/* Issue Upgrade Modal */}
           <IssueUpgradeModal
             visible={!!pendingIssueAnalysis}
@@ -660,32 +610,6 @@ export default function MessagesScreen() {
           ListEmptyComponent={renderEmptyList}
         />
       )}
-
-      {/* Start New Chat FAB */}
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => {
-          connectSocket();
-          setShowChatInterface(true);
-          setShowCreateModal(true);
-        }}
-      >
-        <Ionicons name="add" size={28} color={COLORS.white} />
-      </TouchableOpacity>
-
-      {/* Create Room Modal */}
-      <CreateChatRoomModal
-        visible={showCreateModal}
-        userType={user?.role === "STUDENT" ? "student" : "owner"}
-        onSubmit={handleCreateRoom}
-        onClose={() => {
-          setShowCreateModal(false);
-          if (!currentRoom) {
-            setShowChatInterface(false);
-            setMessageText("");
-          }
-        }}
-      />
 
       {/* Issue Upgrade Modal */}
       <IssueUpgradeModal
