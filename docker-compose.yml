@@ -39,6 +39,8 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
+      db-seed:
+        condition: service_completed_successfully
     healthcheck:
       test:
         ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
@@ -56,6 +58,20 @@ services:
       - "traefik.http.routers.backend.tls.certresolver=unistay-resolver"
       - "traefik.http.services.backend.loadbalancer.server.port=3000"
       - "traefik.docker.network=unistay-backend"
+
+  db-seed:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: unistay_db_seed
+    env_file:
+      - .env
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    command: ["pnpm", "seed"]
+    networks:
+      - unistay-backend
 
   admin:
     build:
