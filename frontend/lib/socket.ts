@@ -122,8 +122,35 @@ class SocketService {
         console.log("[Socket] Disconnected:", reason);
       });
 
-      this.socket.on("connect_error", (error) => {
+      this.socket.on("connect_error", async (error) => {
         console.error("[Socket] Connection error:", error.message);
+
+        // If it's an authentication error, try to refresh the token and reconnect
+        if (
+          error.message.includes("Authentication error") ||
+          error.message.includes("expired")
+        ) {
+          console.log(
+            "[Socket] Attempting token refresh after connection error",
+          );
+          try {
+            const { refreshAccessToken } = await import("./auth");
+            const newToken = await refreshAccessToken();
+
+            if (newToken && this.socket) {
+              console.log(
+                "[Socket] Token refreshed, updating socket auth and reconnecting",
+              );
+              this.socket.auth = { token: newToken };
+              this.socket.connect();
+            }
+          } catch (refreshError) {
+            console.error(
+              "[Socket] Failed to refresh token during reconnect:",
+              refreshError,
+            );
+          }
+        }
       });
 
       // Message event
