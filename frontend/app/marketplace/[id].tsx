@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -10,34 +10,47 @@ import {
   TouchableOpacity,
   View,
   Dimensions,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
-import { COLORS } from '@/lib/constants';
-import { deleteMarketplaceItem, getMarketplaceItemById, reportMarketplaceItem } from '@/lib/marketplace';
-import { useAuthStore } from '@/store/auth.store';
-import type { MarketplaceItem, MarketplaceReportReason } from '@/types/marketplace.types';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { router, useLocalSearchParams } from "expo-router";
+import { COLORS } from "@/lib/constants";
+import {
+  deleteMarketplaceItem,
+  getMarketplaceItemById,
+  reportMarketplaceItem,
+} from "@/lib/marketplace";
+import { useAuthStore } from "@/store/auth.store";
+import { useChatStore } from "@/store/chat.store";
+import type {
+  MarketplaceItem,
+  MarketplaceReportReason,
+} from "@/types/marketplace.types";
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
-const REPORT_REASON_OPTIONS: { value: MarketplaceReportReason; label: string }[] = [
-  { value: 'SPAM', label: 'Spam' },
-  { value: 'SCAM', label: 'Scam' },
-  { value: 'PROHIBITED_ITEM', label: 'Prohibited item' },
-  { value: 'HARASSMENT', label: 'Harassment' },
-  { value: 'OTHER', label: 'Other' },
+const REPORT_REASON_OPTIONS: {
+  value: MarketplaceReportReason;
+  label: string;
+}[] = [
+  { value: "SPAM", label: "Spam" },
+  { value: "SCAM", label: "Scam" },
+  { value: "PROHIBITED_ITEM", label: "Prohibited item" },
+  { value: "HARASSMENT", label: "Harassment" },
+  { value: "OTHER", label: "Other" },
 ];
 
 export default function MarketplaceItemDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuthStore();
+  const { createRoom } = useChatStore();
   const [item, setItem] = useState<MarketplaceItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isReporting, setIsReporting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isReportModalVisible, setIsReportModalVisible] = useState(false);
-  const [selectedReportReason, setSelectedReportReason] = useState<MarketplaceReportReason>('OTHER');
+  const [selectedReportReason, setSelectedReportReason] =
+    useState<MarketplaceReportReason>("OTHER");
   const [activeImage, setActiveImage] = useState(0);
 
   useEffect(() => {
@@ -54,11 +67,11 @@ export default function MarketplaceItemDetailScreen() {
     if (!item || !id) return;
 
     if (user && item.sellerId === user.id) {
-      Alert.alert('Cannot report', 'You cannot report your own listing.');
+      Alert.alert("Cannot report", "You cannot report your own listing.");
       return;
     }
 
-    setSelectedReportReason('OTHER');
+    setSelectedReportReason("OTHER");
     setIsReportModalVisible(true);
   };
 
@@ -69,37 +82,61 @@ export default function MarketplaceItemDetailScreen() {
     try {
       await reportMarketplaceItem(id, selectedReportReason);
       setIsReportModalVisible(false);
-      Alert.alert('Reported', 'Thank you. The listing has been reported.');
+      Alert.alert("Reported", "Thank you. The listing has been reported.");
     } catch {
-      Alert.alert('Error', 'Unable to submit the report right now.');
+      Alert.alert("Error", "Unable to submit the report right now.");
     } finally {
       setIsReporting(false);
+    }
+  };
+
+  const handleMessageSeller = async () => {
+    if (!item) return;
+
+    try {
+      const room = await createRoom(item.sellerId);
+      router.push({
+        pathname: "/(tabs)/messages" as never,
+        params: { roomId: room.id } as never,
+      });
+    } catch (error: unknown) {
+      Alert.alert(
+        "Error",
+        error instanceof Error ? error.message : "Failed to start chat.",
+      );
     }
   };
 
   const handleDelete = () => {
     if (!item || !id) return;
 
-    Alert.alert('Delete Listing', 'Are you sure you want to delete this advertisement?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          setIsDeleting(true);
-          try {
-            await deleteMarketplaceItem(id);
-            Alert.alert('Deleted', 'Your listing has been deleted.', [
-              { text: 'OK', onPress: () => router.replace('/(tabs)/marketplace' as never) },
-            ]);
-          } catch {
-            Alert.alert('Error', 'Unable to delete this listing right now.');
-          } finally {
-            setIsDeleting(false);
-          }
+    Alert.alert(
+      "Delete Listing",
+      "Are you sure you want to delete this advertisement?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            setIsDeleting(true);
+            try {
+              await deleteMarketplaceItem(id);
+              Alert.alert("Deleted", "Your listing has been deleted.", [
+                {
+                  text: "OK",
+                  onPress: () => router.replace("/(tabs)/marketplace" as never),
+                },
+              ]);
+            } catch {
+              Alert.alert("Error", "Unable to delete this listing right now.");
+            } finally {
+              setIsDeleting(false);
+            }
+          },
         },
-      },
-    ]);
+      ],
+    );
   };
 
   if (isLoading) {
@@ -124,7 +161,7 @@ export default function MarketplaceItemDetailScreen() {
   const image = item.images[0];
   const sellerName = item.seller
     ? `${item.seller.firstName} ${item.seller.lastName}`.trim()
-    : 'Seller';
+    : "Seller";
   const isOwner = user?.id === item.sellerId;
 
   return (
@@ -142,14 +179,20 @@ export default function MarketplaceItemDetailScreen() {
               pagingEnabled
               showsHorizontalScrollIndicator={false}
               onMomentumScrollEnd={(e) => {
-                const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+                const idx = Math.round(
+                  e.nativeEvent.contentOffset.x / SCREEN_WIDTH,
+                );
                 setActiveImage(idx);
               }}
               scrollEventThrottle={16}
             >
               {item.images.map((img) => (
                 <View key={img.id} style={{ width: SCREEN_WIDTH }}>
-                  <Image source={{ uri: img.url }} style={styles.carouselImage} resizeMode="cover" />
+                  <Image
+                    source={{ uri: img.url }}
+                    style={styles.carouselImage}
+                    resizeMode="cover"
+                  />
                 </View>
               ))}
             </ScrollView>
@@ -158,13 +201,19 @@ export default function MarketplaceItemDetailScreen() {
           {item.images.length > 1 && (
             <View style={styles.paginationDots}>
               {item.images.map((_, i) => (
-                <View key={i} style={[styles.dot, i === activeImage && styles.dotActive]} />
+                <View
+                  key={i}
+                  style={[styles.dot, i === activeImage && styles.dotActive]}
+                />
               ))}
             </View>
           )}
           {/* Back + Share Overlay */}
           <View style={styles.carouselOverlay}>
-            <TouchableOpacity style={styles.carouselBtn} onPress={() => router.back()}>
+            <TouchableOpacity
+              style={styles.carouselBtn}
+              onPress={() => router.back()}
+            >
               <Ionicons name="arrow-back" size={20} color={COLORS.white} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.carouselBtn}>
@@ -175,7 +224,9 @@ export default function MarketplaceItemDetailScreen() {
           {item.images.length > 1 && (
             <View style={styles.imageCountBadge}>
               <Ionicons name="images-outline" size={12} color={COLORS.white} />
-              <Text style={styles.imageCountText}>{item.images.length} photos</Text>
+              <Text style={styles.imageCountText}>
+                {item.images.length} photos
+              </Text>
             </View>
           )}
         </View>
@@ -183,10 +234,14 @@ export default function MarketplaceItemDetailScreen() {
         <View style={styles.content}>
           {/* Title + Price Badge */}
           <View style={styles.titlePriceRow}>
-            <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
-            {item.adType === 'SELL' && item.price ? (
+            <Text style={styles.title} numberOfLines={2}>
+              {item.title}
+            </Text>
+            {item.adType === "SELL" && item.price ? (
               <View style={styles.priceBadge}>
-                <Text style={styles.priceAmount}>LKR {item.price.toLocaleString()}</Text>
+                <Text style={styles.priceAmount}>
+                  LKR {item.price.toLocaleString()}
+                </Text>
               </View>
             ) : (
               <View style={styles.freeBadge}>
@@ -197,27 +252,53 @@ export default function MarketplaceItemDetailScreen() {
 
           {/* Location Row */}
           <View style={styles.locationRow}>
-            <Ionicons name="location-outline" size={15} color={COLORS.primary} />
-            <Text style={styles.locationText}>{item.city}, {item.district}</Text>
+            <Ionicons
+              name="location-outline"
+              size={15}
+              color={COLORS.primary}
+            />
+            <Text style={styles.locationText}>
+              {item.city}, {item.district}
+            </Text>
           </View>
 
           {/* Quick Info Pills */}
           <View style={styles.pillsRow}>
             <View style={styles.pill}>
-              <Ionicons name="pricetag-outline" size={12} color={COLORS.primary} />
+              <Ionicons
+                name="pricetag-outline"
+                size={12}
+                color={COLORS.primary}
+              />
               <Text style={styles.pillText}>{item.category}</Text>
             </View>
             <View style={styles.pill}>
-              <Ionicons name="checkbox-outline" size={12} color={COLORS.primary} />
-              <Text style={styles.pillText}>{item.itemCondition.replace(/_/g, ' ')}</Text>
-            </View>
-            <View style={[styles.pill, item.adType === 'SELL' ? styles.pillSell : styles.pillGiveaway]}>
-              <Ionicons 
-                name={item.adType === 'SELL' ? 'cart-outline' : 'gift-outline'} 
-                size={12} 
-                color={item.adType === 'SELL' ? COLORS.primary : '#10B981'}
+              <Ionicons
+                name="checkbox-outline"
+                size={12}
+                color={COLORS.primary}
               />
-              <Text style={[styles.pillText, item.adType === 'SELL' ? {} : { color: '#10B981' }]}>
+              <Text style={styles.pillText}>
+                {item.itemCondition.replace(/_/g, " ")}
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.pill,
+                item.adType === "SELL" ? styles.pillSell : styles.pillGiveaway,
+              ]}
+            >
+              <Ionicons
+                name={item.adType === "SELL" ? "cart-outline" : "gift-outline"}
+                size={12}
+                color={item.adType === "SELL" ? COLORS.primary : "#10B981"}
+              />
+              <Text
+                style={[
+                  styles.pillText,
+                  item.adType === "SELL" ? {} : { color: "#10B981" },
+                ]}
+              >
                 {item.adType}
               </Text>
             </View>
@@ -235,7 +316,11 @@ export default function MarketplaceItemDetailScreen() {
           <View style={styles.detailsCard}>
             <View style={styles.detailRow}>
               <View style={styles.detailLeft}>
-                <Ionicons name="document-text-outline" size={18} color={COLORS.primary} />
+                <Ionicons
+                  name="document-text-outline"
+                  size={18}
+                  color={COLORS.primary}
+                />
                 <View>
                   <Text style={styles.detailLabel}>Category</Text>
                   <Text style={styles.detailValue}>{item.category}</Text>
@@ -245,20 +330,32 @@ export default function MarketplaceItemDetailScreen() {
             <View style={styles.detailDivider} />
             <View style={styles.detailRow}>
               <View style={styles.detailLeft}>
-                <Ionicons name="checkmark-done-circle-outline" size={18} color={COLORS.primary} />
+                <Ionicons
+                  name="checkmark-done-circle-outline"
+                  size={18}
+                  color={COLORS.primary}
+                />
                 <View>
                   <Text style={styles.detailLabel}>Condition</Text>
-                  <Text style={styles.detailValue}>{item.itemCondition.replace(/_/g, ' ')}</Text>
+                  <Text style={styles.detailValue}>
+                    {item.itemCondition.replace(/_/g, " ")}
+                  </Text>
                 </View>
               </View>
             </View>
             <View style={styles.detailDivider} />
             <View style={styles.detailRow}>
               <View style={styles.detailLeft}>
-                <Ionicons name="location-sharp" size={18} color={COLORS.primary} />
+                <Ionicons
+                  name="location-sharp"
+                  size={18}
+                  color={COLORS.primary}
+                />
                 <View>
                   <Text style={styles.detailLabel}>Location</Text>
-                  <Text style={styles.detailValue}>{item.city}, {item.district}</Text>
+                  <Text style={styles.detailValue}>
+                    {item.city}, {item.district}
+                  </Text>
                 </View>
               </View>
             </View>
@@ -267,16 +364,24 @@ export default function MarketplaceItemDetailScreen() {
           <View style={styles.divider} />
 
           {/* Seller Card */}
-          <Text style={[styles.sectionTitle, styles.sellerSectionTitle]}>Seller Information</Text>
+          <Text style={[styles.sectionTitle, styles.sellerSectionTitle]}>
+            Seller Information
+          </Text>
           <View style={styles.sellerCard}>
             <View style={styles.sellerAvatar}>
-              <Text style={styles.sellerAvatarText}>{sellerName.charAt(0).toUpperCase()}</Text>
+              <Text style={styles.sellerAvatarText}>
+                {sellerName.charAt(0).toUpperCase()}
+              </Text>
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.sellerName}>{sellerName}</Text>
               {item.seller?.phone ? (
                 <View style={styles.sellerPhoneRow}>
-                  <Ionicons name="call-outline" size={12} color={COLORS.textSecondary} />
+                  <Ionicons
+                    name="call-outline"
+                    size={12}
+                    color={COLORS.textSecondary}
+                  />
                   <Text style={styles.sellerPhone}>{item.seller.phone}</Text>
                 </View>
               ) : null}
@@ -291,30 +396,48 @@ export default function MarketplaceItemDetailScreen() {
           <>
             <TouchableOpacity
               style={styles.messageBtn}
-              onPress={() => router.push(`/marketplace/create?id=${item.id}` as never)}
+              onPress={() =>
+                router.push(`/marketplace/create?id=${item.id}` as never)
+              }
             >
               <Ionicons name="create-outline" size={16} color={COLORS.white} />
               <Text style={styles.messageBtnText}>Edit Listing</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.deleteBtn} disabled={isDeleting} onPress={handleDelete}>
+            <TouchableOpacity
+              style={styles.deleteBtn}
+              disabled={isDeleting}
+              onPress={handleDelete}
+            >
               <Ionicons name="trash-outline" size={16} color={COLORS.red} />
-              <Text style={styles.deleteBtnText}>{isDeleting ? 'Deleting...' : 'Delete'}</Text>
+              <Text style={styles.deleteBtnText}>
+                {isDeleting ? "Deleting..." : "Delete"}
+              </Text>
             </TouchableOpacity>
           </>
         ) : (
           <>
             <TouchableOpacity
               style={styles.messageBtn}
-              onPress={() => router.push('/(tabs)/messages' as never)}
+              onPress={handleMessageSeller}
             >
-              <Ionicons name="chatbubble-outline" size={16} color={COLORS.white} />
+              <Ionicons
+                name="chatbubble-outline"
+                size={16}
+                color={COLORS.white}
+              />
               <Text style={styles.messageBtnText}>Message Seller</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.reportBtn} disabled={isReporting} onPress={handleOpenReportDialog}>
+            <TouchableOpacity
+              style={styles.reportBtn}
+              disabled={isReporting}
+              onPress={handleOpenReportDialog}
+            >
               <Ionicons name="flag-outline" size={16} color={COLORS.red} />
-              <Text style={styles.reportBtnText}>{isReporting ? 'Reporting...' : 'Report'}</Text>
+              <Text style={styles.reportBtnText}>
+                {isReporting ? "Reporting..." : "Report"}
+              </Text>
             </TouchableOpacity>
           </>
         )}
@@ -329,7 +452,9 @@ export default function MarketplaceItemDetailScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalSheet}>
             <Text style={styles.modalTitle}>Report Listing</Text>
-            <Text style={styles.modalSubTitle}>Select a reason for this report</Text>
+            <Text style={styles.modalSubTitle}>
+              Select a reason for this report
+            </Text>
 
             <View style={styles.reasonList}>
               {REPORT_REASON_OPTIONS.map((option) => {
@@ -337,28 +462,50 @@ export default function MarketplaceItemDetailScreen() {
                 return (
                   <TouchableOpacity
                     key={option.value}
-                    style={[styles.reasonOption, isSelected && styles.reasonOptionSelected]}
+                    style={[
+                      styles.reasonOption,
+                      isSelected && styles.reasonOptionSelected,
+                    ]}
                     onPress={() => setSelectedReportReason(option.value)}
                   >
-                    <Text style={[styles.reasonOptionText, isSelected && styles.reasonOptionTextSelected]}>
+                    <Text
+                      style={[
+                        styles.reasonOptionText,
+                        isSelected && styles.reasonOptionTextSelected,
+                      ]}
+                    >
                       {option.label}
                     </Text>
-                    {isSelected ? <Ionicons name="checkmark" size={16} color={COLORS.primary} /> : null}
+                    {isSelected ? (
+                      <Ionicons
+                        name="checkmark"
+                        size={16}
+                        color={COLORS.primary}
+                      />
+                    ) : null}
                   </TouchableOpacity>
                 );
               })}
             </View>
 
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setIsReportModalVisible(false)}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setIsReportModalVisible(false)}
+              >
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalSubmitBtn, isReporting && styles.modalSubmitBtnDisabled]}
+                style={[
+                  styles.modalSubmitBtn,
+                  isReporting && styles.modalSubmitBtnDisabled,
+                ]}
                 disabled={isReporting}
                 onPress={handleReport}
               >
-                <Text style={styles.modalSubmitText}>{isReporting ? 'Submitting...' : 'Submit Report'}</Text>
+                <Text style={styles.modalSubmitText}>
+                  {isReporting ? "Submitting..." : "Submit Report"}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -371,105 +518,116 @@ export default function MarketplaceItemDetailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   content: { paddingBottom: 120 },
-  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.background },
+  loadingWrap: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.background,
+  },
   /* Image Carousel Styles */
   carouselContainer: {
     width: SCREEN_WIDTH,
     height: 320,
     backgroundColor: COLORS.grayLight,
-    position: 'relative',
+    position: "relative",
   },
   carouselImage: {
     width: SCREEN_WIDTH,
     height: 320,
     backgroundColor: COLORS.grayLight,
   },
-  carouselPlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  carouselPlaceholder: { alignItems: "center", justifyContent: "center" },
   paginationDots: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 12,
     left: 0,
     right: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
     gap: 6,
   },
   dot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    backgroundColor: "rgba(255, 255, 255, 0.5)",
   },
   dotActive: {
     backgroundColor: COLORS.white,
   },
   carouselOverlay: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     paddingHorizontal: 12,
     paddingTop: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   carouselBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "rgba(0,0,0,0.3)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   imageCountBadge: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 12,
     right: 12,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: "rgba(0,0,0,0.4)",
     borderRadius: 20,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
   },
   imageCountText: {
     color: COLORS.white,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   /* Title + Price Section */
   titlePriceRow: {
     marginTop: 16,
     marginHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
     gap: 12,
   },
-  title: { flex: 1, fontSize: 22, fontWeight: '800', color: COLORS.text, lineHeight: 28 },
+  title: {
+    flex: 1,
+    fontSize: 22,
+    fontWeight: "800",
+    color: COLORS.text,
+    lineHeight: 28,
+  },
   priceBadge: {
     backgroundColor: COLORS.primary,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  priceAmount: { fontSize: 16, fontWeight: '800', color: COLORS.white },
+  priceAmount: { fontSize: 16, fontWeight: "800", color: COLORS.white },
   freeBadge: {
-    backgroundColor: '#10B98126',
+    backgroundColor: "#10B98126",
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: '#10B981',
+    borderColor: "#10B981",
   },
-  freeBadgeText: { fontSize: 14, fontWeight: '700', color: '#10B981' },
+  freeBadgeText: { fontSize: 14, fontWeight: "700", color: "#10B981" },
   /* Location Row */
   locationRow: {
     marginTop: 10,
     marginHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
   locationText: { fontSize: 14, color: COLORS.textSecondary },
@@ -477,13 +635,13 @@ const styles = StyleSheet.create({
   pillsRow: {
     marginTop: 12,
     marginHorizontal: 16,
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
-    flexWrap: 'wrap',
+    flexWrap: "wrap",
   },
   pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
     backgroundColor: COLORS.grayLight,
     borderRadius: 20,
@@ -494,9 +652,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.grayLight,
   },
   pillGiveaway: {
-    backgroundColor: '#10B98126',
+    backgroundColor: "#10B98126",
   },
-  pillText: { fontSize: 12, fontWeight: '600', color: COLORS.text },
+  pillText: { fontSize: 12, fontWeight: "600", color: COLORS.text },
   /* Divider */
   divider: {
     marginTop: 16,
@@ -506,9 +664,20 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
   },
   /* Section Title */
-  sectionTitle: { marginHorizontal: 16, fontSize: 16, fontWeight: '700', color: COLORS.text },
+  sectionTitle: {
+    marginHorizontal: 16,
+    fontSize: 16,
+    fontWeight: "700",
+    color: COLORS.text,
+  },
   /* Description */
-  descriptionText: { marginTop: 8, marginHorizontal: 16, fontSize: 14, lineHeight: 22, color: COLORS.text },
+  descriptionText: {
+    marginTop: 8,
+    marginHorizontal: 16,
+    fontSize: 14,
+    lineHeight: 22,
+    color: COLORS.text,
+  },
   /* Details Card */
   detailsCard: {
     marginHorizontal: 16,
@@ -516,22 +685,27 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: COLORS.grayBorder,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   detailRow: {
     padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
   detailLeft: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 10,
   },
-  detailLabel: { fontSize: 12, color: COLORS.textSecondary, fontWeight: '500' },
-  detailValue: { fontSize: 14, fontWeight: '600', color: COLORS.text, marginTop: 2 },
+  detailLabel: { fontSize: 12, color: COLORS.textSecondary, fontWeight: "500" },
+  detailValue: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.text,
+    marginTop: 2,
+  },
   detailDivider: {
     height: 1,
     backgroundColor: COLORS.grayBorder,
@@ -549,24 +723,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.grayBorder,
     padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
   sellerAvatar: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#EBF0FF',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "#EBF0FF",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  sellerAvatarText: { fontSize: 18, fontWeight: '800', color: COLORS.primary },
-  sellerName: { fontSize: 15, fontWeight: '800', color: COLORS.text },
-  sellerPhoneRow: { marginTop: 4, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  sellerAvatarText: { fontSize: 18, fontWeight: "800", color: COLORS.primary },
+  sellerName: { fontSize: 15, fontWeight: "800", color: COLORS.text },
+  sellerPhoneRow: {
+    marginTop: 4,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
   sellerPhone: { fontSize: 13, color: COLORS.textSecondary },
   bottomBar: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 10,
     padding: 16,
     borderTopWidth: 1,
@@ -578,38 +757,38 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: COLORS.primary,
     paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
     gap: 6,
   },
-  messageBtnText: { color: COLORS.white, fontWeight: '700' },
+  messageBtnText: { color: COLORS.white, fontWeight: "700" },
   reportBtn: {
     borderRadius: 10,
     borderWidth: 1,
     borderColor: COLORS.red,
     paddingHorizontal: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexDirection: 'row',
+    justifyContent: "center",
+    alignItems: "center",
+    flexDirection: "row",
     gap: 6,
   },
-  reportBtnText: { color: COLORS.red, fontWeight: '700' },
+  reportBtnText: { color: COLORS.red, fontWeight: "700" },
   deleteBtn: {
     borderRadius: 10,
     borderWidth: 1,
     borderColor: COLORS.red,
     paddingHorizontal: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexDirection: 'row',
+    justifyContent: "center",
+    alignItems: "center",
+    flexDirection: "row",
     gap: 6,
   },
-  deleteBtnText: { color: COLORS.red, fontWeight: '700' },
+  deleteBtnText: { color: COLORS.red, fontWeight: "700" },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    justifyContent: 'center',
+    backgroundColor: "rgba(0,0,0,0.35)",
+    justifyContent: "center",
     padding: 20,
   },
   modalSheet: {
@@ -619,7 +798,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.grayBorder,
   },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: COLORS.text },
+  modalTitle: { fontSize: 18, fontWeight: "800", color: COLORS.text },
   modalSubTitle: { marginTop: 4, fontSize: 13, color: COLORS.textSecondary },
   reasonList: { marginTop: 12, gap: 8 },
   reasonOption: {
@@ -628,36 +807,36 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 11,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   reasonOptionSelected: {
     borderColor: COLORS.primary,
     backgroundColor: COLORS.grayLight,
   },
   reasonOptionText: { fontSize: 14, color: COLORS.text },
-  reasonOptionTextSelected: { color: COLORS.primary, fontWeight: '700' },
-  modalActions: { marginTop: 14, flexDirection: 'row', gap: 10 },
+  reasonOptionTextSelected: { color: COLORS.primary, fontWeight: "700" },
+  modalActions: { marginTop: 14, flexDirection: "row", gap: 10 },
   modalCancelBtn: {
     flex: 1,
     borderWidth: 1,
     borderColor: COLORS.grayBorder,
     borderRadius: 10,
     paddingVertical: 11,
-    alignItems: 'center',
+    alignItems: "center",
   },
-  modalCancelText: { color: COLORS.text, fontWeight: '600' },
+  modalCancelText: { color: COLORS.text, fontWeight: "600" },
   modalSubmitBtn: {
     flex: 1.5,
     borderRadius: 10,
     backgroundColor: COLORS.primary,
     paddingVertical: 11,
-    alignItems: 'center',
+    alignItems: "center",
   },
   modalSubmitBtnDisabled: { opacity: 0.65 },
-  modalSubmitText: { color: COLORS.white, fontWeight: '700' },
-  errorTitle: { fontSize: 18, color: COLORS.text, fontWeight: '700' },
+  modalSubmitText: { color: COLORS.white, fontWeight: "700" },
+  errorTitle: { fontSize: 18, color: COLORS.text, fontWeight: "700" },
   backBtn: {
     marginTop: 10,
     borderRadius: 10,
@@ -665,5 +844,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
-  backBtnText: { color: COLORS.white, fontWeight: '700' },
+  backBtnText: { color: COLORS.white, fontWeight: "700" },
 });
