@@ -116,7 +116,9 @@ export default function MessagesScreen() {
       setChatRooms(rooms);
       setRoomIssues(issueMap);
     } catch (error: unknown) {
-      logger.chat.error('Failed to load chat rooms', { error: error instanceof Error ? error.message : error });
+      logger.chat.error("Failed to load chat rooms", {
+        error: error instanceof Error ? error.message : error,
+      });
     } finally {
       setIsLoadingRooms(false);
     }
@@ -132,7 +134,9 @@ export default function MessagesScreen() {
         await loadMessages(room.id);
         setShowChatInterface(true);
       } catch (error: unknown) {
-        logger.chat.error('Failed to join room', { error: error instanceof Error ? error.message : error });
+        logger.chat.error("Failed to join room", {
+          error: error instanceof Error ? error.message : error,
+        });
       }
     },
     [joinRoom, setCurrentRoom, loadMessages, connectSocket],
@@ -268,13 +272,6 @@ export default function MessagesScreen() {
           onPress={() => handleSelectRoom(item)}
           activeOpacity={0.7}
         >
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {otherUser.firstName.charAt(0)}
-              {otherUser.lastName.charAt(0)}
-            </Text>
-          </View>
-
           <View style={styles.info}>
             <Text style={styles.userName} numberOfLines={1}>
               {otherUser.firstName} {otherUser.lastName}
@@ -345,8 +342,6 @@ export default function MessagesScreen() {
               </View>
             )}
           </View>
-
-          <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
         </TouchableOpacity>
       );
     },
@@ -429,7 +424,9 @@ export default function MessagesScreen() {
           />
         );
       } catch (error) {
-        logger.chat.error('Error rendering message', { error: error instanceof Error ? error.message : error });
+        logger.chat.error("Error rendering message", {
+          error: error instanceof Error ? error.message : error,
+        });
         return null;
       }
     },
