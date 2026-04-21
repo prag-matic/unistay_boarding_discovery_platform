@@ -58,7 +58,9 @@ services:
       - "traefik.http.routers.backend.tls.certresolver=unistay-resolver"
       - "traefik.http.services.backend.loadbalancer.server.port=3000"
       - "traefik.docker.network=unistay-backend"
-
+      - "traefik.http.middlewares.backend-rl.ratelimit.average=10"
+      - "traefik.http.middlewares.backend-rl.ratelimit.burst=50"
+      - "traefik.http.routers.backend.middlewares=backend-rl"
   db-seed:
     build:
       context: ./backend
