@@ -148,6 +148,7 @@ services:
     image: openinary/openinary:latest
     container_name: unistay_openinary
     environment:
+      - API_SECRET=${OPENINARY_API_KEY}
       - STORAGE_REGION=${MINIO_REGION}
       - STORAGE_ACCESS_KEY_ID=${MINIO_ROOT_USER}
       - STORAGE_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
@@ -167,7 +168,7 @@ services:
           "CMD",
           "python3",
           "-c",
-          "import urllib.request; urllib.request.urlopen('http://localhost:3001')",
+          "import urllib.request; urllib.request.urlopen('http://localhost:3000')",
         ]
       interval: 10s
       timeout: 5s
@@ -181,7 +182,7 @@ services:
       - "traefik.http.routers.openinary.entrypoints=websecure"
       - "traefik.http.routers.openinary.tls=true"
       - "traefik.http.routers.openinary.tls.certresolver=unistay-resolver"
-      - "traefik.http.services.openinary.loadbalancer.server.port=3001"
+      - "traefik.http.services.openinary.loadbalancer.server.port=3000"
       - "traefik.docker.network=unistay-openinary"
 
 networks:
