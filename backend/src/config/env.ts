@@ -56,6 +56,6 @@ export const config = {
 
   openrouter: {
     apiKey: optional("OPENROUTER_API_KEY", ""),
-    model: optional("OPENROUTER_MODEL", "minimax/minimax-m2.5:free"),
+    model: optional("OPENROUTER_MODEL", "openrouter/free"),
   },
 };
