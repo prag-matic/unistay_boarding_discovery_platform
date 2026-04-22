@@ -17,7 +17,7 @@ const FALLBACK_TRANSITIONS: TransitionSpec = {
     actorRoles: ['OWNER'],
   },
   OWNER_DELETE: {
-    allowedFrom: ['DRAFT'],
+    allowedFrom: ['DRAFT', 'PENDING_APPROVAL'],
     actorRoles: ['OWNER'],
   },
   OWNER_SUBMIT: {

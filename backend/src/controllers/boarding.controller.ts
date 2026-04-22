@@ -377,7 +377,7 @@ export async function submitBoarding(
 	}
 }
 
-// DELETE /api/boardings/:id  (owner, DRAFT only)
+// DELETE /api/boardings/:id  (owner, DRAFT/PENDING_APPROVAL only)
 export async function deleteBoarding(
 	req: Request,
 	res: Response,
@@ -392,7 +392,7 @@ export async function deleteBoarding(
 		const publicIds = await boardingWorkflowService.hardDeleteDraft(id, ownerId);
 		await Promise.allSettled(publicIds.map((publicId) => deleteBoardingImage(publicId)));
 
-		sendSuccess(res, { id }, "Draft boarding permanently deleted");
+		sendSuccess(res, { id }, "Boarding permanently deleted");
 	} catch (error) {
 		next(error);
 	}
