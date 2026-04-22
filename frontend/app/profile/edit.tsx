@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Avatar } from '@/components/ui/Avatar';
 import { Header } from '@/components/layout/Header';
+import api from '@/lib/api';
 import { COLORS } from '@/lib/constants';
 import { getErrorMessage } from '@/utils/helpers';
 import { useImagePicker } from '@/hooks/useImagePicker';
@@ -30,6 +31,7 @@ type EditForm = z.infer<typeof editProfileSchema>;
 export default function EditProfileScreen() {
   const { user, updateProfile, isLoading } = useAuthStore();
   const { pickImage, imageUri } = useImagePicker();
+  const [isResendingVerification, setIsResendingVerification] = useState(false);
 
   const {
     control,
@@ -52,6 +54,23 @@ export default function EditProfileScreen() {
       Alert.alert('Success', 'Profile updated!', [{ text: 'OK', onPress: () => router.back() }]);
     } catch (err) {
       Alert.alert('Error', getErrorMessage(err));
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!user?.email) {
+      Alert.alert('Error', 'Email address is not available.');
+      return;
+    }
+
+    try {
+      setIsResendingVerification(true);
+      await api.post('/auth/resend-verification', { email: user.email });
+      Alert.alert('Sent', 'Verification email resent successfully.');
+    } catch (err) {
+      Alert.alert('Error', getErrorMessage(err));
+    } finally {
+      setIsResendingVerification(false);
     }
   };
 
@@ -111,6 +130,29 @@ export default function EditProfileScreen() {
             placeholder="email@example.com"
             containerStyle={styles.disabledInput}
           />
+
+          {!user?.isVerified ? (
+            <View style={styles.verifySection}>
+              <View style={styles.verifyStatusRow}>
+                <Ionicons name="alert-circle-outline" size={16} color={COLORS.orange} />
+                <Text style={styles.verifyStatusText}>Your email is not verified</Text>
+              </View>
+              <Button
+                title="Resend Verification Email"
+                onPress={handleResendVerification}
+                loading={isResendingVerification}
+                variant="outline"
+                style={styles.resendBtn}
+              />
+            </View>
+          ) : (
+            <View style={styles.verifySection}>
+              <View style={styles.verifyStatusRow}>
+                <Ionicons name="checkmark-circle-outline" size={16} color={COLORS.green} />
+                <Text style={styles.verifyStatusSuccessText}>Your email is verified</Text>
+              </View>
+            </View>
+          )}
 
           <Controller
             control={control}
@@ -184,6 +226,11 @@ const styles = StyleSheet.create({
   changePhotoBtn: { marginTop: 10 },
   changePhotoText: { color: COLORS.primary, fontWeight: '600', fontSize: 14 },
   disabledInput: { opacity: 0.6 },
+  verifySection: { marginTop: 4, marginBottom: 10 },
+  verifyStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+  verifyStatusText: { fontSize: 13, color: COLORS.orange, fontWeight: '500' },
+  verifyStatusSuccessText: { fontSize: 13, color: COLORS.green, fontWeight: '500' },
+  resendBtn: { height: 44 },
   saveBtn: { marginTop: 8, marginBottom: 16 },
   changePasswordBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   changePasswordText: { color: COLORS.primary, fontWeight: '600', fontSize: 14 },

@@ -49,8 +49,21 @@ export default {
     'expo-secure-store',
     'expo-image-picker',
     'expo-location',
+    [
+      'expo-splash-screen',
+      {
+        image: './assets/icon.png',
+        resizeMode: 'contain',
+        backgroundColor: '#4A7BF7',
+      },
+    ],
   ],
   experiments: {
     typedRoutes: true,
+  },
+  extra: {
+    eas: {
+      projectId: '6a4c5a82-2712-4ec7-b830-955785eaffc7',
+    },
   },
 };
