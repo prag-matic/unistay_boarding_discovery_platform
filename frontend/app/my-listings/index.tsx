@@ -164,14 +164,15 @@ export default function MyListingsScreen() {
     ]);
   };
 
-  const handleDeleteDraft = (boarding: Boarding) => {
-    if (boarding.status !== 'DRAFT') {
-      Alert.alert('Not allowed', 'Only draft listings can be permanently deleted.');
+  const handleDeleteListing = (boarding: Boarding) => {
+    const canDelete = boarding.status === 'DRAFT' || boarding.status === 'PENDING_APPROVAL';
+    if (!canDelete) {
+      Alert.alert('Not allowed', 'Only draft and pending listings can be permanently deleted.');
       return;
     }
 
     Alert.alert(
-      'Delete Draft Listing',
+      'Delete Listing',
       `Delete "${boarding.title}" permanently? This cannot be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
@@ -183,7 +184,7 @@ export default function MyListingsScreen() {
               await deleteBoarding(boarding.id);
               setListings((prev) => prev.filter((b) => b.id !== boarding.id));
             } catch {
-              Alert.alert('Error', 'Failed to delete the draft listing. Please try again.');
+              Alert.alert('Error', 'Failed to delete the listing. Please try again.');
             }
           },
         },
@@ -220,8 +221,8 @@ export default function MyListingsScreen() {
     if (available.canArchive) {
       actions.push({ key: 'archive', text: 'Archive', icon: 'archive-outline', destructive: true, onPress: () => handleArchive(boarding) });
     }
-    if (available.canDelete) {
-      actions.push({ key: 'delete', text: 'Delete Draft', icon: 'trash-outline', destructive: true, onPress: () => handleDeleteDraft(boarding) });
+    if (available.canDelete || boarding.status === 'PENDING_APPROVAL') {
+      actions.push({ key: 'delete', text: 'Delete', icon: 'trash-outline', destructive: true, onPress: () => handleDeleteListing(boarding) });
     }
     return actions;
   };
