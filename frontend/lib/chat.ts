@@ -185,3 +185,16 @@ export async function getAllIssues(limit: number = 50) {
   );
   return response.data;
 }
+
+/**
+ * Update an issue
+ * PUT /api/issues/:id
+ */
+export async function updateIssue(id: string, updates: Partial<Issue>) {
+  logger.chat.debug("updateIssue", { id, updates });
+  const response = await api.put<UniStayApiResponse<Issue>>(
+    `/issues/${id}`,
+    updates,
+  );
+  return response.data;
+}
