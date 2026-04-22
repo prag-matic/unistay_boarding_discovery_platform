@@ -377,6 +377,27 @@ export async function submitBoarding(
 	}
 }
 
+// DELETE /api/boardings/:id  (owner, DRAFT/PENDING_APPROVAL only)
+export async function deleteBoarding(
+	req: Request,
+	res: Response,
+	next: NextFunction,
+): Promise<void> {
+	try {
+		if (!req.user?.userId) {
+			throw new ForbiddenError("User is not authenticated");
+		}
+		const { id } = req.params as { id: string };
+		const ownerId = req.user.userId;
+		const publicIds = await boardingWorkflowService.hardDeleteDraft(id, ownerId);
+		await Promise.allSettled(publicIds.map((publicId) => deleteBoardingImage(publicId)));
+
+		sendSuccess(res, { id }, "Boarding permanently deleted");
+	} catch (error) {
+		next(error);
+	}
+}
+
 // PATCH /api/boardings/:id/deactivate  (owner)
 export async function deactivateBoarding(
 	req: Request,
