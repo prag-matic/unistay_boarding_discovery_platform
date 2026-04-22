@@ -46,7 +46,7 @@ export const BOARDING_TRANSITIONS: Record<
 		actorRoles: [Role.OWNER],
 	},
 	OWNER_DELETE: {
-		allowedFrom: [BoardingStatus.DRAFT],
+		allowedFrom: [BoardingStatus.DRAFT, BoardingStatus.PENDING_APPROVAL],
 		actorRoles: [Role.OWNER],
 	},
 	OWNER_SUBMIT: {
