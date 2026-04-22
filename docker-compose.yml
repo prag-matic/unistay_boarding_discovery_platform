@@ -1,0 +1,201 @@
+services:
+  traefik:
+    image: traefik:v3.6
+    container_name: unistay_traefik
+    command:
+      - "--log.level=DEBUG"
+      - "--accesslog=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      # Global HTTP to HTTPS redirect
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      # Let's Encrypt TLS Challenge configuration
+      - "--certificatesresolvers.unistay-resolver.acme.tlschallenge=true"
+      - "--certificatesresolvers.unistay-resolver.acme.email=unistay@mrbhanuka.dev"
+      - "--certificatesresolvers.unistay-resolver.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./letsencrypt:/letsencrypt
+    networks:
+      - unistay-backend
+      - unistay-admin
+      - unistay-openinary
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: unistay_backend
+    environment:
+      - OPENINARY_PUBLIC_URL=https://openinary.unistay.mrbhanuka.dev
+    env_file:
+      - .env
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      db-seed:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - unistay-backend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=Host(`backend.unistay.mrbhanuka.dev`)"
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.tls=true"
+      - "traefik.http.routers.backend.tls.certresolver=unistay-resolver"
+      - "traefik.http.services.backend.loadbalancer.server.port=3000"
+      - "traefik.docker.network=unistay-backend"
+      - "traefik.http.middlewares.backend-rl.ratelimit.average=10"
+      - "traefik.http.middlewares.backend-rl.ratelimit.burst=50"
+      - "traefik.http.routers.backend.middlewares=backend-rl"
+  db-seed:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: unistay_db_seed
+    env_file:
+      - .env
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    command: ["pnpm", "seed"]
+    networks:
+      - unistay-backend
+
+  admin:
+    build:
+      context: ./admin
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=https://backend.unistay.mrbhanuka.dev/api
+    container_name: unistay_admin
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - unistay-admin
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.admin.rule=Host(`admin.unistay.mrbhanuka.dev`)"
+      - "traefik.http.routers.admin.entrypoints=websecure"
+      - "traefik.http.routers.admin.tls=true"
+      - "traefik.http.routers.admin.tls.certresolver=unistay-resolver"
+      - "traefik.http.services.admin.loadbalancer.server.port=3000"
+      - "traefik.docker.network=unistay-admin"
+
+  mongodb:
+    image: mongo:7
+    container_name: unistay_mongodb
+    env_file:
+      - .env
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - unistay-backend
+
+  minio:
+    image: minio/minio:latest
+    container_name: unistay_minio
+    env_file:
+      - .env
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - unistay-openinary
+
+  create-bucket:
+    image: minio/mc:latest
+    container_name: unistay_create_bucket
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD} || exit 1;
+      mc mb -p myminio/${MINIO_BUCKET} || exit 0;
+      mc anonymous set download myminio/${MINIO_BUCKET} || exit 0;
+      exit 0;
+      "
+    networks:
+      - unistay-openinary
+
+  openinary:
+    image: openinary/openinary:latest
+    container_name: unistay_openinary
+    environment:
+      - API_SECRET=${OPENINARY_API_KEY}
+      - STORAGE_REGION=${MINIO_REGION}
+      - STORAGE_ACCESS_KEY_ID=${MINIO_ROOT_USER}
+      - STORAGE_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
+      - STORAGE_BUCKET_NAME=${MINIO_BUCKET}
+      - STORAGE_ENDPOINT=http://minio:9000
+      - BETTER_AUTH_URL=https://openinary.unistay.mrbhanuka.dev
+    depends_on:
+      minio:
+        condition: service_healthy
+      create-bucket:
+        condition: service_completed_successfully
+    volumes:
+      - openinary_db:/app/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python3",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:3000')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - unistay-openinary
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.openinary.rule=Host(`openinary.unistay.mrbhanuka.dev`)"
+      - "traefik.http.routers.openinary.entrypoints=websecure"
+      - "traefik.http.routers.openinary.tls=true"
+      - "traefik.http.routers.openinary.tls.certresolver=unistay-resolver"
+      - "traefik.http.services.openinary.loadbalancer.server.port=3000"
+      - "traefik.docker.network=unistay-openinary"
+
+networks:
+  unistay-backend:
+    name: unistay-backend
+  unistay-admin:
+    name: unistay-admin
+  unistay-openinary:
+    name: unistay-openinary
+
+volumes:
+  mongodb_data:
+  minio_data:
+  openinary_db:
