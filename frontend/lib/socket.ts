@@ -93,81 +93,128 @@ class SocketService {
     (data: { message: string; code: string }) => void
   > = new Set();
 
-  async connect() {
+  async connect(): Promise<void> {
     if (this.socket?.connected) {
       console.log("[Socket] Already connected");
       return;
     }
 
-    try {
-      const token = await storage.getToken();
-      if (!token) {
-        console.warn("[Socket] No token available");
-        return;
-      }
-
-      this.socket = io(SOCKET_URL, {
-        auth: { token },
-        transports: ["websocket", "polling"],
-        reconnection: true,
-        reconnectionAttempts: 5,
-        reconnectionDelay: 1000,
-      });
-
-      this.socket.on("connect", () => {
-        console.log("[Socket] Connected:", this.socket?.id);
-      });
-
-      this.socket.on("disconnect", (reason) => {
-        console.log("[Socket] Disconnected:", reason);
-      });
-
-      this.socket.on("connect_error", (error) => {
-        console.error("[Socket] Connection error:", error.message);
-      });
-
-      // Message event
-      this.socket.on("message", (data) => {
-        console.log("[Socket] New message:", data);
-        try {
-          this.messageListeners.forEach((listener) =>
-            listener(data as ChatMessage),
-          );
-        } catch (error) {
-          console.error(
-            "[Socket] Error processing message:",
-            error instanceof Error ? error.message : error,
-          );
+    return new Promise(async (resolve, reject) => {
+      try {
+        const token = await storage.getToken();
+        if (!token) {
+          console.warn("[Socket] No token available");
+          resolve();
+          return;
         }
-      });
 
-      // Typing event
-      this.socket.on("typing", (data) => {
-        this.typingListeners.forEach((listener) => listener(data));
-      });
+        this.socket = io(SOCKET_URL, {
+          auth: { token },
+          transports: ["websocket", "polling"],
+          reconnection: true,
+          reconnectionAttempts: 5,
+          reconnectionDelay: 1000,
+        });
 
-      // Read event
-      this.socket.on("read", (data) => {
-        this.readListeners.forEach((listener) => listener(data));
-      });
+        const connectionTimeout = setTimeout(() => {
+          if (!this.socket?.connected) {
+            console.warn("[Socket] Connection timeout");
+            resolve(); // Resolve anyway to allow the app to continue, but log warning
+          }
+        }, 5000);
 
-      // Issue analysis event
-      this.socket.on("issueAnalysis", (data) => {
-        console.log("[Socket] Issue analysis:", data);
-        this.issueAnalysisListeners.forEach((listener) =>
-          listener(data as IssueAnalysis),
-        );
-      });
+        this.socket.on("connect", () => {
+          console.log("[Socket] Connected:", this.socket?.id);
+          clearTimeout(connectionTimeout);
+          resolve();
+        });
 
-      // Error event
-      this.socket.on("error", (data) => {
-        console.error("[Socket] Error:", data);
-        this.errorListeners.forEach((listener) => listener(data));
-      });
-    } catch (error) {
-      console.error("[Socket] Failed to connect:", error);
-      throw error;
-    }
+        this.socket.on("disconnect", (reason) => {
+          console.log("[Socket] Disconnected:", reason);
+        });
+
+        this.socket.on("connect_error", async (error) => {
+          console.error("[Socket] Connection error:", error.message);
+
+          // Only reject if it's the initial connection attempt
+          if (!this.socket?.connected) {
+            clearTimeout(connectionTimeout);
+            // Don't reject, just resolve so the app doesn't crash,
+            // but the socket won't be connected
+            resolve();
+          }
+
+          // If it's an authentication error, try to refresh the token and reconnect
+          if (
+            error.message.includes("Authentication error") ||
+            error.message.includes("expired")
+          ) {
+            console.log(
+              "[Socket] Attempting token refresh after connection error",
+            );
+            try {
+              const { refreshAccessToken } = await import("./auth");
+              const newToken = await refreshAccessToken();
+
+              if (newToken && this.socket) {
+                console.log(
+                  "[Socket] Token refreshed, updating socket auth and reconnecting",
+                );
+                this.socket.auth = { token: newToken };
+                this.socket.connect();
+              }
+            } catch (refreshError) {
+              console.error(
+                "[Socket] Failed to refresh token during reconnect:",
+                refreshError,
+              );
+            }
+          }
+        });
+
+        // Message event
+        this.socket.on("message", (data) => {
+          console.log("[Socket] New message:", data);
+          try {
+            this.messageListeners.forEach((listener) =>
+              listener(data as ChatMessage),
+            );
+          } catch (error) {
+            console.error(
+              "[Socket] Error processing message:",
+              error instanceof Error ? error.message : error,
+            );
+          }
+        });
+
+        // Typing event
+        this.socket.on("typing", (data) => {
+          this.typingListeners.forEach((listener) => listener(data));
+        });
+
+        // Read event
+        this.socket.on("read", (data) => {
+          this.readListeners.forEach((listener) => listener(data));
+        });
+
+        // Issue analysis event
+        this.socket.on("issueAnalysis", (data) => {
+          console.log("[Socket] Issue analysis:", data);
+          this.issueAnalysisListeners.forEach((listener) =>
+            listener(data as IssueAnalysis),
+          );
+        });
+
+        // Error event
+        this.socket.on("error", (data) => {
+          console.error("[Socket] Error:", data);
+          this.errorListeners.forEach((listener) => listener(data));
+        });
+      } catch (error) {
+        console.error("[Socket] Failed to connect:", error);
+        reject(error);
+      }
+    });
   }
 
   disconnect() {

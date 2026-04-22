@@ -23,6 +23,7 @@ interface ChatState {
   hasMoreMessages: boolean;
   lastCursor?: string;
   pendingIssueAnalysis: IssueAnalysis | null;
+  _listenersSetup: boolean;
 
   // Actions - Room management
   setCurrentRoom: (room: ChatRoom | null) => void;
@@ -115,7 +116,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // Prevent duplicate messages by checking if message ID already exists
       const exists = state.messages.some((msg) => msg.id === message.id);
       if (exists) {
-        logger.chat.debug('Duplicate message detected, skipping', { messageId: message.id });
+        logger.chat.debug("Duplicate message detected, skipping", {
+          messageId: message.id,
+        });
         return state; // Don't add duplicate
       }
       return {
@@ -125,7 +128,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   loadMessages: async (roomId, limit = 50) => {
-    logger.chat.debug('loadMessages', { roomId, limit });
+    logger.chat.debug("loadMessages", { roomId, limit });
     set({ isLoading: true, messages: [], currentIssue: null });
     try {
       const { getChatHistory, getRoomIssues } = await import("@/lib/chat");
@@ -160,7 +163,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
         hasMoreMessages: !!nextCursor,
       });
     } catch (error) {
-      logger.chat.error('Failed to load messages', { error: error instanceof Error ? error.message : error });
+      logger.chat.error("Failed to load messages", {
+        error: error instanceof Error ? error.message : error,
+      });
       throw error;
     } finally {
       set({ isLoading: false });
@@ -168,7 +173,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   loadMoreMessages: async (roomId, cursor, limit = 50) => {
-    logger.chat.debug('loadMoreMessages', { roomId, cursor, limit });
+    logger.chat.debug("loadMoreMessages", { roomId, cursor, limit });
     if (get().isLoadingHistory) return;
 
     set({ isLoadingHistory: true });
@@ -184,7 +189,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
         hasMoreMessages: !!nextCursor,
       }));
     } catch (error) {
-      logger.chat.error('Failed to load more messages', { error: error instanceof Error ? error.message : error });
+      logger.chat.error("Failed to load more messages", {
+        error: error instanceof Error ? error.message : error,
+      });
     } finally {
       set({ isLoadingHistory: false });
     }
@@ -249,8 +256,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
     await socketService.sendTyping(roomId, isTyping);
   },
 
+  // Private flag to prevent duplicate listeners
+  _listenersSetup: false,
+
   connectSocket: async () => {
     await socketService.connect();
+
+    // Prevent duplicate listeners
+    if (get()._listenersSetup) {
+      return;
+    }
+
+    set({ _listenersSetup: true });
 
     // Set up event listeners
     socketService.onMessage((message) => {
@@ -264,7 +281,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
 
     socketService.onIssueAnalysis((analysis) => {
-      logger.chat.debug('Issue analysis received', { roomId: analysis.roomId, isIssue: analysis.isIssue });
+      logger.chat.debug("Issue analysis received", {
+        roomId: analysis.roomId,
+        isIssue: analysis.isIssue,
+      });
       // Only show if this is for the current room and is actually an issue
       if (analysis.isIssue && analysis.roomId === get().currentRoom?.id) {
         get().setPendingIssueAnalysis(analysis);
@@ -272,7 +292,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
 
     socketService.onError((error) => {
-      logger.chat.error('Socket error', { error });
+      logger.chat.error("Socket error", { error });
     });
   },
 
@@ -352,9 +372,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // Clear pending analysis
       get().dismissIssueAnalysis();
 
-      logger.chat.debug('Issue created successfully', { issueId: newIssue.id });
+      logger.chat.debug("Issue created successfully", { issueId: newIssue.id });
     } catch (error) {
-      logger.chat.error('Failed to create issue', {
+      logger.chat.error("Failed to create issue", {
         error: error instanceof Error ? error.message : error,
       });
       throw error;
