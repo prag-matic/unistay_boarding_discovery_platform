@@ -422,13 +422,7 @@ export default function MessagesScreen() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0}
       >
-        <SafeAreaView
-          edges={["top"]}
-          style={[
-            styles.container,
-            { backgroundColor: ISSUE_BACKGROUND_COLORS[backgroundType] },
-          ]}
-        >
+        <SafeAreaView edges={["top"]}>
           {/* Header */}
           <View style={styles.chatHeader}>
             <TouchableOpacity onPress={handleBackToHistory}>
