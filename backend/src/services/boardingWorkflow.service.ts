@@ -356,9 +356,12 @@ export class BoardingWorkflowService {
 			if (existing.ownerId.toString() !== ownerId) {
 				throw new ForbiddenError("You do not own this listing");
 			}
-			if (existing.status !== BoardingStatus.DRAFT) {
+			if (
+				existing.status !== BoardingStatus.DRAFT &&
+				existing.status !== BoardingStatus.PENDING_APPROVAL
+			) {
 				throw new InvalidStateTransitionError(
-					"Only DRAFT listings can be permanently deleted",
+					"Only DRAFT and PENDING_APPROVAL listings can be permanently deleted",
 				);
 			}
 
