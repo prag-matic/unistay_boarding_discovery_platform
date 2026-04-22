@@ -24,7 +24,7 @@ The Boardings API provides endpoints for managing accommodation listings. Featur
 ### Authentication Requirement
 - Most endpoints require JWT authentication via `Authorization: Bearer <token>` header
 - Public endpoints: Search, Get by slug
-- Owner-only endpoints: Create, Update, Submit, Activate, Deactivate, Image operations
+- Owner-only endpoints: Create, Update, Submit, Delete Draft, Activate, Deactivate, Image operations
 
 ### Authorization Roles
 - `OWNER`: Can create and manage boarding listings
@@ -1035,7 +1035,61 @@ Invalid state (400):
 
 ---
 
-### 7. Deactivate Boarding
+### 7. Permanently Delete Draft Boarding
+
+**Endpoint:** `DELETE /api/boardings/:id`
+
+**Description:** Permanently delete a draft boarding listing from the database. This action is irreversible and only applies to the owner’s own DRAFT listings.
+
+**Authentication:** ✅ Required (Bearer token)
+
+**Authorization:** `OWNER` role (must own the boarding)
+
+**Path Parameters:**
+
+| Parameter | Type | Required |
+|-----------|------|----------|
+| `id` | string | ✅ |
+
+**Request Example:**
+```bash
+DELETE /api/boardings/507f1f77bcf86cd799439011
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR...
+```
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Draft boarding permanently deleted",
+  "data": {
+    "id": "507f1f77bcf86cd799439011"
+  }
+}
+```
+
+**Business Logic:**
+- Only DRAFT boardings can be permanently deleted
+- Must be the boarding owner
+- Removes the boarding document and related draft data from the database
+- Deletes associated image records and best-effort Cloudinary assets
+
+**Validation Errors:**
+
+Invalid state (400):
+```json
+{
+  "success": false,
+  "error": {
+    "code": "INVALID_STATE_TRANSITION",
+    "message": "Only DRAFT listings can be permanently deleted"
+  }
+}
+```
+
+---
+
+### 8. Deactivate Boarding
 
 **Endpoint:** `PATCH /api/boardings/:id/deactivate`
 

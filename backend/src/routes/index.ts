@@ -57,9 +57,6 @@ router.use("/payments", paymentRoutes);
 // Review routes
 router.use("/reviews", reviewRoutes);
 
-// Boarding routes (review access via boarding)
-router.use("/boardings", reviewRoutes);
-
 // Chat Routes
 router.use("/chat", chatRoutes);
 

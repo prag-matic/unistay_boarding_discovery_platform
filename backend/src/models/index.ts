@@ -7,6 +7,8 @@ export {
 	BoardingStatusHistory,
 	type IBoardingStatusHistory,
 } from "./BoardingStatusHistory.js";
+export { ChatMessage, type IChatMessage } from "./ChatMessage.js";
+export { ChatRoom, type IChatRoom } from "./ChatRoom.js";
 export {
 	EmailVerificationToken,
 	type IEmailVerificationToken,

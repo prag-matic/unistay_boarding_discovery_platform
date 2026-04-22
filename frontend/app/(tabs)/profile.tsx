@@ -187,8 +187,23 @@ export default function ProfileScreen() {
               variant="primary"
               pill
             />
-            <Text style={styles.username}>@{user?.username ?? 'alex_t'}</Text>
+            <Badge
+              label={user?.isVerified ? 'Verified' : 'Not Verified'}
+              variant={user?.isVerified ? 'success' : 'warning'}
+              pill
+            />
+            {user?.username ? <Text style={styles.username}>@{user.username}</Text> : null}
           </View>
+          {!user?.isVerified && user?.email ? (
+            <TouchableOpacity
+              style={styles.verifyAction}
+              onPress={() =>
+                router.push({ pathname: '/(auth)/verify-email', params: { email: user.email } })
+              }
+            >
+              <Text style={styles.verifyActionText}>Verify email now</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         {/* Main Menu */}
@@ -239,6 +254,14 @@ const styles = StyleSheet.create({
   userName: { fontSize: 20, fontWeight: '700', color: COLORS.text, marginBottom: 8 },
   badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   username: { fontSize: 14, color: COLORS.textSecondary },
+  verifyAction: {
+    marginTop: 10,
+  },
+  verifyActionText: {
+    fontSize: 13,
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
   menuCard: {
     backgroundColor: COLORS.white,
     marginHorizontal: 16,

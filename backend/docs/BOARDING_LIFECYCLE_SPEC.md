@@ -1,6 +1,6 @@
 # Boarding Lifecycle & Governance Specification
 
-Version: `2026-04-07`
+Version: `2026-04-20`
 
 ## Authoritative state model
 
@@ -30,6 +30,7 @@ When owners edit an `ACTIVE` listing, it is automatically transitioned to `PENDI
 Owner:
 - Update: `DRAFT | REJECTED | INACTIVE | ACTIVE`
 - Submit for review: `DRAFT | REJECTED | INACTIVE -> PENDING_APPROVAL` (requires at least 1 image)
+- Permanent delete: `DRAFT -> deleted from DB` (owner-only)
 - Deactivate: `ACTIVE -> INACTIVE`
 - Reactivate: `INACTIVE -> ACTIVE`
 - Archive: allowed from `DRAFT | REJECTED | INACTIVE | ACTIVE` (`isDeleted=true`)

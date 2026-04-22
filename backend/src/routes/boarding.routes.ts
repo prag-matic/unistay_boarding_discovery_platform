@@ -1,20 +1,21 @@
 import type { Router } from "express";
 import { Router as createRouter } from "express";
 import {
-  activateBoarding,
-  archiveBoarding,
-  createBoarding,
-  deactivateBoarding,
-  deleteImage,
-  getBoardingStatusHistory,
-  getBoardingBySlug,
-  getBoardingLifecycleSpec,
-  getMyListings,
-  restoreBoarding,
-  searchBoardings,
-  submitBoarding,
-  updateBoarding,
-  uploadImages,
+	activateBoarding,
+	archiveBoarding,
+	createBoarding,
+	deactivateBoarding,
+	deleteBoarding,
+	deleteImage,
+	getBoardingStatusHistory,
+	getBoardingBySlug,
+	getBoardingLifecycleSpec,
+	getMyListings,
+	restoreBoarding,
+	searchBoardings,
+	submitBoarding,
+	updateBoarding,
+	uploadImages,
 } from "@/controllers/boarding.controller.js";
 import { authenticate, requireRole } from "@/middleware/auth.js";
 import { uploadBoardingImageMiddleware } from "@/middleware/upload.js";
@@ -54,6 +55,14 @@ router.put(
   validateParams(boardingIdParamSchema),
   validateBody(updateBoardingSchema),
   updateBoarding,
+);
+
+router.delete(
+	"/:id",
+	authenticate,
+	requireRole("OWNER"),
+	validateParams(boardingIdParamSchema),
+	deleteBoarding,
 );
 
 router.patch(

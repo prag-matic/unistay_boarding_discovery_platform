@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { createContext, useContext, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { api, type AuthUser } from '../services/api';
 
 interface AuthContextValue {
@@ -15,6 +15,13 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(api.getStoredAuthUser());
+
+  useEffect(() => {
+    if (!api.hasStoredAccessToken()) {
+      api.clearSession();
+      setUser(null);
+    }
+  }, []);
 
   const value = useMemo<AuthContextValue>(
     () => ({

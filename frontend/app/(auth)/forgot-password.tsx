@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -24,6 +24,13 @@ import { getErrorMessage } from '@/utils/helpers';
 type ForgotForm = z.infer<typeof forgotPasswordSchema>;
 
 export default function ForgotPasswordScreen() {
+  const { token } = useLocalSearchParams<{ token?: string }>();
+
+  useEffect(() => {
+    if (!token) return;
+    router.replace({ pathname: '/(auth)/reset-password', params: { token } });
+  }, [token]);
+
   const {
     control,
     handleSubmit,
