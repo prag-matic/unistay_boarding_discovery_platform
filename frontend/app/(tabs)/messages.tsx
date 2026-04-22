@@ -20,11 +20,11 @@ import { useChatStore } from "@/store/chat.store";
 import { useAuthStore } from "@/store/auth.store";
 import { ChatBubble } from "@/components/chat/ChatBubble";
 import { ChatInput } from "@/components/chat/ChatInput";
-import { IssueBanner } from "@/components/chat/IssueBanner";
 
 import {
   ISSUE_BACKGROUND_COLORS,
   ISSUE_BADGE_COLORS,
+  ISSUE_PRIORITY_COLORS,
 } from "@/types/chat.types";
 import type {
   ChatRoom,
@@ -416,13 +416,116 @@ export default function MessagesScreen() {
 
   // Show chat interface
   if (showChatInterface && currentRoom) {
+    const handleCloseIssue = async () => {
+      if (!currentIssue) return;
+
+      try {
+        const { updateIssue } = await import("@/lib/chat");
+        const response = await updateIssue(currentIssue.id, {
+          status: "RESOLVED",
+        });
+
+        if (response.success) {
+          useChatStore.getState().updateIssue(currentIssue.id, {
+            status: "RESOLVED",
+          });
+          Alert.alert("Success", "Issue marked as resolved");
+        }
+      } catch (error) {
+        Alert.alert("Error", "Failed to close issue");
+      }
+    };
+
+    const renderIssueCard = () => {
+      if (!currentIssue) return null;
+
+      const priorityInfo =
+        ISSUE_PRIORITY_COLORS[currentIssue.priority] ||
+        ISSUE_PRIORITY_COLORS.MEDIUM;
+
+      return (
+        <View
+          style={[
+            styles.issueCard,
+            {
+              backgroundColor:
+                ISSUE_BACKGROUND_COLORS[
+                  `issue_${currentIssue.category}` as keyof typeof ISSUE_BACKGROUND_COLORS
+                ] || ISSUE_BACKGROUND_COLORS.issue_other,
+            },
+          ]}
+        >
+          <View style={styles.issueCardHeader}>
+            <View
+              style={[
+                styles.issueCardBadge,
+                {
+                  backgroundColor:
+                    ISSUE_BADGE_COLORS[currentIssue.category]?.bg ||
+                    COLORS.gray,
+                },
+              ]}
+            >
+              <Text style={styles.issueCardBadgeText}>
+                {currentIssue.category.replace("_", " ")}
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.priorityBadge,
+                { backgroundColor: priorityInfo.bg },
+              ]}
+            >
+              <Text style={styles.priorityBadgeText}>
+                {currentIssue.priority}
+              </Text>
+            </View>
+          </View>
+
+          <Text style={styles.issueCardTitle}>{currentIssue.title}</Text>
+          <Text style={styles.issueCardDescription}>
+            {currentIssue.description}
+          </Text>
+
+          <View style={styles.issueCardFooter}>
+            <View style={styles.statusRow}>
+              <View
+                style={[
+                  styles.statusDot,
+                  { backgroundColor: getIssueStatusColor(currentIssue.status) },
+                ]}
+              />
+              <Text style={styles.statusText}>
+                Status: {currentIssue.status.replace("_", " ")}
+              </Text>
+            </View>
+
+            {currentIssue.status !== "RESOLVED" &&
+              currentIssue.status !== "CLOSED" && (
+                <TouchableOpacity
+                  style={styles.closeIssueBtn}
+                  onPress={handleCloseIssue}
+                >
+                  <Ionicons
+                    name="checkmark-circle-outline"
+                    size={18}
+                    color={COLORS.white}
+                  />
+                  <Text style={styles.closeIssueBtnText}>Mark Resolved</Text>
+                </TouchableOpacity>
+              )}
+          </View>
+        </View>
+      );
+    };
+
     return (
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0}
       >
-        <SafeAreaView edges={["top"]}>
+        <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
           {/* Header */}
           <View style={styles.chatHeader}>
             <TouchableOpacity onPress={handleBackToHistory}>
@@ -435,56 +538,12 @@ export default function MessagesScreen() {
                   ? currentRoom.participants.owner.firstName
                   : currentRoom.participants.student.firstName}
               </Text>
-              {currentIssue ? (
-                <View style={styles.headerIssueInfo}>
-                  <Ionicons name="warning" size={14} color={COLORS.primary} />
-                  <Text style={styles.headerIssueText} numberOfLines={1}>
-                    Issue: {currentIssue.title}
-                  </Text>
-                  <View
-                    style={[
-                      styles.headerIssueBadge,
-                      {
-                        backgroundColor:
-                          ISSUE_BADGE_COLORS[currentIssue.category]?.bg ||
-                          COLORS.gray,
-                      },
-                    ]}
-                  >
-                    <Text style={styles.headerIssueBadgeText}>
-                      {currentIssue.category.replace("_", " ")}
-                    </Text>
-                  </View>
-                </View>
-              ) : currentRoom.boardingId ? (
+              {currentRoom.boardingId ? (
                 <Text style={styles.headerSubtitle} numberOfLines={1}>
                   {currentRoom.boardingId.title}
                 </Text>
               ) : null}
             </View>
-
-            {currentIssue && (
-              <View style={styles.headerIssueStatusBadge}>
-                <View
-                  style={[
-                    styles.headerIssueStatus,
-                    {
-                      backgroundColor: COLORS.white,
-                      borderColor: getIssueStatusColor(currentIssue.status),
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.headerIssueStatusText,
-                      { color: getIssueStatusColor(currentIssue.status) },
-                    ]}
-                  >
-                    {currentIssue.status.replace("_", " ")}
-                  </Text>
-                </View>
-              </View>
-            )}
           </View>
 
           {/* Messages List */}
@@ -493,6 +552,7 @@ export default function MessagesScreen() {
             data={messages}
             renderItem={renderMessage}
             keyExtractor={(item) => item.id}
+            ListHeaderComponent={renderIssueCard}
             contentContainerStyle={styles.messagesList}
             ListEmptyComponent={
               <View style={styles.emptyMessages}>
@@ -955,5 +1015,93 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: COLORS.gray,
+  },
+  issueCard: {
+    margin: 16,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.grayBorder,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  issueCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  issueCardBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  issueCardBadgeText: {
+    color: COLORS.white,
+    fontSize: 10,
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
+  priorityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  priorityBadgeText: {
+    color: COLORS.white,
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  issueCardTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: COLORS.text,
+    marginBottom: 8,
+  },
+  issueCardDescription: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  issueCardFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderTopWidth: 1,
+    borderTopColor: "rgba(0,0,0,0.05)",
+    paddingTop: 12,
+  },
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: COLORS.textSecondary,
+  },
+  closeIssueBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  closeIssueBtnText: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: "700",
   },
 });
