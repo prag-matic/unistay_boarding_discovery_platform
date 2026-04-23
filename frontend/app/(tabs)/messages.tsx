@@ -71,6 +71,11 @@ export default function MessagesScreen() {
   const flatListRef = useRef<FlatList>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  const analyzedMessage = messages.find(
+    (m) => m.id === pendingIssueAnalysis?.messageId,
+  );
+  const isSender = analyzedMessage?.senderId === user?.id;
+
   useEffect(() => {
     loadChatRooms();
     // Don't connect socket on mount - connect only when user starts chatting
@@ -229,7 +234,7 @@ export default function MessagesScreen() {
   const filteredRooms = searchQuery
     ? chatRooms.filter((room) => {
         const otherUser =
-          user?.role === "STUDENT"
+          room.participants.student.id === user?.id
             ? room.participants.owner
             : room.participants.student;
         return (
@@ -244,7 +249,7 @@ export default function MessagesScreen() {
   const renderRoom = useCallback(
     ({ item }: { item: ChatRoom }) => {
       const otherUser =
-        user?.role === "STUDENT"
+        item.participants.student.id === user?.id
           ? item.participants.owner
           : item.participants.student;
       const lastMessage = item.lastMessage;
@@ -501,7 +506,9 @@ export default function MessagesScreen() {
             </View>
 
             {currentIssue.status !== "RESOLVED" &&
-              currentIssue.status !== "CLOSED" && (
+              currentIssue.status !== "CLOSED" &&
+              ((currentIssue.reportedBy as any).id === user?.id ||
+                (currentIssue.reportedBy as any)._id === user?.id) && (
                 <TouchableOpacity
                   style={styles.closeIssueBtn}
                   onPress={handleCloseIssue}
@@ -534,7 +541,7 @@ export default function MessagesScreen() {
 
             <View style={styles.headerInfo}>
               <Text style={styles.headerTitle}>
-                {user?.role === "STUDENT"
+                {currentRoom.participants.student.id === user?.id
                   ? currentRoom.participants.owner.firstName
                   : currentRoom.participants.student.firstName}
               </Text>
@@ -598,7 +605,7 @@ export default function MessagesScreen() {
 
           {/* Issue Upgrade Modal */}
           <IssueUpgradeModal
-            visible={!!pendingIssueAnalysis}
+            visible={!!pendingIssueAnalysis && isSender}
             analysis={pendingIssueAnalysis}
             onUpgrade={async (title, description) => {
               if (pendingIssueAnalysis) {
@@ -667,7 +674,7 @@ export default function MessagesScreen() {
 
       {/* Issue Upgrade Modal */}
       <IssueUpgradeModal
-        visible={!!pendingIssueAnalysis}
+        visible={!!pendingIssueAnalysis && isSender}
         analysis={pendingIssueAnalysis}
         onUpgrade={async (title, description) => {
           if (pendingIssueAnalysis) {
