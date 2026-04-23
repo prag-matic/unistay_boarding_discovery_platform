@@ -21,7 +21,7 @@ const BOARDING_ALLOWED_MIME_TYPES = [
   "image/heif",
 ];
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
-export const MAX_BOARDING_IMAGES = 8;
+export const MAX_BOARDING_IMAGES = 10;
 export const MAX_MARKETPLACE_IMAGES = 4;
 
 // Configure multer for memory storage (files stored in Buffer)
