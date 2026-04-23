@@ -68,6 +68,13 @@ export async function createIssue(
       throw new NotFoundError("Message not found in this chat room");
     }
 
+    // Only the sender of the message can create an issue from it
+    if (message.senderId.toString() !== req.user.userId) {
+      throw new ForbiddenError(
+        "Only the sender of the message can convert it to a formal issue",
+      );
+    }
+
     // Get recent message context (last 10 messages)
     const recentMessages = await ChatMessage.find({
       roomId: new Types.ObjectId(roomId),
@@ -168,17 +175,26 @@ export async function getIssues(
     // Build query based on user role
     const query: Record<string, unknown> = {};
 
-    if (userRole === "STUDENT") {
-      // Students can only see issues they reported or were assigned to them
-      query.$or = [{ reportedBy: userId }, { assignedTo: userId }];
-    } else if (userRole === "OWNER") {
-      // Owners can see all issues for their boarding houses
-      // Get all chat rooms where the user is an owner
-      const ownerChatRooms = await ChatRoom.find({
-        "participants.owner": userId,
+    if (userRole === "STUDENT" || userRole === "OWNER") {
+      // Get all chat rooms where the user is a participant
+      const userChatRooms = await ChatRoom.find({
+        $or: [
+          { "participants.student": userId },
+          { "participants.owner": userId },
+        ],
       }).distinct("_id");
 
-      query.roomId = { $in: ownerChatRooms };
+      if (userRole === "STUDENT") {
+        // Students can see issues they reported, were assigned to them, or for their chat rooms
+        query.$or = [
+          { roomId: { $in: userChatRooms } },
+          { reportedBy: userId },
+          { assignedTo: userId },
+        ];
+      } else {
+        // Owners can see all issues for their chat rooms
+        query.roomId = { $in: userChatRooms };
+      }
     } else if (userRole === "ADMIN") {
       // Admins can see all issues
     } else {
@@ -279,28 +295,23 @@ export async function getIssue(
     if (!issue) {
       throw new NotFoundError("Issue not found");
     }
-
     // Verify user has access to this issue
     const userRole = req.user.role;
     const isReporter = issue.reportedBy._id.toString() === req.user.userId;
     const isAssignee = issue.assignedTo?._id.toString() === req.user.userId;
 
-    if (userRole === "STUDENT" && !isReporter && !isAssignee) {
-      throw new ForbiddenError("You don't have access to this issue");
+    // Verify user is a participant of the chat room
+    const chatRoom = await ChatRoom.findById(issue.roomId._id);
+    if (!chatRoom) {
+      throw new NotFoundError("Chat room not found for this issue");
     }
 
-    if (userRole === "OWNER") {
-      // Verify owner is part of the chat room
-      const chatRoom = await ChatRoom.findById(issue.roomId._id);
-      if (!chatRoom) {
-        throw new NotFoundError("Chat room not found");
-      }
+    const isParticipant =
+      chatRoom.participants.student.toString() === req.user.userId ||
+      chatRoom.participants.owner.toString() === req.user.userId;
 
-      const isOwner =
-        chatRoom.participants.owner.toString() === req.user.userId;
-      if (!isOwner) {
-        throw new ForbiddenError("You don't have access to this issue");
-      }
+    if (userRole !== "ADMIN" && !isReporter && !isAssignee && !isParticipant) {
+      throw new ForbiddenError("You don't have access to this issue");
     }
 
     sendSuccess(res, issue);
@@ -349,6 +360,16 @@ export async function updateIssue(
       if (!["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"].includes(status)) {
         throw new BadRequestError("Invalid status value");
       }
+
+      // Only the reporter or an admin can resolve/close an issue
+      if (
+        (status === "RESOLVED" || status === "CLOSED") &&
+        !isReporter &&
+        userRole !== "ADMIN"
+      ) {
+        throw new ForbiddenError("Only the creator of the issue can close it");
+      }
+
       update.status = status;
 
       if (status === "RESOLVED" || status === "CLOSED") {
