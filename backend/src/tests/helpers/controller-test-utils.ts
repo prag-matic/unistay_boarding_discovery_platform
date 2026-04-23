@@ -53,6 +53,10 @@ export function makeReq(overrides: Partial<Request> = {}): Request {
 
 export function makeRes(): Response {
 	const json = vi.fn();
-	const status = vi.fn(() => ({ json }));
-	return { status, json } as unknown as Response;
+	const send = vi.fn();
+	const redirect = vi.fn();
+	const type = vi.fn(() => ({ set, send }));
+	const set = vi.fn(() => ({ send }));
+	const status = vi.fn(() => ({ json, type, set, send, redirect }));
+	return { status, json, type, set, send, redirect } as unknown as Response;
 }
