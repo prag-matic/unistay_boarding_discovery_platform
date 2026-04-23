@@ -2,6 +2,11 @@ import cors from "cors";
 import type { Application, Request, Response } from "express";
 import express from "express";
 import helmet from "helmet";
+import {
+  serveChangePasswordPage,
+  serveForgotPasswordPage,
+  serveResetPasswordLandingPage,
+} from "./controllers/auth.controller.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import router from "./routes/index.js";
 
@@ -16,6 +21,11 @@ app.use(cors());
 // Body parsing
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Password reset UI routes
+app.get("/forgot-password", serveForgotPasswordPage);
+app.get("/reset-password", serveResetPasswordLandingPage);
+app.get("/change-password", serveChangePasswordPage);
 
 // API routes
 app.use("/api", router);
