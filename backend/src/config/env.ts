@@ -39,19 +39,13 @@ export const config = {
   },
 
   cloudinary: {
-    cloudName: optional("CLOUDINARY_CLOUD_NAME", ""),
-    apiKey: optional("CLOUDINARY_API_KEY", ""),
-    apiSecret: optional("CLOUDINARY_API_SECRET", ""),
+    cloudName: required("CLOUDINARY_CLOUD_NAME"),
+    apiKey: required("CLOUDINARY_API_KEY"),
+    apiSecret: required("CLOUDINARY_API_SECRET"),
     uploadFolder: optional(
       "CLOUDINARY_UPLOAD_FOLDER",
       "unistay/profile-images",
     ),
-  },
-
-  openinary: {
-    baseUrl: optional("OPENINARY_URL", "http://localhost:3001"),
-    publicUrl: optional("OPENINARY_PUBLIC_URL", "http://localhost:3001"),
-    apiKey: optional("OPENINARY_API_KEY", ""),
   },
 
   openrouter: {
