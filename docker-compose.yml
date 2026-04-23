@@ -25,15 +25,12 @@ services:
     networks:
       - unistay-backend
       - unistay-admin
-      - unistay-openinary
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: unistay_backend
-    environment:
-      - OPENINARY_PUBLIC_URL=https://openinary.unistay.mrbhanuka.dev
     env_file:
       - .env
     depends_on:
@@ -114,88 +111,11 @@ services:
     networks:
       - unistay-backend
 
-  minio:
-    image: minio/minio:latest
-    container_name: unistay_minio
-    env_file:
-      - .env
-    volumes:
-      - minio_data:/data
-    command: server /data --console-address ":9001"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    networks:
-      - unistay-openinary
-
-  create-bucket:
-    image: minio/mc:latest
-    container_name: unistay_create_bucket
-    depends_on:
-      minio:
-        condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD} || exit 1;
-      mc mb -p myminio/${MINIO_BUCKET} || exit 0;
-      mc anonymous set download myminio/${MINIO_BUCKET} || exit 0;
-      exit 0;
-      "
-    networks:
-      - unistay-openinary
-
-  openinary:
-    image: openinary/openinary:latest
-    container_name: unistay_openinary
-    environment:
-      - API_SECRET=${OPENINARY_API_KEY}
-      - STORAGE_REGION=${MINIO_REGION}
-      - STORAGE_ACCESS_KEY_ID=${MINIO_ROOT_USER}
-      - STORAGE_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
-      - STORAGE_BUCKET_NAME=${MINIO_BUCKET}
-      - STORAGE_ENDPOINT=http://minio:9000
-      - BETTER_AUTH_URL=https://openinary.unistay.mrbhanuka.dev
-    depends_on:
-      minio:
-        condition: service_healthy
-      create-bucket:
-        condition: service_completed_successfully
-    volumes:
-      - openinary_db:/app/data
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "python3",
-          "-c",
-          "import urllib.request; urllib.request.urlopen('http://localhost:3000')",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
-    networks:
-      - unistay-openinary
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.openinary.rule=Host(`openinary.unistay.mrbhanuka.dev`)"
-      - "traefik.http.routers.openinary.entrypoints=websecure"
-      - "traefik.http.routers.openinary.tls=true"
-      - "traefik.http.routers.openinary.tls.certresolver=unistay-resolver"
-      - "traefik.http.services.openinary.loadbalancer.server.port=3000"
-      - "traefik.docker.network=unistay-openinary"
-
 networks:
   unistay-backend:
     name: unistay-backend
   unistay-admin:
     name: unistay-admin
-  unistay-openinary:
-    name: unistay-openinary
 
 volumes:
   mongodb_data:
-  minio_data:
-  openinary_db:
