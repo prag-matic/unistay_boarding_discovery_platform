@@ -6,7 +6,7 @@
 //   "Maps SDK for Android" and "Maps SDK for iOS" enabled.
 //   Copy .env.example → .env and fill in the key before running the app.
 
-const googleMapsApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
+const googleMapsApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? 'AIzaSyAfTSyzBlcbcR__wGVIZDdMWaHtNlzlD4Q';
 
 /** @type {import('expo/config').ExpoConfig} */
 export default {
