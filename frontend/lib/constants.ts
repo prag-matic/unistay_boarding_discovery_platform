@@ -19,8 +19,7 @@ export const COLORS = {
 };
 
 // API URL from environment variable or default to localhost
-export const API_URL =
-  process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000/api";
+export const API_URL = "https://backend.unistay.mrbhanuka.dev/api";
 
 export const STORAGE_KEYS = {
   TOKEN: "unistay_token",
