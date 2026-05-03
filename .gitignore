@@ -3,3 +3,5 @@ frontend/.expo
 *.pem
 .env
 letsencrypt/
+change_auth.fish
+teammates.txt
