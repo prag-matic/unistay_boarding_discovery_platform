@@ -5,3 +5,5 @@ frontend/.expo
 letsencrypt/
 change_auth.fish
 teammates.txt
+go.mod
+main.go
