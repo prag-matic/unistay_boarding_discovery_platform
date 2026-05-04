@@ -110,6 +110,14 @@ services:
       retries: 5
     networks:
       - unistay-backend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.tcp.routers.mongodb.rule=HostSNI(`db.unistay.mrbhanuka.dev`)"
+      - "traefik.tcp.routers.mongodb.entrypoints=websecure"
+      - "traefik.tcp.routers.mongodb.tls=true"
+      - "traefik.tcp.routers.mongodb.tls.certresolver=unistay-resolver"
+      - "traefik.tcp.services.mongodb.loadbalancer.server.port=27017"
+      - "traefik.docker.network=unistay-backend"
 
 networks:
   unistay-backend:
